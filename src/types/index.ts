@@ -24,6 +24,7 @@ export interface UserProfile {
   role: Role;
   area: string;
   cargo: string;
+  pais: Pais | null;           // País del usuario (determina jerarquía comercial)
   managerId: string | null;    // UID del jefe directo; null = sin jefe
   managerName: string | null;  // Nombre del jefe (desnormalizado para evitar joins)
   createdAt: Timestamp;

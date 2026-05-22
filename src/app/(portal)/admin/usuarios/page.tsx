@@ -17,7 +17,7 @@ import {
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { usersCol, db } from "@/lib/firebase/firestore";
-import { UserProfile, Role } from "@/types";
+import { UserProfile, Role, Pais } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
@@ -44,6 +44,9 @@ import {
 import { Users, UserPlus, Loader2, GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { AREAS, getCargoOptions, resolveManager } from "@/constants/hierarchy";
+
+const PAISES: Pais[] = ["Guatemala", "El Salvador", "Honduras", "México"];
 
 export default function AdminUsuariosPage() {
   const { userProfile } = useAuth();
@@ -59,8 +62,20 @@ export default function AdminUsuariosPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("colaborador");
   const [area, setArea] = useState("");
+  const [pais, setPais] = useState("");
   const [cargo, setCargo] = useState("");
-  const [managerId, setManagerId] = useState<string>("");
+
+  // Dynamic cargo options based on area + pais
+  const cargoOptions = getCargoOptions(area, pais || null);
+
+  function handleAreaChange(v: string | null) {
+    setArea(v ?? "");
+    setCargo("");
+  }
+  function handlePaisChange(v: string | null) {
+    setPais(v ?? "");
+    setCargo("");
+  }
 
   const loadUsers = useCallback(async () => {
     const snap = await getDocs(query(usersCol(), orderBy("displayName")));
@@ -83,8 +98,8 @@ export default function AdminUsuariosPage() {
     setPassword("");
     setRole("colaborador");
     setArea("");
+    setPais("");
     setCargo("");
-    setManagerId("");
   }
 
   async function handleCreateUser() {
@@ -96,6 +111,9 @@ export default function AdminUsuariosPage() {
       toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
+    if (!area) { toast.error("Selecciona un área"); return; }
+    if (area === "Comercial" && !pais) { toast.error("Selecciona un país"); return; }
+    if (!cargo) { toast.error("Selecciona un cargo"); return; }
 
     setCreating(true);
 
@@ -121,20 +139,20 @@ export default function AdminUsuariosPage() {
       );
       await updateProfile(cred.user, { displayName: displayName.trim() });
 
-      // Resolve manager name from selected UID
-      const selectedManager = managerId
-        ? users.find((u) => u.uid === managerId)
-        : null;
+      // Auto-resolve manager from existing users in Firestore
+      const { managerId: resolvedManagerId, managerName: resolvedManagerName } =
+        resolveManager(users, area, pais || null, cargo);
 
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         displayName: displayName.trim(),
         email: email.trim().toLowerCase(),
         role,
-        area: area.trim(),
-        cargo: cargo.trim(),
-        managerId: selectedManager?.uid ?? null,
-        managerName: selectedManager?.displayName ?? null,
+        area,
+        cargo,
+        pais: pais || null,
+        managerId: resolvedManagerId,
+        managerName: resolvedManagerName,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
@@ -204,6 +222,9 @@ export default function AdminUsuariosPage() {
                   Área / Cargo
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  País
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Jefe directo
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -239,6 +260,9 @@ export default function AdminUsuariosPage() {
                   <td className="px-4 py-3">
                     <p className="font-medium">{user.area || "—"}</p>
                     <p className="text-xs text-muted-foreground">{user.cargo || "—"}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {user.pais || "—"}
                   </td>
                   <td className="px-4 py-3">
                     {user.managerName ? (
@@ -323,57 +347,66 @@ export default function AdminUsuariosPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">Área</Label>
-                <Input
-                  placeholder="Recursos Humanos"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  disabled={creating}
-                />
+                <Label className="text-sm">Área *</Label>
+                <Select value={area} onValueChange={handleAreaChange} disabled={creating}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar área..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AREAS.map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-sm">Cargo</Label>
-                <Input
-                  placeholder="Gerente"
-                  value={cargo}
-                  onChange={(e) => setCargo(e.target.value)}
-                  disabled={creating}
-                />
+                <Label className="text-sm">
+                  País {area === "Comercial" ? "*" : <span className="text-muted-foreground">(opcional)</span>}
+                </Label>
+                <Select value={pais} onValueChange={handlePaisChange} disabled={creating}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar país..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAISES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
+                <Label className="text-sm">Cargo *</Label>
+                <Select
+                  value={cargo}
+                  onValueChange={(v) => setCargo(v ?? "")}
+                  disabled={creating || cargoOptions.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !area ? "Selecciona área primero" :
+                      area === "Comercial" && !pais ? "Selecciona país primero" :
+                      "Seleccionar cargo..."
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cargoOptions.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-sm">Rol *</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={creating}>
+                <Select value={role} onValueChange={(v) => { if (v) setRole(v as Role); }} disabled={creating}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="administrador">Administrador</SelectItem>
                     <SelectItem value="colaborador">Colaborador</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm">Jefe directo</Label>
-                <Select
-                  value={managerId}
-                  onValueChange={(v) => setManagerId(!v || v === "none" ? "" : v)}
-                  disabled={creating}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin jefe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin jefe directo</SelectItem>
-                    {users.map((u) => (
-                      <SelectItem key={u.uid} value={u.uid}>
-                        {u.displayName}
-                        {u.cargo ? ` · ${u.cargo}` : ""}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>

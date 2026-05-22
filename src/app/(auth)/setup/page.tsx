@@ -21,31 +21,53 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, CheckCircle2, LogIn, Users, GitBranch } from "lucide-react";
+import { Loader2, UserPlus, CheckCircle2, LogIn, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Role } from "@/types";
+import { Pais, Role } from "@/types";
 import Image from "next/image";
 import { ROUTES } from "@/constants/routes";
+import { AREAS, getCargoOptions, resolveManager } from "@/constants/hierarchy";
+
+const PAISES: Pais[] = ["Guatemala", "El Salvador", "Honduras", "México"];
 
 interface CreatedUser {
-  uid: string;           // needed so children can reference this as managerId
+  uid: string;
   displayName: string;
   email: string;
   role: Role;
+  area: string;
+  cargo: string;
+  pais: string | null;
 }
 
 export default function SetupPage() {
   const router = useRouter();
+
+  // Form state
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("colaborador");
   const [area, setArea] = useState("");
+  const [pais, setPais] = useState("");
   const [cargo, setCargo] = useState("");
-  const [managerId, setManagerId] = useState<string>("");
+
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedUser[]>([]);
+
+  // Dynamic cargo options
+  const cargoOptions = getCargoOptions(area, pais || null);
+
+  // Reset cargo when area or pais changes
+  function handleAreaChange(v: string | null) {
+    setArea(v ?? "");
+    setCargo("");
+  }
+  function handlePaisChange(v: string | null) {
+    setPais(v ?? "");
+    setCargo("");
+  }
 
   async function handleCreate() {
     if (!displayName.trim() || !email.trim() || !password.trim()) {
@@ -56,35 +78,51 @@ export default function SetupPage() {
       toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
+    if (!area) { toast.error("Selecciona un área"); return; }
+    if (area === "Comercial" && !pais) { toast.error("Selecciona un país"); return; }
+    if (!cargo) { toast.error("Selecciona un cargo"); return; }
 
     setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(cred.user, { displayName: displayName.trim() });
 
-      const selectedManager = managerId
-        ? created.find((u) => u.uid === managerId)
-        : null;
+      // Auto-resolve manager from already-created users in this session
+      const { managerId, managerName } = resolveManager(
+        created,
+        area,
+        pais || null,
+        cargo
+      );
 
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         displayName: displayName.trim(),
         email: email.trim().toLowerCase(),
         role,
-        area: area.trim(),
-        cargo: cargo.trim(),
-        managerId: selectedManager?.uid ?? null,
-        managerName: selectedManager?.displayName ?? null,
+        area,
+        cargo,
+        pais: pais || null,
+        managerId,
+        managerName,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
 
-      // Sign out so next user can be created with a fresh auth state
+      // Sign out so the next user can be created
       await signOut(auth);
 
       setCreated((prev) => [
         ...prev,
-        { uid: cred.user.uid, displayName: displayName.trim(), email: email.trim(), role },
+        {
+          uid: cred.user.uid,
+          displayName: displayName.trim(),
+          email: email.trim(),
+          role,
+          area,
+          cargo,
+          pais: pais || null,
+        },
       ]);
 
       // Reset form
@@ -93,10 +131,10 @@ export default function SetupPage() {
       setPassword("");
       setRole("colaborador");
       setArea("");
+      setPais("");
       setCargo("");
-      setManagerId("");
 
-      toast.success(`Usuario "${displayName.trim()}" creado exitosamente`);
+      toast.success(`Usuario "${displayName.trim()}" creado`);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code;
       if (code === "auth/email-already-in-use") {
@@ -125,7 +163,7 @@ export default function SetupPage() {
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold text-foreground">Configuración inicial</h1>
           <p className="text-sm text-muted-foreground">
-            Crea los usuarios del portal. Puedes agregar tantos como necesites antes de iniciar sesión.
+            Crea los usuarios del portal en orden jerárquico (directores primero).
           </p>
         </div>
 
@@ -135,7 +173,7 @@ export default function SetupPage() {
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border border-border bg-card p-4 space-y-2"
+              className="rounded-xl border border-border bg-card p-4"
             >
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
                 <Users className="h-4 w-4 text-muted-foreground" />
@@ -152,8 +190,10 @@ export default function SetupPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">{u.displayName}</p>
-                      <p className="text-xs text-muted-foreground">{u.email}</p>
+                      <p className="text-sm font-medium">{u.displayName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {u.cargo} · {u.area}{u.pais ? ` · ${u.pais}` : ""}
+                      </p>
                     </div>
                   </div>
                   <Badge
@@ -175,76 +215,95 @@ export default function SetupPage() {
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* Nombre */}
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="text-sm">Nombre completo *</Label>
               <Input placeholder="Ana García" value={displayName} onChange={(e) => setDisplayName(e.target.value)} disabled={loading} />
             </div>
 
+            {/* Correo + Contraseña */}
             <div className="space-y-1.5">
               <Label className="text-sm">Correo electrónico *</Label>
               <Input type="email" placeholder="ana@ferco.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-sm">Contraseña *</Label>
               <Input type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
             </div>
 
+            {/* Área + País */}
             <div className="space-y-1.5">
-              <Label className="text-sm">Área</Label>
-              <Input placeholder="Recursos Humanos" value={area} onChange={(e) => setArea(e.target.value)} disabled={loading} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm">Cargo</Label>
-              <Input placeholder="Gerente de RR.HH." value={cargo} onChange={(e) => setCargo(e.target.value)} disabled={loading} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm">Rol *</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={loading}>
+              <Label className="text-sm">Área *</Label>
+              <Select value={area} onValueChange={handleAreaChange} disabled={loading}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar área..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="administrador">Administrador — puede mover solicitudes y ver todo</SelectItem>
-                  <SelectItem value="colaborador">Colaborador — puede crear solicitudes y comentar</SelectItem>
+                  {AREAS.map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                País {area === "Comercial" ? "*" : <span className="text-muted-foreground">(opcional)</span>}
+              </Label>
+              <Select
+                value={pais}
+                onValueChange={handlePaisChange}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar país..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAISES.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Jefe directo — populated from already-created users */}
+            {/* Cargo + Rol */}
             <div className="space-y-1.5">
-              <Label className="text-sm flex items-center gap-1.5">
-                <GitBranch className="h-3.5 w-3.5" />
-                Jefe directo
-              </Label>
+              <Label className="text-sm">Cargo *</Label>
               <Select
-                value={managerId}
-                onValueChange={(v) => setManagerId(!v || v === "none" ? "" : v)}
-                disabled={loading || created.length === 0}
+                value={cargo}
+                onValueChange={(v) => setCargo(v ?? "")}
+                disabled={loading || cargoOptions.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={created.length === 0 ? "Crea más usuarios primero" : "Sin jefe directo"} />
+                  <SelectValue placeholder={
+                    !area ? "Selecciona área primero" :
+                    area === "Comercial" && !pais ? "Selecciona país primero" :
+                    "Seleccionar cargo..."
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin jefe directo</SelectItem>
-                  {created.map((u) => (
-                    <SelectItem key={u.uid} value={u.uid}>
-                      {u.displayName} · {u.role === "administrador" ? "Admin" : "Colaborador"}
-                    </SelectItem>
+                  {cargoOptions.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Rol *</Label>
+              <Select value={role} onValueChange={(v) => { if (v) setRole(v as Role); }} disabled={loading}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="administrador">Administrador</SelectItem>
+                  <SelectItem value="colaborador">Colaborador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <Button className="w-full" onClick={handleCreate} disabled={loading}>
-            {loading ? (
-              <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creando usuario...</>
-            ) : (
-              <><UserPlus className="h-4 w-4 mr-2" />Crear usuario</>
-            )}
+            {loading
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creando usuario...</>
+              : <><UserPlus className="h-4 w-4 mr-2" />Crear usuario</>
+            }
           </Button>
         </div>
 
@@ -256,7 +315,7 @@ export default function SetupPage() {
               Listo — ir al login
             </Button>
             <p className="text-xs text-center text-muted-foreground mt-2">
-              Inicia sesión con cualquiera de los usuarios que acabas de crear.
+              Inicia sesión con cualquiera de los usuarios creados.
             </p>
           </motion.div>
         )}
