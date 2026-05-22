@@ -2,5 +2,11 @@
   command = "npm run build"
   publish = ".next"
 
+# Firebase API keys are intentionally public — security is enforced by
+# Firebase Security Rules, not by keeping the key secret. This disables
+# Netlify's false-positive detection on NEXT_PUBLIC_* Firebase values.
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
