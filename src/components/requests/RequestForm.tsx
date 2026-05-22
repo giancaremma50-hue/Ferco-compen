@@ -138,61 +138,86 @@ export function RequestForm() {
     try {
       const requestNumber = generateRequestNumber();
 
-      // Upload files first
-      const attachments = await Promise.all(
-        files.map(async (file) => {
-          const tempId = nanoid();
-          const { storageUrl } = await uploadFile(
-            file,
-            tempId,
-            userProfile.uid
+      // ── Step 1: Upload files (non-fatal — proceed without files if Storage fails) ──
+      let attachments: {
+        id: string;
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+        storageUrl: string;
+        uploadedBy: string;
+        uploadedAt: Timestamp;
+      }[] = [];
+
+      if (files.length > 0) {
+        try {
+          attachments = await Promise.all(
+            files.map(async (file) => {
+              const tempId = nanoid();
+              const { storageUrl } = await uploadFile(file, tempId, userProfile.uid);
+              return {
+                id: nanoid(),
+                fileName: file.name,
+                fileType: file.type,
+                fileSize: file.size,
+                storageUrl,
+                uploadedBy: userProfile.uid,
+                uploadedAt: Timestamp.now(),
+              };
+            })
           );
-          return {
-            id: nanoid(),
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            storageUrl,
-            uploadedBy: userProfile.uid,
-            uploadedAt: Timestamp.now(),
-          };
-        })
-      );
+        } catch (uploadErr) {
+          console.error("[RequestForm] Storage upload failed:", uploadErr);
+          toast.warning("Los archivos adjuntos no pudieron subirse. La solicitud se creará sin ellos.");
+          attachments = [];
+        }
+      }
 
-      // Create the request doc
-      const requestRef = await addDoc(requestsCol(), {
-        requestNumber,
-        createdBy: userProfile.uid,
-        creatorName: userProfile.displayName,
-        ...data,
-        attachments,
-        stage: "en_analisis",
-        commentCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // Notify all admins
-      const adminUids = await getAdminUids();
-      const recipients = adminUids.filter((uid) => uid !== userProfile.uid);
-      if (recipients.length > 0) {
-        const batch = writeBatch(db);
-        await createNotifications(batch, recipients, {
-          type: "new_request",
-          requestId: requestRef.id,
+      // ── Step 2: Create the request document in Firestore ──
+      let requestRef: { id: string };
+      try {
+        requestRef = await addDoc(requestsCol(), {
           requestNumber,
-          requestTitle: data.detalleMovimiento,
-          fromUserId: userProfile.uid,
-          fromUserName: userProfile.displayName,
+          createdBy: userProfile.uid,
+          creatorName: userProfile.displayName,
+          ...data,
+          attachments,
+          stage: "en_analisis",
+          commentCount: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-        await batch.commit();
+      } catch (firestoreErr) {
+        console.error("[RequestForm] Firestore write failed:", firestoreErr);
+        toast.error("Error al guardar la solicitud. Verifica tu conexión e inténtalo de nuevo.");
+        return;
+      }
+
+      // ── Step 3: Notify admins (non-fatal) ──
+      try {
+        const adminUids = await getAdminUids();
+        const recipients = adminUids.filter((uid) => uid !== userProfile.uid);
+        if (recipients.length > 0) {
+          const batch = writeBatch(db);
+          await createNotifications(batch, recipients, {
+            type: "new_request",
+            requestId: requestRef.id,
+            requestNumber,
+            requestTitle: data.detalleMovimiento,
+            fromUserId: userProfile.uid,
+            fromUserName: userProfile.displayName,
+          });
+          await batch.commit();
+        }
+      } catch (notifErr) {
+        console.warn("[RequestForm] Notification dispatch failed (non-fatal):", notifErr);
       }
 
       toast.success("Solicitud creada exitosamente");
       router.push(ROUTES.SOLICITUD_DETALLE(requestRef.id));
     } catch (err) {
-      console.error(err);
-      toast.error("Error al crear la solicitud. Inténtalo de nuevo.");
+      console.error("[RequestForm] Unexpected error:", err);
+      toast.error("Error inesperado. Inténtalo de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
