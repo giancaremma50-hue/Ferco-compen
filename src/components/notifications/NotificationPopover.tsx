@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Notification } from "@/types";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,7 @@ export function NotificationPopover({
   children,
 }: NotificationPopoverProps) {
   const { userProfile } = useAuth();
+  const [open, setOpen] = useState(false);
 
   async function handleMarkAllRead() {
     if (!userProfile) return;
@@ -35,7 +37,7 @@ export function NotificationPopover({
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0" sideOffset={8}>
         {/* Header */}
@@ -73,7 +75,12 @@ export function NotificationPopover({
             </div>
           ) : (
             notifications.map((n) => (
-              <NotificationItem key={n.id} notification={n} onRead={handleRead} />
+              <NotificationItem
+                key={n.id}
+                notification={n}
+                onRead={handleRead}
+                onClose={() => setOpen(false)}
+              />
             ))
           )}
         </div>

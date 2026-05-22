@@ -27,9 +27,10 @@ function timeAgo(date: Date): string {
 interface NotificationItemProps {
   notification: Notification;
   onRead: (id: string) => void;
+  onClose?: () => void;
 }
 
-export function NotificationItem({ notification, onRead }: NotificationItemProps) {
+export function NotificationItem({ notification, onRead, onClose }: NotificationItemProps) {
   const date = notification.createdAt?.toDate?.();
   const stageConfig = notification.newStage ? STAGE_MAP.get(notification.newStage) : null;
 
@@ -43,11 +44,11 @@ export function NotificationItem({ notification, onRead }: NotificationItemProps
   return (
     <Link
       href={ROUTES.SOLICITUD_DETALLE(notification.requestId)}
-      onClick={() => onRead(notification.id)}
+      onClick={() => { onRead(notification.id); onClose?.(); }}
       className={cn(
-        "flex gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer",
+        "flex gap-3 px-3 py-3 rounded-lg transition-all cursor-pointer",
         notification.read
-          ? "hover:bg-muted/50"
+          ? "opacity-50 hover:opacity-80 hover:bg-muted/50"
           : "bg-primary/5 hover:bg-primary/10"
       )}
     >

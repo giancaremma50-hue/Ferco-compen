@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, X, File as FileIcon } from "lucide-react";
+import { Paperclip, Upload, X, File as FileIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +33,7 @@ export function FileUploadZone({
     [files, maxFiles, onFilesChange]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     maxFiles: maxFiles - files.length,
     maxSize: maxSizeMB * 1024 * 1024,
@@ -48,30 +48,37 @@ export function FileUploadZone({
       <div
         {...getRootProps()}
         className={cn(
-          "relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors duration-200",
+          "relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors duration-200",
           isDragActive
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-primary/50 hover:bg-muted/50"
+            ? "border-primary bg-primary/5 cursor-copy"
+            : "border-border hover:border-primary/50 hover:bg-muted/50 cursor-default"
         )}
       >
         <input {...getInputProps()} />
         <Upload
           className={cn(
-            "h-8 w-8 mb-2 transition-colors",
+            "h-7 w-7 transition-colors",
             isDragActive ? "text-primary" : "text-muted-foreground"
           )}
         />
-        <p className="text-sm text-muted-foreground">
-          {isDragActive ? (
-            "Suelta los archivos aquí"
-          ) : (
-            <>
-              <span className="font-medium text-foreground">Haz clic</span> o
-              arrastra archivos aquí
-            </>
-          )}
-        </p>
-        <p className="text-xs text-muted-foreground/70 mt-1">
+
+        {isDragActive ? (
+          <p className="text-sm font-medium text-primary">Suelta los archivos aquí</p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">Arrastra archivos aquí, o</p>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); open(); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-muted transition-colors"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              Adjuntar archivo
+            </button>
+          </>
+        )}
+
+        <p className="text-xs text-muted-foreground/70">
           Máximo {maxFiles} archivos · {maxSizeMB} MB cada uno
         </p>
       </div>
