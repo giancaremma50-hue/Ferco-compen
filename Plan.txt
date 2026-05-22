@@ -1,0 +1,260 @@
+# Portal de Compensaciones — Ferco Cerámica
+
+## Contexto
+Portal web interno para centralizar solicitudes de análisis de compensación. Actualmente el proceso ocurre de forma dispersa; el portal lo concentra en un kanban, con formulario estructurado, comentarios, archivos y notificaciones en tiempo real. Stack: Next.js 14 App Router + TypeScript + Tailwind CSS v4 + shadcn/ui + Firebase + framer-motion. Deploy en Netlify.
+
+**Usuarios:** 2 administradores (área de compensaciones) + 50+ colaboradores (empleados internos Ferco). Solo en español.
+
+---
+
+## Stack y dependencias
+
+```bash
+npx create-next-app@latest . --typescript --tailwind --app --src-dir --import-alias "@/*"
+npx shadcn@latest init
+npx shadcn@latest add button card dialog dropdown-menu form input label popover select separator skeleton textarea toast badge checkbox
+
+npm install firebase @hello-pangea/dnd framer-motion react-hook-form zod @hookform/resolvers react-dropzone @radix-ui/react-tooltip @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-checkbox @radix-ui/react-icons class-variance-authority
+npm install -D @netlify/plugin-nextjs
+```
+
+---
+
+## Estructura de carpetas
+
+```
+src/
+├── app/
+│   ├── globals.css                  # Tema Ferco (variables CSS provistas + color gold)
+│   ├── layout.tsx                   # Root: AuthProvider
+│   ├── (auth)/login/page.tsx        # Pantalla de login
+│   └── (portal)/
+│       ├── layout.tsx               # AuthGuard + Shell (Header + Sidebar)
+│       ├── dashboard/page.tsx       # Tablero Kanban
+│       ├── solicitudes/
+│       │   ├── nueva/page.tsx       # Formulario nueva solicitud
+│       │   └── [id]/page.tsx        # Detalle + comentarios + archivos
+│       └── admin/
+│           └── usuarios/page.tsx    # Gestión de usuarios (admin only)
+│
+├── components/
+│   ├── ui/                          # shadcn + componentes provistos
+│   │   ├── prompt-input.tsx         # (provisto) bandeja comentarios
+│   │   ├── success-login-card.tsx   # (provisto) estilo formulario
+│   │   ├── animated-state-icons.tsx # (provisto) iconos animados
+│   │   ├── popover.tsx              # (provisto) notificaciones
+│   │   └── dialog.tsx               # (provisto) login
+│   ├── auth/
+│   │   ├── LoginForm.tsx
+│   │   └── AuthGuard.tsx
+│   ├── layout/
+│   │   ├── Header.tsx               # Logo Ferco + NotificationBell + avatar
+│   │   ├── Sidebar.tsx              # Links según rol
+│   │   └── Shell.tsx
+│   ├── kanban/
+│   │   ├── KanbanBoard.tsx          # @hello-pangea/dnd context, 4 columnas
+│   │   ├── KanbanColumn.tsx         # Droppable zone con framer-motion stagger
+│   │   ├── KanbanCard.tsx           # Card con hover lift (motion.div)
+│   │   └── StageBadge.tsx           # Pill coloreado por etapa
+│   ├── requests/
+│   │   ├── RequestForm.tsx          # react-hook-form + zod
+│   │   ├── RequestDetail.tsx        # Vista completa: metadata + thread
+│   │   ├── FileUploadZone.tsx       # react-dropzone
+│   │   └── FileAttachmentList.tsx
+│   ├── comments/
+│   │   ├── CommentThread.tsx
+│   │   ├── CommentBubble.tsx
+│   │   └── CommentInput.tsx         # Estilo PromptInput
+│   └── notifications/
+│       ├── NotificationBell.tsx     # Badge animado (framer-motion scale)
+│       ├── NotificationPopover.tsx
+│       └── NotificationItem.tsx
+│
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useRequests.ts               # onSnapshot tiempo real
+│   ├── useComments.ts
+│   ├── useNotifications.ts
+│   └── useFileUpload.ts
+│
+├── lib/firebase/
+│   ├── config.ts                    # initializeApp desde .env.local
+│   ├── auth.ts                      # signIn / signOut helpers
+│   ├── firestore.ts                 # refs tipados + helpers CRUD + fan-out notificaciones
+│   └── storage.ts                   # upload / getDownloadURL
+│
+├── context/AuthContext.tsx          # user + userProfile + role + loading
+├── types/index.ts                   # Interfaces: User, Request, Comment, Notification
+└── constants/
+    ├── kanban.ts                    # STAGES array + colores por etapa
+    └── routes.ts
+```
+
+---
+
+## Firebase: colecciones
+
+### `users/{uid}`
+```ts
+{ uid, email, displayName, role: "administrador"|"colaborador",
+  area, cargo, createdAt, lastLoginAt }
+```
+
+### `requests/{requestId}`
+```ts
+{ id, requestNumber,               // "COMP-2026-AB3F2C"
+  createdBy, creatorName,
+
+  // Campos del formulario (campos con * son obligatorios)
+  tipoMovimiento: "incremento"|"promocion"|"ajuste_salarial"|"nueva_plaza"|"otro",  // *
+  tipoMovimientoOtro?: string,     // habilitado solo si tipoMovimiento === "otro"
+  detalleMovimiento: string,       // *
+  nombreSolicitante: string,       // *
+  puestoSolicitante: string,       // *
+  nombrePersonaEvaluar: string,    // *
+  puestoPersonaEvaluar: string,    // *
+  pais: "Guatemala"|"El Salvador"|"Honduras"|"México",  // *
+  area: string,                    // *
+  sucursal?: string,               // opcional
+  bonoVariable1?: number,          // opcionales (1-5)
+  bonoVariable2?: number,
+  bonoVariable3?: number,
+  bonoVariable4?: number,
+  bonoVariable5?: number,
+  justificacion: string,           // *
+
+  stage: "en_analisis"|"en_proceso_aprobacion"|"finalizada"|"cancelada_denegada",
+  attachments: [{id, fileName, fileType, fileSize, storageUrl, uploadedBy, uploadedAt}],
+  commentCount, createdAt, updatedAt, stageChangedAt, stageChangedBy? }
+```
+
+**Lógica condicional del formulario:** cuando `tipoMovimiento === "otro"`, se muestra dinámicamente un campo de texto `tipoMovimientoOtro` con `react-hook-form` `watch()`. El schema Zod valida: si `tipoMovimiento === "otro"` entonces `tipoMovimientoOtro` es obligatorio.
+
+### `requests/{id}/comments/{commentId}`
+```ts
+{ id, requestId, content, authorId, authorName, authorRole,
+  parentId?,   // null = raíz, string = respuesta
+  attachments?, createdAt, editedAt? }
+```
+
+### `notifications/{notificationId}`
+```ts
+{ id, recipientId, type, requestId, requestNumber, requestTitle,
+  fromUserId, fromUserName, newStage?, commentPreview?,
+  read: boolean, createdAt }
+```
+
+**Índices Firestore requeridos:**
+- `notifications`: `(recipientId, read, createdAt DESC)`
+- `requests`: `(createdBy, stage, createdAt DESC)`
+- `requests`: `(stage, createdAt DESC)`
+
+---
+
+## Reglas de notificaciones
+
+| Evento | Quién dispara | Destinatario | Tipo |
+|---|---|---|---|
+| Nueva solicitud creada | `RequestForm.tsx` | Todos los admins (query `role=="administrador"`) | `new_request` |
+| Cambio de etapa | `KanbanBoard.tsx` onDragEnd | `request.createdBy` | `stage_changed` |
+| Comentario nuevo (raíz) | `CommentInput.tsx` | Colaborador → admins; Admin → creador | `new_comment` |
+| Respuesta a comentario | `CommentInput.tsx` (con parentId) | `parentComment.authorId` | `comment_replied` |
+
+Implementación: `writeBatch()` atómico en `lib/firebase/firestore.ts`. Con 2 admins, el fan-out es trivial (máx 2 writes). Los UIDs de admins se obtienen dinámicamente via query, no hardcodeados.
+
+---
+
+## Flujo de autenticación
+
+1. Cualquier ruta `(portal)/*` → `AuthGuard` revisa `AuthContext.loading`
+2. Sin usuario → redirect a `/login`
+3. `LoginForm` llama `signInWithEmailAndPassword()`
+4. `onAuthStateChanged` → fetch `users/{uid}` de Firestore → hidrata `role`
+5. Redirect según rol: ambos van a `/dashboard` (admin puede arrastrar, colaborador solo ve)
+6. Creación de usuarios: admin manual desde Firebase Console o script de seed
+
+> **Importante:** Toda la autenticación es client-side. No usar Next.js middleware para Firebase Auth (incompatible con Netlify sin backend custom).
+
+---
+
+## Variables de entorno (.env.local)
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+```
+
+Estas mismas variables se configuran en el panel de Netlify (Environment Variables).
+
+---
+
+## Tema y diseño
+
+- **globals.css:** Variables CSS provistas por el usuario (blanco/oscuro) + color gold `#D4A017` para acento Ferco
+- **Logo:** Versión oscura en fondo claro (header), versión blanca en sidebar colapsado o dark mode
+- **Animaciones framer-motion:**
+  - Kanban: columnas con `staggerChildren` al cargar
+  - Cards: `whileHover={{ y: -2, boxShadow }}` 
+  - Notificaciones: badge con `animate={{ scale: [1, 1.3, 1] }}` al aparecer nuevo
+  - Transiciones de página: `AnimatePresence` en `(portal)/layout.tsx`
+  - Formulario: `motion.div` con `initial/animate` en pasos
+- **Iconos:** `animated-state-icons.tsx` para estados del sistema; `lucide-react` para navegación
+
+---
+
+## Netlify deploy
+
+```toml
+# netlify.toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+```
+
+---
+
+## Orden de implementación
+
+1. **Scaffolding:** create-next-app + shadcn init + instalar dependencias + globals.css con tema
+2. **Firebase:** config.ts + types/index.ts + context/AuthContext.tsx
+3. **Auth:** LoginForm + AuthGuard + rutas (auth) y (portal)/layout
+4. **Formulario:** RequestForm + FileUploadZone + página solicitudes/nueva
+5. **Kanban:** KanbanCard → KanbanColumn → KanbanBoard + useRequests hook
+6. **Detalle:** RequestDetail + CommentThread + CommentInput + useComments
+7. **Notificaciones:** useNotifications + NotificationBell + NotificationPopover
+8. **Admin panel:** página usuarios (tabla básica)
+9. **Pulido:** transiciones de página, skeletons, responsividad mobile, dark mode
+10. **Deploy:** netlify.toml + push a `claude/amazing-ride-wVyAH` + configurar env vars en Netlify
+
+---
+
+## Puntos críticos / gotchas
+
+- **Drag-and-drop race condition:** Con 2 admins es tolerable. Usar optimistic UI + rollback si falla el write.
+- **Firebase Storage CORS:** Configurar CORS en el bucket antes del primer deploy (`gsutil cors set cors.json gs://bucket`).
+- **Uploads antes del doc:** Subir archivos a Storage primero, luego crear el documento Firestore con las URLs ya pobladas.
+- **commentCount:** Usar `writeBatch()` para escribir comentario + incrementar contador atómicamente.
+- **Tailwind v4 + shadcn:** Usar `@theme` directive en globals.css para colores Ferco, no en tailwind.config.ts.
+- **Firebase en App Router:** Todo Firebase es client-side. Marcar componentes con `"use client"`. No importar Firebase en Server Components.
+- **Formulario campos pendientes:** Los campos exactos del formulario serán confirmados con las capturas de pantalla del usuario. El esquema Zod se actualiza en ese momento.
+
+---
+
+## Verificación
+
+1. Crear 2 cuentas admin + 3 cuentas colaborador en Firebase Console
+2. Colaborador crea solicitud → admin recibe notificación
+3. Admin arrastra card → colaborador recibe notificación de cambio de etapa
+4. Comentario de colaborador → admin recibe notificación
+5. Admin responde comentario → colaborador recibe notificación
+6. Verificar que colaborador NO puede arrastrar cards
+7. Verificar que admin puede editar cualquier solicitud
+8. Verificar upload y descarga de archivos adjuntos
+9. Deploy en Netlify con env vars configuradas
