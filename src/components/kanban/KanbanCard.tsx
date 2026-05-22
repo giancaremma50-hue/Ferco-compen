@@ -3,7 +3,7 @@
 import { Draggable } from "@hello-pangea/dnd";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { MessageSquare, Paperclip, Calendar } from "lucide-react";
+import { MessageSquare, Paperclip, Calendar, User } from "lucide-react";
 import { Request } from "@/types";
 import { StageBadge } from "./StageBadge";
 import { ROUTES } from "@/constants/routes";
@@ -12,9 +12,10 @@ interface KanbanCardProps {
   request: Request;
   index: number;
   isDraggable: boolean;
+  showCreator?: boolean;  // true in "Mi equipo" view
 }
 
-export function KanbanCard({ request, index, isDraggable }: KanbanCardProps) {
+export function KanbanCard({ request, index, isDraggable, showCreator = false }: KanbanCardProps) {
   const date = request.createdAt?.toDate?.();
   const dateStr = date
     ? new Intl.DateTimeFormat("es-GT", {
@@ -58,6 +59,16 @@ export function KanbanCard({ request, index, isDraggable }: KanbanCardProps) {
                   </span>
                   <StageBadge stage={request.stage} />
                 </div>
+
+                {/* Creator — only visible in "Mi equipo" tab */}
+                {showCreator && request.creatorName && (
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="text-xs text-muted-foreground truncate">
+                      {request.creatorName}
+                    </span>
+                  </div>
+                )}
 
                 {/* Title */}
                 <h3 className="text-sm font-medium text-foreground leading-snug mb-2 line-clamp-2">

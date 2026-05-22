@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, CheckCircle2, LogIn, Users } from "lucide-react";
+import { Loader2, UserPlus, CheckCircle2, LogIn, Users, GitBranch } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Role } from "@/types";
@@ -29,6 +29,7 @@ import Image from "next/image";
 import { ROUTES } from "@/constants/routes";
 
 interface CreatedUser {
+  uid: string;           // needed so children can reference this as managerId
   displayName: string;
   email: string;
   role: Role;
@@ -42,6 +43,7 @@ export default function SetupPage() {
   const [role, setRole] = useState<Role>("colaborador");
   const [area, setArea] = useState("");
   const [cargo, setCargo] = useState("");
+  const [managerId, setManagerId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedUser[]>([]);
 
@@ -57,11 +59,13 @@ export default function SetupPage() {
 
     setLoading(true);
     try {
-      // Create Firebase Auth user
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(cred.user, { displayName: displayName.trim() });
 
-      // Create Firestore profile
+      const selectedManager = managerId
+        ? created.find((u) => u.uid === managerId)
+        : null;
+
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         displayName: displayName.trim(),
@@ -69,16 +73,18 @@ export default function SetupPage() {
         role,
         area: area.trim(),
         cargo: cargo.trim(),
+        managerId: selectedManager?.uid ?? null,
+        managerName: selectedManager?.displayName ?? null,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
 
-      // Sign out so the next user can be created
+      // Sign out so next user can be created with a fresh auth state
       await signOut(auth);
 
       setCreated((prev) => [
         ...prev,
-        { displayName: displayName.trim(), email: email.trim(), role },
+        { uid: cred.user.uid, displayName: displayName.trim(), email: email.trim(), role },
       ]);
 
       // Reset form
@@ -88,6 +94,7 @@ export default function SetupPage() {
       setRole("colaborador");
       setArea("");
       setCargo("");
+      setManagerId("");
 
       toast.success(`Usuario "${displayName.trim()}" creado exitosamente`);
     } catch (err: unknown) {
@@ -109,30 +116,14 @@ export default function SetupPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-start py-12 px-4">
       {/* Logo */}
       <div className="mb-8">
-        <Image
-          src="/logo-negro.png"
-          alt="Ferco Cerámica"
-          width={160}
-          height={48}
-          className="object-contain dark:hidden"
-          priority
-        />
-        <Image
-          src="/logo-blanca.png"
-          alt="Ferco Cerámica"
-          width={160}
-          height={48}
-          className="object-contain hidden dark:block"
-          priority
-        />
+        <Image src="/logo-negro.png" alt="Ferco Cerámica" width={160} height={48} className="object-contain dark:hidden" priority />
+        <Image src="/logo-blanca.png" alt="Ferco Cerámica" width={160} height={48} className="object-contain hidden dark:block" priority />
       </div>
 
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">
-            Configuración inicial
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Configuración inicial</h1>
           <p className="text-sm text-muted-foreground">
             Crea los usuarios del portal. Puedes agregar tantos como necesites antes de iniciar sesión.
           </p>
@@ -152,7 +143,7 @@ export default function SetupPage() {
               </div>
               {created.map((u, i) => (
                 <motion.div
-                  key={i}
+                  key={u.uid}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
@@ -161,19 +152,13 @@ export default function SetupPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {u.displayName}
-                      </p>
+                      <p className="text-sm font-medium text-foreground">{u.displayName}</p>
                       <p className="text-xs text-muted-foreground">{u.email}</p>
                     </div>
                   </div>
                   <Badge
                     variant={u.role === "administrador" ? "default" : "secondary"}
-                    style={
-                      u.role === "administrador"
-                        ? { backgroundColor: "var(--gold)", color: "white", border: "none" }
-                        : {}
-                    }
+                    style={u.role === "administrador" ? { backgroundColor: "var(--gold)", color: "white", border: "none" } : {}}
                   >
                     {u.role === "administrador" ? "Admin" : "Colaborador"}
                   </Badge>
@@ -192,108 +177,81 @@ export default function SetupPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="text-sm">Nombre completo *</Label>
-              <Input
-                placeholder="Ana García"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={loading}
-              />
+              <Input placeholder="Ana García" value={displayName} onChange={(e) => setDisplayName(e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Correo electrónico *</Label>
-              <Input
-                type="email"
-                placeholder="ana@ferco.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
+              <Input type="email" placeholder="ana@ferco.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Contraseña *</Label>
-              <Input
-                type="password"
-                placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
+              <Input type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Área</Label>
-              <Input
-                placeholder="Recursos Humanos"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                disabled={loading}
-              />
+              <Input placeholder="Recursos Humanos" value={area} onChange={(e) => setArea(e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Cargo</Label>
-              <Input
-                placeholder="Gerente de RR.HH."
-                value={cargo}
-                onChange={(e) => setCargo(e.target.value)}
-                disabled={loading}
-              />
+              <Input placeholder="Gerente de RR.HH." value={cargo} onChange={(e) => setCargo(e.target.value)} disabled={loading} />
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label className="text-sm">Rol *</Label>
-              <Select
-                value={role}
-                onValueChange={(v) => setRole(v as Role)}
-                disabled={loading}
-              >
+              <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={loading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="administrador">
-                    Administrador — puede mover solicitudes y ver todo
-                  </SelectItem>
-                  <SelectItem value="colaborador">
-                    Colaborador — puede crear solicitudes y comentar
-                  </SelectItem>
+                  <SelectItem value="administrador">Administrador — puede mover solicitudes y ver todo</SelectItem>
+                  <SelectItem value="colaborador">Colaborador — puede crear solicitudes y comentar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Jefe directo — populated from already-created users */}
+            <div className="space-y-1.5">
+              <Label className="text-sm flex items-center gap-1.5">
+                <GitBranch className="h-3.5 w-3.5" />
+                Jefe directo
+              </Label>
+              <Select
+                value={managerId}
+                onValueChange={(v) => setManagerId(!v || v === "none" ? "" : v)}
+                disabled={loading || created.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={created.length === 0 ? "Crea más usuarios primero" : "Sin jefe directo"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin jefe directo</SelectItem>
+                  {created.map((u) => (
+                    <SelectItem key={u.uid} value={u.uid}>
+                      {u.displayName} · {u.role === "administrador" ? "Admin" : "Colaborador"}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <Button
-            className="w-full"
-            onClick={handleCreate}
-            disabled={loading}
-          >
+          <Button className="w-full" onClick={handleCreate} disabled={loading}>
             {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Creando usuario...
-              </>
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creando usuario...</>
             ) : (
-              <>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Crear usuario
-              </>
+              <><UserPlus className="h-4 w-4 mr-2" />Crear usuario</>
             )}
           </Button>
         </div>
 
         {/* Go to login */}
         {created.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push(ROUTES.LOGIN)}
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Button variant="outline" className="w-full" onClick={() => router.push(ROUTES.LOGIN)}>
               <LogIn className="h-4 w-4 mr-2" />
               Listo — ir al login
             </Button>

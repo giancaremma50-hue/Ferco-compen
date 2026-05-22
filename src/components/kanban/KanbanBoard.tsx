@@ -10,10 +10,19 @@ import { Stage } from "@/types";
 import { KanbanColumn } from "./KanbanColumn";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  /** "my" = mis solicitudes (default), "team" = solicitudes del equipo */
+  mode?: "my" | "team";
+}
+
+export function KanbanBoard({ mode = "my" }: KanbanBoardProps) {
   const { userProfile } = useAuth();
-  const { byStage, loading } = useRequests();
+  const { myByStage, teamByStage, byStage, loading } = useRequests();
   const isAdmin = userProfile?.role === "administrador";
+
+  // Pick the right data source based on mode
+  const getByStage = mode === "team" ? teamByStage : byStage;
+  const showCreator = mode === "team";
 
   async function onDragEnd(result: DropResult) {
     const { destination, source, draggableId } = result;
@@ -22,7 +31,7 @@ export function KanbanBoard() {
     if (!userProfile) return;
 
     const newStage = destination.droppableId as Stage;
-    const currentRequests = byStage(source.droppableId as Stage);
+    const currentRequests = getByStage(source.droppableId as Stage);
     const request = currentRequests.find((r) => r.id === draggableId);
     if (!request) return;
 
@@ -63,8 +72,9 @@ export function KanbanBoard() {
           <KanbanColumn
             key={stage.id}
             stage={stage}
-            requests={byStage(stage.id)}
+            requests={getByStage(stage.id)}
             isDraggable={isAdmin}
+            showCreator={showCreator}
           />
         ))}
       </div>

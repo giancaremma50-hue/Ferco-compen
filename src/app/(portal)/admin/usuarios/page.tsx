@@ -41,7 +41,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Users, UserPlus, Loader2 } from "lucide-react";
+import { Users, UserPlus, Loader2, GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -60,6 +60,7 @@ export default function AdminUsuariosPage() {
   const [role, setRole] = useState<Role>("colaborador");
   const [area, setArea] = useState("");
   const [cargo, setCargo] = useState("");
+  const [managerId, setManagerId] = useState<string>("");
 
   const loadUsers = useCallback(async () => {
     const snap = await getDocs(query(usersCol(), orderBy("displayName")));
@@ -83,6 +84,7 @@ export default function AdminUsuariosPage() {
     setRole("colaborador");
     setArea("");
     setCargo("");
+    setManagerId("");
   }
 
   async function handleCreateUser() {
@@ -96,7 +98,8 @@ export default function AdminUsuariosPage() {
     }
 
     setCreating(true);
-    // We use a SECONDARY Firebase app instance so the admin stays signed in.
+
+    // Secondary Firebase app so the admin stays signed in
     const secondaryApp = initializeApp(
       {
         apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -118,6 +121,11 @@ export default function AdminUsuariosPage() {
       );
       await updateProfile(cred.user, { displayName: displayName.trim() });
 
+      // Resolve manager name from selected UID
+      const selectedManager = managerId
+        ? users.find((u) => u.uid === managerId)
+        : null;
+
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         displayName: displayName.trim(),
@@ -125,6 +133,8 @@ export default function AdminUsuariosPage() {
         role,
         area: area.trim(),
         cargo: cargo.trim(),
+        managerId: selectedManager?.uid ?? null,
+        managerName: selectedManager?.displayName ?? null,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
@@ -142,7 +152,6 @@ export default function AdminUsuariosPage() {
         console.error(err);
       }
     } finally {
-      // Clean up secondary app regardless
       await firebaseSignOut(secondaryAuth).catch(() => {});
       await deleteApp(secondaryApp).catch(() => {});
       setCreating(false);
@@ -195,16 +204,16 @@ export default function AdminUsuariosPage() {
                   Área / Cargo
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Jefe directo
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Rol
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {users.map((user) => (
-                <tr
-                  key={user.uid}
-                  className="hover:bg-muted/30 transition-colors"
-                >
+                <tr key={user.uid} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div
@@ -226,33 +235,31 @@ export default function AdminUsuariosPage() {
                       <span className="font-medium">{user.displayName}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {user.email}
-                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium">{user.area || "—"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {user.cargo || "—"}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{user.cargo || "—"}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    {user.managerName ? (
+                      <div className="flex items-center gap-1.5">
+                        <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-sm">{user.managerName}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Badge
-                      variant={
-                        user.role === "administrador" ? "default" : "secondary"
-                      }
+                      variant={user.role === "administrador" ? "default" : "secondary"}
                       style={
                         user.role === "administrador"
-                          ? {
-                              backgroundColor: "var(--gold)",
-                              color: "white",
-                              border: "none",
-                            }
+                          ? { backgroundColor: "var(--gold)", color: "white", border: "none" }
                           : {}
                       }
                     >
-                      {user.role === "administrador"
-                        ? "Administrador"
-                        : "Colaborador"}
+                      {user.role === "administrador" ? "Administrador" : "Colaborador"}
                     </Badge>
                   </td>
                 </tr>
@@ -264,9 +271,7 @@ export default function AdminUsuariosPage() {
             <div className="text-center py-16 text-muted-foreground">
               <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
               <p className="font-medium">Sin usuarios registrados</p>
-              <p className="text-xs mt-1">
-                Haz clic en &quot;Crear usuario&quot; para agregar el primero.
-              </p>
+              <p className="text-xs mt-1">Haz clic en &quot;Crear usuario&quot; para agregar el primero.</p>
             </div>
           )}
         </motion.div>
@@ -337,21 +342,41 @@ export default function AdminUsuariosPage() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm">Rol *</Label>
-              <Select
-                value={role}
-                onValueChange={(v) => setRole(v as Role)}
-                disabled={creating}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="administrador">Administrador</SelectItem>
-                  <SelectItem value="colaborador">Colaborador</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Rol *</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={creating}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="administrador">Administrador</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm">Jefe directo</Label>
+                <Select
+                  value={managerId}
+                  onValueChange={(v) => setManagerId(!v || v === "none" ? "" : v)}
+                  disabled={creating}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin jefe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin jefe directo</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.uid} value={u.uid}>
+                        {u.displayName}
+                        {u.cargo ? ` · ${u.cargo}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -365,15 +390,9 @@ export default function AdminUsuariosPage() {
             </Button>
             <Button onClick={handleCreateUser} disabled={creating}>
               {creating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creando...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creando...</>
               ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Crear
-                </>
+                <><UserPlus className="h-4 w-4 mr-2" />Crear</>
               )}
             </Button>
           </DialogFooter>

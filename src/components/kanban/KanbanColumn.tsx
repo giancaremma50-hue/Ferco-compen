@@ -11,6 +11,7 @@ interface KanbanColumnProps {
   stage: StageConfig;
   requests: Request[];
   isDraggable: boolean;
+  showCreator?: boolean;
 }
 
 const containerVariants = {
@@ -27,7 +28,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
-export function KanbanColumn({ stage, requests, isDraggable }: KanbanColumnProps) {
+export function KanbanColumn({ stage, requests, isDraggable, showCreator = false }: KanbanColumnProps) {
   return (
     <div className="flex flex-col min-w-[280px] max-w-[320px] w-full">
       {/* Column header */}
@@ -77,6 +78,7 @@ export function KanbanColumn({ stage, requests, isDraggable }: KanbanColumnProps
                     request={request}
                     index={index}
                     isDraggable={isDraggable}
+                    showCreator={showCreator}
                   />
                 </motion.div>
               ))}

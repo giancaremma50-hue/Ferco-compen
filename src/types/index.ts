@@ -24,6 +24,8 @@ export interface UserProfile {
   role: Role;
   area: string;
   cargo: string;
+  managerId: string | null;    // UID del jefe directo; null = sin jefe
+  managerName: string | null;  // Nombre del jefe (desnormalizado para evitar joins)
   createdAt: Timestamp;
   lastLoginAt: Timestamp;
 }
