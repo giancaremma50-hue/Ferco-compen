@@ -169,31 +169,35 @@ export function RequestDetail({ requestId }: RequestDetailProps) {
               )}
             </div>
 
-            {/* Bonos */}
-            {[1, 2, 3, 4, 5].some((n) => request[`bonoVariable${n}` as keyof Request]) && (
+            {/* Referencia de monto / porcentaje */}
+            {(request.montoReferencia || request.porcentajeReferencia) && (
               <>
                 <Separator />
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
-                    Bonos variables
+                    Referencia de ajuste
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {[1, 2, 3, 4, 5].map((n) => {
-                      const val = request[`bonoVariable${n}` as keyof Request];
-                      if (!val) return null;
-                      return (
-                        <span
-                          key={n}
-                          className="rounded-lg bg-muted px-2.5 py-1 text-sm"
-                        >
-                          Bono {n}:{" "}
-                          <span className="font-medium">
-                            {formatCurrency(Number(val), request.pais)}
-                          </span>
+                    {request.montoReferencia != null && (
+                      <span className="rounded-lg bg-muted px-2.5 py-1 text-sm">
+                        Monto:{" "}
+                        <span className="font-medium">
+                          {formatCurrency(request.montoReferencia, request.pais)}
                         </span>
-                      );
-                    })}
+                      </span>
+                    )}
+                    {request.porcentajeReferencia != null && (
+                      <span className="rounded-lg bg-muted px-2.5 py-1 text-sm">
+                        Porcentaje:{" "}
+                        <span className="font-medium">
+                          {request.porcentajeReferencia}%
+                        </span>
+                      </span>
+                    )}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Valor orientativo sujeto a revisión por el equipo de Compensaciones.
+                  </p>
                 </div>
               </>
             )}

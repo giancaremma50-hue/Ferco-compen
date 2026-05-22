@@ -56,11 +56,8 @@ export interface Request {
   pais: Pais;
   area: string;
   sucursal?: string;
-  bonoVariable1?: number;
-  bonoVariable2?: number;
-  bonoVariable3?: number;
-  bonoVariable4?: number;
-  bonoVariable5?: number;
+  montoReferencia?: number;
+  porcentajeReferencia?: number;
   justificacion: string;
   stage: Stage;
   attachments: FileAttachment[];

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -36,7 +36,8 @@ import {
 import { FileUploadZone } from "./FileUploadZone";
 import { ROUTES } from "@/constants/routes";
 import { Pais, TipoMovimiento } from "@/types";
-import { getCurrencySymbol } from "@/constants/currency";
+
+const TIPOS_CON_REFERENCIA: TipoMovimiento[] = ["incremento", "ajuste_salarial"];
 
 const schema = z
   .object({
@@ -49,6 +50,15 @@ const schema = z
     ] as const),
     tipoMovimientoOtro: z.string().optional(),
     detalleMovimiento: z.string().min(10, "Mínimo 10 caracteres"),
+    montoReferencia: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : Number(v)),
+      z.number().positive("Debe ser mayor a 0").optional()
+    ),
+    porcentajeReferencia: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : Number(v)),
+      z.number().positive("Debe ser mayor a 0").max(100, "Máximo 100%").optional()
+    ),
+    justificacion: z.string().min(20, "Mínimo 20 caracteres"),
     nombreSolicitante: z.string().min(2, "Requerido"),
     puestoSolicitante: z.string().min(2, "Requerido"),
     nombrePersonaEvaluar: z.string().min(2, "Requerido"),
@@ -56,22 +66,25 @@ const schema = z
     pais: z.enum(["Guatemala", "El Salvador", "Honduras", "México"] as const),
     area: z.string().min(2, "Requerido"),
     sucursal: z.string().optional(),
-    bonoVariable1: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().nonnegative().optional()),
-    bonoVariable2: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().nonnegative().optional()),
-    bonoVariable3: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().nonnegative().optional()),
-    bonoVariable4: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().nonnegative().optional()),
-    bonoVariable5: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().nonnegative().optional()),
-    justificacion: z.string().min(20, "Mínimo 20 caracteres"),
   })
   .superRefine((data, ctx) => {
-    if (
-      data.tipoMovimiento === "otro" &&
-      !data.tipoMovimientoOtro?.trim()
-    ) {
+    if (data.tipoMovimiento === "otro" && !data.tipoMovimientoOtro?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Especifica el tipo de movimiento",
         path: ["tipoMovimientoOtro"],
+      });
+    }
+
+    if (
+      TIPOS_CON_REFERENCIA.includes(data.tipoMovimiento) &&
+      data.montoReferencia == null &&
+      data.porcentajeReferencia == null
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Ingresa al menos un monto o porcentaje de referencia",
+        path: ["montoReferencia"],
       });
     }
   });
@@ -81,6 +94,9 @@ type FormData = {
   tipoMovimiento: TipoMovimiento;
   tipoMovimientoOtro?: string;
   detalleMovimiento: string;
+  montoReferencia?: number;
+  porcentajeReferencia?: number;
+  justificacion: string;
   nombreSolicitante: string;
   puestoSolicitante: string;
   nombrePersonaEvaluar: string;
@@ -88,12 +104,6 @@ type FormData = {
   pais: Pais;
   area: string;
   sucursal?: string;
-  bonoVariable1?: number;
-  bonoVariable2?: number;
-  bonoVariable3?: number;
-  bonoVariable4?: number;
-  bonoVariable5?: number;
-  justificacion: string;
 };
 
 const TIPOS: { value: TipoMovimiento; label: string }[] = [
@@ -128,8 +138,7 @@ export function RequestForm() {
   });
 
   const tipoMovimiento = watch("tipoMovimiento");
-  const watchedPais    = watch("pais");
-  const currencySymbol = getCurrencySymbol(watchedPais);
+  const showReferencia = TIPOS_CON_REFERENCIA.includes(tipoMovimiento);
 
   async function onSubmit(data: FormData) {
     if (!userProfile) return;
@@ -229,7 +238,8 @@ export function RequestForm() {
       animate={{ opacity: 1, y: 0, transition: { duration: 0.35 } }}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Section 1: Tipo de movimiento */}
+
+        {/* Section 1: Tipo de movimiento + justificación (agrupados) */}
         <Section title="Tipo de movimiento">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Tipo de movimiento *" error={errors.tipoMovimiento?.message}>
@@ -251,24 +261,28 @@ export function RequestForm() {
               </Select>
             </Field>
 
-            {tipoMovimiento === "otro" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <Field
-                  label="Especifica el tipo *"
-                  error={errors.tipoMovimientoOtro?.message}
+            <AnimatePresence>
+              {tipoMovimiento === "otro" && (
+                <motion.div
+                  key="otro"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
-                  <Input
-                    placeholder="Describe el tipo de movimiento"
-                    {...register("tipoMovimientoOtro")}
-                    className={errors.tipoMovimientoOtro ? "border-destructive" : ""}
-                  />
-                </Field>
-              </motion.div>
-            )}
+                  <Field
+                    label="Especifica el tipo *"
+                    error={errors.tipoMovimientoOtro?.message}
+                  >
+                    <Input
+                      placeholder="Describe el tipo de movimiento"
+                      {...register("tipoMovimientoOtro")}
+                      className={errors.tipoMovimientoOtro ? "border-destructive" : ""}
+                    />
+                  </Field>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <Field label="Detalle del movimiento *" error={errors.detalleMovimiento?.message}>
@@ -277,6 +291,64 @@ export function RequestForm() {
               rows={3}
               {...register("detalleMovimiento")}
               className={errors.detalleMovimiento ? "border-destructive" : ""}
+            />
+          </Field>
+
+          {/* Monto / Porcentaje — solo para Incremento salarial y Ajuste salarial */}
+          <AnimatePresence>
+            {showReferencia && (
+              <motion.div
+                key="referencia"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-3 overflow-hidden"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Monto de referencia"
+                    error={errors.montoReferencia?.message}
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                      {...register("montoReferencia")}
+                      className={errors.montoReferencia ? "border-destructive" : ""}
+                    />
+                  </Field>
+                  <Field
+                    label="Porcentaje de referencia (%)"
+                    error={errors.porcentajeReferencia?.message}
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      placeholder="0.0"
+                      {...register("porcentajeReferencia")}
+                      className={errors.porcentajeReferencia ? "border-destructive" : ""}
+                    />
+                  </Field>
+                </div>
+                <p className="text-xs text-muted-foreground rounded-lg bg-muted/60 px-3 py-2 leading-relaxed">
+                  El monto o porcentaje ingresado es una referencia orientativa para que el
+                  equipo de Compensaciones evalúe la propuesta. El valor final está sujeto
+                  a revisión y puede cambiar.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Justificación — colocada dentro de esta sección, debajo del detalle */}
+          <Field label="Justificación *" error={errors.justificacion?.message}>
+            <Textarea
+              placeholder="Describe el desempeño del colaborador: cumplimiento de objetivos y metas, proyectos relevantes ejecutados, contribuciones destacadas e impacto generado en el área y la organización."
+              rows={5}
+              {...register("justificacion")}
+              className={errors.justificacion ? "border-destructive" : ""}
             />
           </Field>
         </Section>
@@ -344,42 +416,7 @@ export function RequestForm() {
           </div>
         </Section>
 
-        {/* Section 4: Bonos variables */}
-        <Section title="Bonos variables (opcional)">
-          <div className="grid gap-4 sm:grid-cols-5">
-            {([1, 2, 3, 4, 5] as const).map((n) => (
-              <Field key={n} label={`Bono ${n}`}>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground select-none">
-                    {currencySymbol}
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    placeholder="0.00"
-                    className="pl-7"
-                    {...register(`bonoVariable${n}` as `bonoVariable${typeof n}`)}
-                  />
-                </div>
-              </Field>
-            ))}
-          </div>
-        </Section>
-
-        {/* Section 5: Justificación */}
-        <Section title="Justificación">
-          <Field label="Justificación *" error={errors.justificacion?.message}>
-            <Textarea
-              placeholder="Explica la razón del movimiento..."
-              rows={5}
-              {...register("justificacion")}
-              className={errors.justificacion ? "border-destructive" : ""}
-            />
-          </Field>
-        </Section>
-
-        {/* Section 6: Archivos */}
+        {/* Section 4: Archivos */}
         <Section title="Archivos adjuntos">
           <FileUploadZone files={files} onFilesChange={setFiles} />
         </Section>
