@@ -36,6 +36,7 @@ import {
 import { FileUploadZone } from "./FileUploadZone";
 import { ROUTES } from "@/constants/routes";
 import { Pais, TipoMovimiento } from "@/types";
+import { getCurrencySymbol } from "@/constants/currency";
 
 const schema = z
   .object({
@@ -127,6 +128,8 @@ export function RequestForm() {
   });
 
   const tipoMovimiento = watch("tipoMovimiento");
+  const watchedPais    = watch("pais");
+  const currencySymbol = getCurrencySymbol(watchedPais);
 
   async function onSubmit(data: FormData) {
     if (!userProfile) return;
@@ -321,13 +324,19 @@ export function RequestForm() {
           <div className="grid gap-4 sm:grid-cols-5">
             {([1, 2, 3, 4, 5] as const).map((n) => (
               <Field key={n} label={`Bono ${n}`}>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="0.00"
-                  {...register(`bonoVariable${n}` as `bonoVariable${typeof n}`)}
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground select-none">
+                    {currencySymbol}
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="0.00"
+                    className="pl-7"
+                    {...register(`bonoVariable${n}` as `bonoVariable${typeof n}`)}
+                  />
+                </div>
               </Field>
             ))}
           </div>

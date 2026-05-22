@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Globe, MapPin, Building, User } from "lucide-react";
 import { STAGE_MAP } from "@/constants/kanban";
+import { formatCurrency } from "@/constants/currency";
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
 import { motion } from "framer-motion";
@@ -187,10 +188,7 @@ export function RequestDetail({ requestId }: RequestDetailProps) {
                         >
                           Bono {n}:{" "}
                           <span className="font-medium">
-                            {Number(val).toLocaleString("es-GT", {
-                              style: "currency",
-                              currency: "GTQ",
-                            })}
+                            {formatCurrency(Number(val), request.pais)}
                           </span>
                         </span>
                       );

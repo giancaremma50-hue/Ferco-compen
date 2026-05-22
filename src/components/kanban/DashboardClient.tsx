@@ -3,26 +3,31 @@
 import { useState } from "react";
 import { Users, LayoutGrid } from "lucide-react";
 import { KanbanBoard } from "./KanbanBoard";
+import { RequestCardGrid } from "@/components/requests/RequestCardGrid";
 import { useRequests } from "@/hooks/useRequests";
 import { useAuth } from "@/context/AuthContext";
 
 export function DashboardClient() {
   const { userProfile } = useAuth();
-  const { hasTeam, teamRequests } = useRequests();
+  const { myRequests, teamRequests, hasTeam, loading } = useRequests();
   const [activeTab, setActiveTab] = useState<"my" | "team">("my");
   const isAdmin = userProfile?.role === "administrador";
 
-  // Admins see everything in a single board — no tabs needed
+  // ── Admins: full Kanban board (drag-and-drop, all requests) ──────────────
   if (isAdmin) {
     return <KanbanBoard mode="my" />;
   }
 
-  // Collaborators without direct reports — single board, no tabs
+  // ── Collaborators without direct reports: simple card grid ────────────────
   if (!hasTeam) {
-    return <KanbanBoard mode="my" />;
+    return (
+      <div className="p-6">
+        <RequestCardGrid requests={myRequests} loading={loading} />
+      </div>
+    );
   }
 
-  // Managers — two tabs
+  // ── Managers: two tabs, each with a card grid ─────────────────────────────
   return (
     <div>
       {/* Tab bar */}
@@ -44,12 +49,17 @@ export function DashboardClient() {
         />
       </div>
 
-      {/* Board — renders the selected mode */}
-      {activeTab === "my" ? (
-        <KanbanBoard mode="my" />
-      ) : (
-        <KanbanBoard mode="team" />
-      )}
+      <div className="p-6">
+        {activeTab === "my" ? (
+          <RequestCardGrid requests={myRequests} loading={loading} />
+        ) : (
+          <RequestCardGrid
+            requests={teamRequests}
+            loading={loading}
+            showCreator
+          />
+        )}
+      </div>
     </div>
   );
 }

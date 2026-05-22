@@ -112,7 +112,7 @@ export default function AdminUsuariosPage() {
       return;
     }
     if (!area) { toast.error("Selecciona un área"); return; }
-    if (area === "Comercial" && !pais) { toast.error("Selecciona un país"); return; }
+    if (!pais) { toast.error("Selecciona un país"); return; }
     if (!cargo) { toast.error("Selecciona un cargo"); return; }
 
     setCreating(true);
@@ -360,9 +360,7 @@ export default function AdminUsuariosPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-sm">
-                  País {area === "Comercial" ? "*" : <span className="text-muted-foreground">(opcional)</span>}
-                </Label>
+                <Label className="text-sm">País *</Label>
                 <Select value={pais} onValueChange={handlePaisChange} disabled={creating}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar país..." />

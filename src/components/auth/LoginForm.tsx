@@ -83,7 +83,7 @@ export function LoginForm() {
                   id="email"
                   type="email"
                   placeholder="tu@fercoceramica.com"
-                  autoComplete="email"
+                  autoComplete="off"
                   {...register("email")}
                   className={errors.email ? "border-destructive" : ""}
                 />
@@ -102,7 +102,7 @@ export function LoginForm() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     {...register("password")}
                     className={errors.password ? "border-destructive pr-10" : "pr-10"}
                   />

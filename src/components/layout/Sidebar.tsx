@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, Users } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, PlusCircle, Users, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { signOut } from "@/lib/firebase/auth";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,13 @@ const links = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { userProfile } = useAuth();
+
+  async function handleSignOut() {
+    await signOut();
+    router.replace(ROUTES.LOGIN);
+  }
 
   const visibleLinks = links.filter((l) =>
     userProfile ? (l.roles as readonly string[]).includes(userProfile.role) : false
@@ -63,15 +70,24 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto p-4 border-t border-sidebar-border">
+      <div className="mt-auto p-4 border-t border-sidebar-border space-y-3">
         <div
           className="h-1 w-8 rounded-full"
           style={{ backgroundColor: "var(--gold)" }}
         />
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground">
           Portal de Compensaciones
         </p>
         <p className="text-xs text-muted-foreground">Ferco Cerámica © 2026</p>
+
+        {/* Sign-out button */}
+        <button
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          Cerrar sesión
+        </button>
       </div>
     </aside>
   );
