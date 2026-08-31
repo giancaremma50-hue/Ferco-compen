@@ -29,6 +29,16 @@ Plataforma de reclutamiento (Applicant Tracking System). Next.js 16 + Supabase +
 
 ---
 
+## Cierre de producción — regla obligatoria
+
+**Toda fase o funcionalidad ya terminada y verificada se empuja directo al repositorio (push), sin esperar a agrupar varias fases.** Cada push de cierre incluye:
+
+1. El código de la fase, ya pasado por `/code-review`.
+2. Los documentos afectados actualizados en el mismo commit: `README.md` si cambió cómo se usa el proyecto, y este `AGENTS.md` si cambió una regla o el stack.
+3. **`.claude/napkin.md` actualizado como bitácora de registro** — no solo trampas de sintaxis: toda decisión no obvia, todo error real encontrado y cómo se resolvió, y todo gotcha nuevo del stack. Es el historial de la construcción de la plataforma, se lee antes de tocar código y se cura en cada lectura (máx. 10 ítems por categoría, se re-prioriza).
+
+No se deja trabajo terminado sin subir. "Terminado" significa: compila, pasa lint y typecheck, y pasó `/code-review`.
+
 ## Uso obligatorio de skills
 
 Estas skills **no son opcionales**. Antes de empezar cualquier tarea, ubícala en esta tabla y carga la skill que corresponda.
