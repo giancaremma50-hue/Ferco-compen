@@ -1,16 +1,23 @@
 import Image from "next/image";
+import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
 import { ROLE_LABEL } from "@/lib/auth/role-labels";
 import { ActionButton } from "@/components/ui/action-button";
+import { NotificationBell } from "@/components/layout/notification-bell";
+import type { NotificationItem } from "@/lib/notifications/get-notifications";
 import type { Tables } from "@/lib/supabase/database.types";
 
 export function AppHeader({
   organization,
   profile,
+  initialNotifications,
+  initialUnreadCount,
 }: {
   organization: Pick<Tables<"organizations">, "platform_name" | "logo_url">;
-  profile: Pick<Tables<"profiles">, "display_name" | "role">;
+  profile: Pick<Tables<"profiles">, "id" | "display_name" | "role">;
+  initialNotifications: NotificationItem[];
+  initialUnreadCount: number;
 }) {
   const initials = profile.display_name
     .split(" ")
@@ -40,11 +47,18 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-3">
+        <NotificationBell
+          profileId={profile.id}
+          initialItems={initialNotifications}
+          initialUnreadCount={initialUnreadCount}
+        />
         <span className="text-xs text-muted-foreground">{ROLE_LABEL[profile.role]}</span>
-        <div className="flex size-[30px] items-center justify-center rounded-full bg-primary text-[12px] font-medium text-primary-foreground">
-          {initials}
-        </div>
-        <span className="text-[13px]">{profile.display_name}</span>
+        <Link href="/mi-cuenta" className="flex items-center gap-2">
+          <div className="flex size-[30px] items-center justify-center rounded-full bg-primary text-[12px] font-medium text-primary-foreground">
+            {initials}
+          </div>
+          <span className="text-[13px]">{profile.display_name}</span>
+        </Link>
         <form action={signOut}>
           <ActionButton
             variant="ghost"
