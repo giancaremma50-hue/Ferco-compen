@@ -41,7 +41,7 @@
   /* Trazos */
   --border: #e4e1da;
   --input: #e4e1da;
-  --ring: #1f4d3d;
+  --ring: var(--accent);
 
   --radius: 0.5rem;
 }
@@ -73,7 +73,7 @@
 
   --border: #33332c;
   --input: #33332c;
-  --ring: #4f9e80;
+  --ring: var(--accent);
 }
 
 @theme inline {
@@ -116,8 +116,6 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    /* Deja espacio para el menú flotante inferior: sin esto tapa el último elemento. */
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
   }
 
   /* Cifras alineadas en toda métrica y tabla. */

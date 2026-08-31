@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
       // Logos y portadas servidas desde el bucket público de marca.
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],
+    // Sin dangerouslyAllowSVG a propósito: el configurador de marca no
+    // admite subir SVG (ver src/lib/organizations/actions.ts) precisamente
+    // para no tener que sandboxear nada aquí.
   },
 };
 

@@ -43,6 +43,20 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 - HSTS y cabeceras de seguridad en `next.config.ts`.
 - `SUPABASE_SERVICE_ROLE_KEY` y `RESEND_API_KEY` solo en el servidor.
 
+## Estado del proyecto
+
+| Fase | Estado |
+|---|---|
+| 0 — Fundamentos | ✅ |
+| 1 — Diseño | ✅ |
+| 2 — Base de datos y RLS | ✅ |
+| 3 — Auth con Google y configurador | ✅ |
+| 4-8 | Pendientes |
+
+**Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
+1. Activar el custom access token hook (Authentication → Hooks).
+2. Configurar el proveedor de Google (Authentication → Providers).
+
 ## Para agentes de IA
 
 Lee **`AGENTS.md`** antes de trabajar: contiene el uso obligatorio de skills, las reglas de interacción no negociables y las reglas de diseño visual.
