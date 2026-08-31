@@ -1,0 +1,332 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: #14140f; background: #faf9f7; }
+    a { color: #1f4d3d; text-decoration: none; } a:hover { color: #14140f; }
+    .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+    .num { font-variant-numeric: tabular-nums; }
+    .label { font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: #6b6862; }
+    .panel { border: 1px solid #e4e1da; background: #ffffff; }
+    .phead { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e4e1da; }
+    .dt { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 9px 18px; font-size: 13px; }
+    .dt span:first-child { color: #6b6862; }
+    .navitem { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; font-size: 13px; font-weight: 500; color: rgba(250,249,247,0.62); }
+    .navitem.on { background: #faf9f7; color: #14140f; }
+    .mention { color: #1f4d3d; background: #f0f4f2; padding: 0 3px; border-radius: 2px; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1440px; height: 1180px; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 32px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <a href="#" style="display: flex; align-items: center; gap: 7px; font-size: 13px; color: #6b6862;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        Analista de Compensaciones
+      </a>
+      <span style="color: #e4e1da;">/</span>
+      <span style="font-size: 13px; font-weight: 500;">Sofía Marroquín</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button style="display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; background: #ffffff; border: 1px solid #e4e1da; border-radius: 4px; font-family: inherit; font-size: 13px; color: #14140f; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+        Agendar
+      </button>
+      <button style="display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; background: #14140f; border: 1px solid #14140f; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 500; color: #faf9f7; cursor: pointer;">
+        Avanzar de etapa
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 360px 640px 320px; gap: 28px; padding: 28px 32px 0;">
+
+    <!-- Rail izquierdo: identidad y CV -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+      <div class="panel" style="padding: 22px 18px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="flex: none; width: 52px; height: 52px; border-radius: 26px; background: #1f4d3d; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 500;">SM</div>
+          <div style="min-width: 0;">
+            <h1 class="serif" style="margin: 0; font-size: 26px; line-height: 1.15;">Sofía Marroquín</h1>
+            <p style="margin: 3px 0 0; font-size: 13px; color: #6b6862;">Analista Sr. de Compensaciones</p>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin: 18px 0; padding: 12px 0; border-top: 1px solid #f2f0ec; border-bottom: 1px solid #f2f0ec;">
+          <span class="label">Calificación</span>
+          <div style="display: flex; gap: 3px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#9a6b1f"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#9a6b1f"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#9a6b1f"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#9a6b1f"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#e4e1da"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 2px; margin: 0 -18px;">
+          <div class="dt"><span>Correo</span><span>sofia.marroquin@correo.com</span></div>
+          <div class="dt"><span>Teléfono</span><span class="num">+502 5412 8890</span></div>
+          <div class="dt"><span>Ubicación</span><span>Ciudad de Guatemala</span></div>
+          <div class="dt"><span>Experiencia</span><span class="num">7 años</span></div>
+          <div class="dt"><span>Origen</span><span>Portal de empleos</span></div>
+          <div class="dt"><span>Postuló</span><span class="num">26 ago 2026</span></div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;">
+          <span style="display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px solid #e4e1da; border-radius: 3px; font-size: 12px; color: #3a3830;">Bandas salariales</span>
+          <span style="display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px solid #e4e1da; border-radius: 3px; font-size: 12px; color: #3a3830;">SQL</span>
+          <span style="display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px solid #e4e1da; border-radius: 3px; font-size: 12px; color: #3a3830;">Power BI</span>
+          <span style="display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px solid #e4e1da; border-radius: 3px; font-size: 12px; color: #3a3830;">Equidad interna</span>
+          <span style="display: inline-flex; height: 24px; align-items: center; padding: 0 8px; border: 1px dashed #9a6b1f; border-radius: 3px; font-size: 12px; color: #9a6b1f;">Extraído del CV</span>
+        </div>
+      </div>
+
+      <!-- CV embebido -->
+      <div class="panel">
+        <div class="phead">
+          <span style="font-size: 13px; font-weight: 500;">CV-Sofia-Marroquin.pdf</span>
+          <div style="display: flex; gap: 8px;">
+            <span class="num" style="font-size: 12px; color: #6b6862;">628 KB</span>
+            <a href="#" style="font-size: 12px;">Abrir</a>
+          </div>
+        </div>
+        <div style="padding: 20px 18px; background: #f7f6f3;">
+          <div style="background: #ffffff; border: 1px solid #e4e1da; padding: 22px 20px; min-height: 280px;">
+            <p class="serif" style="margin: 0; font-size: 18px;">Sofía Marroquín</p>
+            <p style="margin: 4px 0 14px; font-size: 10px; color: #6b6862;">Analista Sr. de Compensaciones · Guatemala</p>
+            <div style="height: 1px; background: #e4e1da; margin-bottom: 14px;"></div>
+            <p style="margin: 0 0 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6862;">Experiencia</p>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="height: 5px; background: #e9e7e1; width: 100%;"></div>
+              <div style="height: 5px; background: #e9e7e1; width: 92%;"></div>
+              <div style="height: 5px; background: #e9e7e1; width: 78%;"></div>
+              <div style="height: 5px; background: #e9e7e1; width: 88%;"></div>
+            </div>
+            <p style="margin: 16px 0 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6862;">Educación</p>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="height: 5px; background: #e9e7e1; width: 84%;"></div>
+              <div style="height: 5px; background: #e9e7e1; width: 66%;"></div>
+            </div>
+            <p style="margin: 16px 0 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6862;">Habilidades</p>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="height: 5px; background: #e9e7e1; width: 95%;"></div>
+              <div style="height: 5px; background: #e9e7e1; width: 52%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Centro: notas -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+      <!-- Etapas -->
+      <div class="panel" style="padding: 18px;">
+        <p class="label" style="margin: 0 0 14px;">Etapa actual</p>
+        <div style="display: flex; align-items: center;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #1f4d3d;"></div>
+            <span style="font-size: 11px; color: #6b6862;">Postulado</span>
+          </div>
+          <div style="width: 6px;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #1f4d3d;"></div>
+            <span style="font-size: 11px; color: #6b6862;">Preselección</span>
+          </div>
+          <div style="width: 6px;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #1f4d3d;"></div>
+            <span style="font-size: 11px; font-weight: 500; color: #1f4d3d;">Entrevista RH</span>
+          </div>
+          <div style="width: 6px;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #e4e1da;"></div>
+            <span style="font-size: 11px; color: #6b6862;">Entrevista jefe</span>
+          </div>
+          <div style="width: 6px;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #e4e1da;"></div>
+            <span style="font-size: 11px; color: #6b6862;">Oferta</span>
+          </div>
+          <div style="width: 6px;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+            <div style="height: 3px; background: #e4e1da;"></div>
+            <span style="font-size: 11px; color: #6b6862;">Contratado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hilo de notas -->
+      <div class="panel">
+        <div class="phead">
+          <h2 class="serif" style="margin: 0; font-size: 20px;">Notas del equipo</h2>
+          <span class="num" style="font-size: 12px; color: #6b6862;">3 notas</span>
+        </div>
+
+        <div style="display: flex; gap: 12px; padding: 18px; border-bottom: 1px solid #f2f0ec;">
+          <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #14140f; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">MR</div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 13px; font-weight: 500;">Marcela Ruano</span>
+              <span style="font-size: 11px; color: #6b6862;">RH · hace 2 días</span>
+            </div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Muy sólida en la parte técnica. Construyó las bandas de Walmart CA desde cero. <span class="mention">@Roberto Cifuentes</span> vale la pena que la veas antes de la entrevista del jueves.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; padding: 18px; border-bottom: 1px solid #f2f0ec;">
+          <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #6b6862; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">RC</div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 13px; font-weight: 500;">Roberto Cifuentes</span>
+              <span style="font-size: 11px; color: #6b6862;">Gestor · hace 1 día</span>
+            </div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Leí el CV. Me interesa cómo manejó la revisión salarial de 2025 con 800 personas. Voy a preguntarle por eso.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; padding: 18px; border-bottom: 1px solid #e4e1da;">
+          <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #14140f; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">MR</div>
+          <div style="min-width: 0; width: 100%;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 13px; font-weight: 500;">Marcela Ruano</span>
+              <span style="font-size: 11px; color: #6b6862;">RH · hace 6 horas</span>
+              <span style="display: inline-flex; align-items: center; height: 19px; padding: 0 6px; border: 1px solid #9a6b1f; border-radius: 3px; font-size: 10px; color: #9a6b1f;">Privada</span>
+            </div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Su expectativa salarial es Q 15,000. Está dentro de banda pero en el tercio alto.</p>
+          </div>
+        </div>
+
+        <!-- Redactor -->
+        <div style="padding: 16px 18px;">
+          <div style="border: 1px solid #e4e1da; border-radius: 5px; background: #faf9f7;">
+            <div style="padding: 12px 14px; font-size: 14px; color: #6b6862; min-height: 48px;">Escribe una nota. Usa <span class="mention">@</span> para mencionar a alguien del equipo.</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-top: 1px solid #e4e1da;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b6862; cursor: pointer;">
+                <span style="width: 15px; height: 15px; border: 1px solid #c9c5bc; border-radius: 3px; background: #ffffff;"></span>
+                Solo visible para RH
+              </label>
+              <button style="height: 32px; padding: 0 16px; background: #14140f; border: 1px solid #14140f; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 500; color: #faf9f7; cursor: pointer;">Publicar nota</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rail derecho: bitácora -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div class="panel">
+        <div class="phead">
+          <h2 class="serif" style="margin: 0; font-size: 20px;">Bitácora</h2>
+          <span style="font-size: 11px; color: #6b6862;">Solo lectura</span>
+        </div>
+
+        <div style="padding: 18px 18px 6px;">
+
+          <div style="display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 20px; position: relative;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="width: 7px; height: 7px; border-radius: 4px; background: #1f4d3d; margin-top: 4px;"></span>
+              <span style="flex: 1; width: 1px; background: #e4e1da; margin-top: 4px;"></span>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.5;">Avanzó a <strong style="font-weight: 500;">Entrevista RH</strong></p>
+              <p class="num" style="margin: 3px 0 0; font-size: 11px; color: #6b6862;">Marcela Ruano · 29 ago, 09:14</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="width: 7px; height: 7px; border-radius: 4px; background: #c9c5bc; margin-top: 4px;"></span>
+              <span style="flex: 1; width: 1px; background: #e4e1da; margin-top: 4px;"></span>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.5;">Correo enviado: <em>Invitación a entrevista</em></p>
+              <p class="num" style="margin: 3px 0 0; font-size: 11px; color: #6b6862;">Automático · 29 ago, 09:14</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="width: 7px; height: 7px; border-radius: 4px; background: #c9c5bc; margin-top: 4px;"></span>
+              <span style="flex: 1; width: 1px; background: #e4e1da; margin-top: 4px;"></span>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.5;">Calificada con <strong class="num" style="font-weight: 500;">4 de 5</strong></p>
+              <p class="num" style="margin: 3px 0 0; font-size: 11px; color: #6b6862;">Marcela Ruano · 28 ago, 16:40</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="width: 7px; height: 7px; border-radius: 4px; background: #c9c5bc; margin-top: 4px;"></span>
+              <span style="flex: 1; width: 1px; background: #e4e1da; margin-top: 4px;"></span>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.5;">Avanzó a <strong style="font-weight: 500;">Preselección</strong></p>
+              <p class="num" style="margin: 3px 0 0; font-size: 11px; color: #6b6862;">Marcela Ruano · 27 ago, 11:02</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 14px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="width: 7px; height: 7px; border-radius: 4px; background: #c9c5bc; margin-top: 4px;"></span>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.5;">Postuló desde el portal</p>
+              <p class="num" style="margin: 3px 0 0; font-size: 11px; color: #6b6862;">26 ago, 20:31</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Acción destructiva -->
+      <div class="panel" style="padding: 18px;">
+        <p class="label" style="margin: 0 0 4px;">Cerrar el proceso</p>
+        <p style="margin: 0 0 14px; font-size: 13px; line-height: 1.55; color: #6b6862;">Se le notifica por correo con el motivo que elijas.</p>
+        <button style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 38px; background: #ffffff; border: 1px solid #b3261e; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 500; color: #b3261e; cursor: pointer;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          Descartar candidata
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Menú principal flotante -->
+  <nav style="position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 6px; border: 1px solid #14140f; border-radius: 28px; background: #14140f;">
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V20h14V9.8"/></svg>
+      Inicio
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+      Vacantes
+    </div>
+    <div class="navitem on">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 20v-2a4 4 0 0 0-3-3.9"/></svg>
+      Candidatos
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
+      Pipeline
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      Ajustes
+    </div>
+  </nav>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: #14140f; background: #faf9f7; }
+    a { color: #1f4d3d; text-decoration: none; } a:hover { color: #14140f; }
+    .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+    .num { font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    .label { font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: #6b6862; }
+    .panel { border: 1px solid #e4e1da; background: #ffffff; }
+    .item { display: flex; flex-direction: column; gap: 7px; padding: 15px 18px; border-bottom: 1px solid #f2f0ec; border-left: 3px solid transparent; }
+    .item.sel { background: #f7f6f3; border-left-color: #14140f; }
+    .sev { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 11px; font-weight: 500; }
+    .st { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6b6862; }
+    .navitem { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; font-size: 13px; font-weight: 500; color: rgba(250,249,247,0.62); }
+    .navitem.on { background: #faf9f7; color: #14140f; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1440px; height: 1020px; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 40px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 24px; height: 24px; border: 1px solid #14140f; display: flex; align-items: center; justify-content: center;">
+        <span class="serif" style="font-size: 15px; line-height: 1;">A</span>
+      </div>
+      <span class="serif" style="font-size: 18px;">Atrio</span>
+      <span style="margin-left: 10px; display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid #1f4d3d; border-radius: 3px; font-size: 11px; color: #1f4d3d;">Super admin</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <div style="width: 30px; height: 30px; border-radius: 15px; background: #14140f; color: #faf9f7; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center;">GC</div>
+      <span style="font-size: 13px;">Giancarlo</span>
+    </div>
+  </header>
+
+  <div style="padding: 32px 40px 0;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 26px;">
+      <div>
+        <p class="label" style="margin: 0;">Configuración</p>
+        <h1 class="serif" style="margin: 8px 0 0; font-size: 38px; line-height: 1.1;">Centro de errores</h1>
+        <p style="margin: 8px 0 0; font-size: 14px; color: #6b6862;">Lo que se rompió, quién lo vivió, y la conversación para resolverlo.</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <div style="text-align: right;">
+          <p class="label" style="margin: 0;">Sin abrir</p>
+          <p class="serif num" style="margin: 5px 0 0; font-size: 28px; line-height: 1; color: #b3261e;">3</p>
+        </div>
+        <div style="width: 1px; height: 34px; background: #e4e1da;"></div>
+        <div style="text-align: right;">
+          <p class="label" style="margin: 0;">En revisión</p>
+          <p class="serif num" style="margin: 5px 0 0; font-size: 28px; line-height: 1;">2</p>
+        </div>
+        <div style="width: 1px; height: 34px; background: #e4e1da;"></div>
+        <div style="text-align: right;">
+          <p class="label" style="margin: 0;">Resueltos (30 d)</p>
+          <p class="serif num" style="margin: 5px 0 0; font-size: 28px; line-height: 1; color: #6b6862;">17</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 430px 1fr; gap: 24px;">
+
+      <!-- Bandeja -->
+      <div class="panel" style="align-self: start;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #e4e1da;">
+          <span style="display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border: 1px solid #14140f; border-radius: 4px; background: #14140f; font-size: 12px; color: #faf9f7;">Sin resolver</span>
+          <span style="display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border: 1px solid #e4e1da; border-radius: 4px; font-size: 12px; color: #6b6862;">Todos</span>
+          <span style="display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border: 1px solid #e4e1da; border-radius: 4px; font-size: 12px; color: #6b6862;">Críticos</span>
+          <span class="num" style="margin-left: auto; font-size: 12px; color: #6b6862;">5</span>
+        </div>
+
+        <div class="item sel">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="sev" style="background: #fbeae9; color: #b3261e;">Crítica</span>
+            <span class="mono num" style="font-size: 11px; color: #6b6862;">ERR-2026-0142</span>
+            <span class="num" style="margin-left: auto; font-size: 11px; color: #6b6862;">hace 40 min</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4;">No se pudo guardar la postulación</p>
+          <p style="margin: 0; font-size: 12px; color: #6b6862; line-height: 1.5;">Marcela Ruano · «Estaba subiendo el CV de una candidata y se quedó cargando»</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 2px;">
+            <span class="st"><span style="width: 6px; height: 6px; border-radius: 3px; background: #b3261e;"></span>Sin abrir</span>
+            <span class="st num">3 personas afectadas</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="sev" style="background: #fbf3e4; color: #9a6b1f;">Media</span>
+            <span class="mono num" style="font-size: 11px; color: #6b6862;">ERR-2026-0141</span>
+            <span class="num" style="margin-left: auto; font-size: 11px; color: #6b6862;">hace 3 h</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4;">El filtro de país no devuelve resultados</p>
+          <p style="margin: 0; font-size: 12px; color: #6b6862; line-height: 1.5;">Roberto Cifuentes · «Filtré por Honduras y me salió vacío»</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 2px;">
+            <span class="st"><span style="width: 6px; height: 6px; border-radius: 3px; background: #9a6b1f;"></span>En revisión</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="sev" style="background: #fbf3e4; color: #9a6b1f;">Media</span>
+            <span class="mono num" style="font-size: 11px; color: #6b6862;">ERR-2026-0139</span>
+            <span class="num" style="margin-left: auto; font-size: 11px; color: #6b6862;">ayer</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4;">No llegó el correo de invitación a entrevista</p>
+          <p style="margin: 0; font-size: 12px; color: #6b6862; line-height: 1.5;">Ana Vásquez · «La candidata dice que no le llegó nada»</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 2px;">
+            <span class="st"><span style="width: 6px; height: 6px; border-radius: 3px; background: #1f4d3d;"></span>Esperando al usuario</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="sev" style="background: #f2f0ec; color: #6b6862;">Baja</span>
+            <span class="mono num" style="font-size: 11px; color: #6b6862;">ERR-2026-0138</span>
+            <span class="num" style="margin-left: auto; font-size: 11px; color: #6b6862;">hace 2 d</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4;">El menú tapa el último candidato de la lista</p>
+          <p style="margin: 0; font-size: 12px; color: #6b6862; line-height: 1.5;">Luis Paz · «En el celular no puedo ver al último»</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 2px;">
+            <span class="st"><span style="width: 6px; height: 6px; border-radius: 3px; background: #b3261e;"></span>Sin abrir</span>
+          </div>
+        </div>
+
+        <div class="item" style="border-bottom: none;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="sev" style="background: #f2f0ec; color: #6b6862;">Baja</span>
+            <span class="mono num" style="font-size: 11px; color: #6b6862;">ERR-2026-0136</span>
+            <span class="num" style="margin-left: auto; font-size: 11px; color: #6b6862;">hace 4 d</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4;">Sesión expirada al volver de comer</p>
+          <p style="margin: 0; font-size: 12px; color: #6b6862; line-height: 1.5;">Karla Díaz · «Perdí lo que estaba escribiendo»</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 2px;">
+            <span class="st"><span style="width: 6px; height: 6px; border-radius: 3px; background: #b3261e;"></span>Sin abrir</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detalle + hilo -->
+      <div class="panel" style="display: flex; flex-direction: column;">
+
+        <div style="padding: 22px 26px; border-bottom: 1px solid #e4e1da;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <span class="sev" style="background: #fbeae9; color: #b3261e;">Crítica</span>
+            <span class="mono num" style="font-size: 12px; color: #6b6862;">ERR-2026-0142</span>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button style="height: 32px; padding: 0 13px; border: 1px solid #e4e1da; border-radius: 4px; background: #ffffff; font-family: inherit; font-size: 12px; cursor: pointer;">Marcar en revisión</button>
+              <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px; border: 1px solid #1f4d3d; border-radius: 4px; background: #1f4d3d; font-family: inherit; font-size: 12px; font-weight: 500; color: #faf9f7; cursor: pointer;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                Resolver
+              </button>
+            </div>
+          </div>
+          <h2 class="serif" style="margin: 0; font-size: 28px; line-height: 1.2;">No se pudo guardar la postulación</h2>
+          <p style="margin: 10px 0 0; font-size: 13px; color: #6b6862;">Reportado por <strong style="font-weight: 500; color: #14140f;">Marcela Ruano</strong> (admin) · 31 ago 2026, 08:42 · Agrupa <span class="num">3</span> ocurrencias</p>
+        </div>
+
+        <!-- Contexto técnico -->
+        <div style="padding: 20px 26px; border-bottom: 1px solid #e4e1da; background: #faf9f7;">
+          <p class="label" style="margin: 0 0 12px;">Contexto capturado automáticamente</p>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px;">
+            <div style="display: flex; gap: 12px; font-size: 12px;"><span style="width: 84px; color: #6b6862;">Ruta</span><span class="mono">/vacantes/000118/candidatos/nuevo</span></div>
+            <div style="display: flex; gap: 12px; font-size: 12px;"><span style="width: 84px; color: #6b6862;">Acción</span><span class="mono">crearCandidato</span></div>
+            <div style="display: flex; gap: 12px; font-size: 12px;"><span style="width: 84px; color: #6b6862;">Código</span><span class="mono">STORAGE_UPLOAD_TIMEOUT</span></div>
+            <div style="display: flex; gap: 12px; font-size: 12px;"><span style="width: 84px; color: #6b6862;">Navegador</span><span class="mono">Chrome 141 · macOS</span></div>
+          </div>
+          <div class="mono" style="margin-top: 14px; padding: 12px 14px; border: 1px solid #e4e1da; background: #ffffff; font-size: 11px; line-height: 1.7; color: #6b6862; white-space: pre-line;">StorageError: upload exceeded 30000 ms
+  at uploadCv (lib/storage.ts:64)
+  at crearCandidato (actions/candidatos.ts:118)</div>
+        </div>
+
+        <!-- Hilo -->
+        <div style="flex: 1; padding: 22px 26px;">
+          <p class="label" style="margin: 0 0 18px;">Conversación con quien lo reportó</p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+            <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #6b6862; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">MR</div>
+            <div>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <span style="font-size: 13px; font-weight: 500;">Marcela Ruano</span>
+                <span class="num" style="font-size: 11px; color: #6b6862;">08:42</span>
+              </div>
+              <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Estaba subiendo el CV de una candidata desde el celular con datos móviles y se quedó cargando como dos minutos, después salió el mensaje de error. Lo intenté tres veces.</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+            <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #14140f; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">GC</div>
+            <div>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <span style="font-size: 13px; font-weight: 500;">Giancarlo</span>
+                <span style="display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border: 1px solid #1f4d3d; border-radius: 3px; font-size: 10px; color: #1f4d3d;">Soporte</span>
+                <span class="num" style="font-size: 11px; color: #6b6862;">09:05</span>
+              </div>
+              <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Gracias, Marcela. Ya lo veo: el archivo pesaba 14 MB y el límite es 10. El mensaje que te mostró no lo decía y eso es culpa nuestra. Estoy subiendo el límite y arreglando el mensaje. ¿El CV era un PDF escaneado?</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 22px;">
+            <div style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #6b6862; color: #faf9f7; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500;">MR</div>
+            <div>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <span style="font-size: 13px; font-weight: 500;">Marcela Ruano</span>
+                <span class="num" style="font-size: 11px; color: #6b6862;">09:11</span>
+              </div>
+              <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #3a3830;">Sí, escaneado. Me pasa seguido con los que mandan por WhatsApp.</p>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #e4e1da; border-radius: 5px; background: #faf9f7;">
+            <div style="padding: 12px 14px; min-height: 44px; font-size: 14px; color: #6b6862;">Responde a Marcela…</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-top: 1px solid #e4e1da;">
+              <span style="font-size: 12px; color: #6b6862;">Se le notifica por correo y dentro de la plataforma.</span>
+              <button style="height: 32px; padding: 0 16px; background: #14140f; border: 1px solid #14140f; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 500; color: #faf9f7; cursor: pointer;">Responder</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Menú principal flotante -->
+  <nav style="position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 6px; border: 1px solid #14140f; border-radius: 28px; background: #14140f;">
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V20h14V9.8"/></svg>
+      Inicio
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+      Vacantes
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 20v-2a4 4 0 0 0-3-3.9"/></svg>
+      Candidatos
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
+      Pipeline
+    </div>
+    <div class="navitem on">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      Ajustes
+    </div>
+  </nav>
+
+</div>
+</x-dc>
+</body>
+</html>

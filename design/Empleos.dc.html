@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: #14140f; background: #faf9f7; }
+    a { color: #1f4d3d; text-decoration: none; } a:hover { color: #14140f; }
+    .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+    .num { font-variant-numeric: tabular-nums; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 1px solid #e4e1da; border-radius: 4px; background: #ffffff; font-size: 13px; color: #14140f; }
+    .meta { font-size: 13px; color: #6b6862; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; min-height: 1200px;">
+
+  <!-- Barra pública -->
+  <header style="display: flex; align-items: center; justify-content: space-between; height: 68px; padding: 0 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 26px; height: 26px; border: 1px solid #14140f; display: flex; align-items: center; justify-content: center;">
+        <span class="serif" style="font-size: 16px; line-height: 1;">A</span>
+      </div>
+      <span class="serif" style="font-size: 19px;">Atrio</span>
+    </div>
+    <nav style="display: flex; align-items: center; gap: 32px; font-size: 14px;">
+      <a href="#" style="color: #14140f; border-bottom: 1px solid #14140f; padding-bottom: 2px;">Vacantes</a>
+      <a href="#" style="color: #6b6862;">Cómo contratamos</a>
+      <a href="#" style="color: #6b6862;">Entrar</a>
+    </nav>
+  </header>
+
+  <!-- Encabezado editorial -->
+  <section style="padding: 72px 64px 40px; border-bottom: 1px solid #e4e1da;">
+    <p style="margin: 0; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #6b6862;">Trabaja con nosotros</p>
+    <h1 class="serif" style="margin: 18px 0 0; font-size: 60px; line-height: 1.05; letter-spacing: -0.015em; max-width: 780px;">Catorce plazas abiertas en cuatro países</h1>
+    <p style="margin: 20px 0 0; font-size: 16px; line-height: 1.6; color: #6b6862; max-width: 560px;">Postular toma menos de tres minutos. Te responderemos por correo con el estado de tu proceso, aunque la respuesta sea que no.</p>
+  </section>
+
+  <!-- Filtros -->
+  <section style="display: flex; align-items: center; justify-content: space-between; padding: 24px 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 1px solid #e4e1da; border-radius: 4px; background: #faf9f7; width: 260px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span style="font-size: 13px; color: #6b6862;">Buscar por puesto o palabra</span>
+      </div>
+      <div class="chip">País: Todos <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="chip">Área: Todas <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="chip" style="border-color: #1f4d3d; color: #1f4d3d;">Modalidad: Híbrida
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1f4d3d" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
+    </div>
+    <span class="meta num">14 vacantes</span>
+  </section>
+
+  <!-- Listado -->
+  <section style="display: flex; flex-direction: column;">
+
+    <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; padding: 28px 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 class="serif" style="margin: 0; font-size: 26px; line-height: 1.2;">Analista de Compensaciones</h2>
+        <div style="display: flex; align-items: center; gap: 10px;" class="meta">
+          <span>Recursos Humanos</span><span style="color: #e4e1da;">·</span>
+          <span>Guatemala</span><span style="color: #e4e1da;">·</span>
+          <span>Híbrida</span><span style="color: #e4e1da;">·</span>
+          <span>Tiempo completo</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <span class="meta num">Publicada hace 3 días</span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px; border: 1px solid #14140f; border-radius: 5px; font-size: 14px; font-weight: 500; color: #14140f;">
+          Ver vacante
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; padding: 28px 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 class="serif" style="margin: 0; font-size: 26px; line-height: 1.2;">Jefe de Sucursal</h2>
+        <div style="display: flex; align-items: center; gap: 10px;" class="meta">
+          <span>Comercial</span><span style="color: #e4e1da;">·</span>
+          <span>El Salvador</span><span style="color: #e4e1da;">·</span>
+          <span>Presencial</span><span style="color: #e4e1da;">·</span>
+          <span>Tiempo completo</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <span class="meta num">Publicada hace 6 días</span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px; border: 1px solid #14140f; border-radius: 5px; font-size: 14px; font-weight: 500; color: #14140f;">
+          Ver vacante
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; padding: 28px 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 class="serif" style="margin: 0; font-size: 26px; line-height: 1.2;">Desarrollador Full Stack</h2>
+        <div style="display: flex; align-items: center; gap: 10px;" class="meta">
+          <span>Tecnología</span><span style="color: #e4e1da;">·</span>
+          <span>Guatemala</span><span style="color: #e4e1da;">·</span>
+          <span>Remota</span><span style="color: #e4e1da;">·</span>
+          <span>Tiempo completo</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <span class="meta num">Publicada hace 9 días</span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px; border: 1px solid #14140f; border-radius: 5px; font-size: 14px; font-weight: 500; color: #14140f;">
+          Ver vacante
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; padding: 28px 64px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 class="serif" style="margin: 0; font-size: 26px; line-height: 1.2;">Auxiliar Contable</h2>
+        <div style="display: flex; align-items: center; gap: 10px;" class="meta">
+          <span>Finanzas</span><span style="color: #e4e1da;">·</span>
+          <span>Honduras</span><span style="color: #e4e1da;">·</span>
+          <span>Presencial</span><span style="color: #e4e1da;">·</span>
+          <span>Tiempo completo</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <span class="meta num">Publicada hace 12 días</span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px; border: 1px solid #14140f; border-radius: 5px; font-size: 14px; font-weight: 500; color: #14140f;">
+          Ver vacante
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Cierre: candidatura espontánea -->
+  <section style="display: flex; align-items: center; justify-content: space-between; gap: 48px; margin: 56px 64px; padding: 40px; border: 1px solid #e4e1da; background: #ffffff;">
+    <div style="max-width: 560px;">
+      <h3 class="serif" style="margin: 0; font-size: 30px; line-height: 1.2;">¿No ves tu puesto?</h3>
+      <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.6; color: #6b6862;">Déjanos tu CV. Cuando se abra una plaza que encaje con tu perfil, eres de los primeros en enterarte.</p>
+    </div>
+    <a href="#" style="display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 24px; background: #1f4d3d; border: 1px solid #1f4d3d; border-radius: 5px; font-size: 15px; font-weight: 500; color: #faf9f7;">Dejar mi CV</a>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>

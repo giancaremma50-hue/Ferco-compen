@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: #14140f; background: #faf9f7; }
+    a { color: #1f4d3d; text-decoration: none; } a:hover { color: #14140f; }
+    .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+    .num { font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    .panel { border: 1px solid #e4e1da; background: #ffffff; }
+    .cap { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6862; }
+    .note { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: #6b6862; max-width: 640px; }
+    .state { font-size: 11px; color: #6b6862; margin: 10px 0 0; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 42px; padding: 0 20px; border-radius: 5px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .spin { animation: rot 0.8s linear infinite; transform-origin: 50% 50%; }
+    @keyframes rot { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  </style>
+</helmet>
+
+<div style="width: 1180px; min-height: 1400px; padding: 40px; box-sizing: border-box;">
+
+  <h1 class="serif" style="margin: 0 0 6px; font-size: 34px;">Reglas de interacción</h1>
+  <p class="note" style="margin-bottom: 40px;">Las cuatro reglas no negociables, resueltas como componentes para que no dependan de la disciplina de nadie.</p>
+
+  <!-- 1. Botón de acción -->
+  <section style="margin-bottom: 40px;">
+    <p class="cap">Regla 1 · <span style="text-transform: none; letter-spacing: 0;">ActionButton</span></p>
+    <p class="note">Todo botón que muta datos confirma al usuario que algo está pasando. El spinner sale del <span class="mono" style="font-size: 12px;">pending</span> de <span class="mono" style="font-size: 12px;">useActionState</span>, no de un estado inventado a mano.</p>
+
+    <div class="panel" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;">
+      <div style="padding: 26px 24px; border-right: 1px solid #e4e1da;">
+        <span class="btn" style="background: #14140f; border: 1px solid #14140f; color: #faf9f7;">Publicar vacante</span>
+        <p class="state">Reposo</p>
+      </div>
+      <div style="padding: 26px 24px; border-right: 1px solid #e4e1da;">
+        <span class="btn" style="background: #14140f; border: 1px solid #14140f; color: #faf9f7;">Publicar vacante</span>
+        <p class="state">Cursor encima · sin cambio de tamaño</p>
+      </div>
+      <div style="padding: 26px 24px; border-right: 1px solid #e4e1da; background: #faf9f7;">
+        <span class="btn" style="background: #14140f; border: 1px solid #14140f; color: #faf9f7; opacity: 0.85; cursor: progress;">
+          <svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9" /></svg>
+          Publicando…
+        </span>
+        <p class="state">Cargando · deshabilitado · <span class="mono">aria-busy</span></p>
+      </div>
+      <div style="padding: 26px 24px;">
+        <span class="btn" style="background: #ffffff; border: 1px solid #e4e1da; color: #c9c5bc; cursor: not-allowed;">Publicar vacante</span>
+        <p class="state">Deshabilitado · falta llenar el formulario</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Confirmación de éxito -->
+  <section style="margin-bottom: 40px;">
+    <p class="cap">Regla 2 · confirmación de éxito</p>
+    <p class="note">Toda acción exitosa dice exactamente qué pasó. Nunca «Éxito» ni «Listo». Cuando la acción es reversible, el aviso trae el deshacer.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+      <div class="panel" style="display: flex; align-items: center; gap: 12px; padding: 15px 17px; border-color: #2f6f4e;">
+        <svg style="flex: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2f6f4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2" stroke-width="1.6"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+        <div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500;">Vacante publicada</p>
+          <p style="margin: 3px 0 0; font-size: 12px; color: #6b6862;">Ya aparece en el portal de empleos.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="display: flex; align-items: center; gap: 12px; padding: 15px 17px; border-color: #2f6f4e;">
+        <svg style="flex: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2f6f4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2" stroke-width="1.6"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+        <div style="flex: 1;">
+          <p style="margin: 0; font-size: 14px; font-weight: 500;">Sofía avanzó a Entrevista RH</p>
+          <p style="margin: 3px 0 0; font-size: 12px; color: #6b6862;">Se le envió la invitación.</p>
+        </div>
+        <button style="flex: none; height: 28px; padding: 0 11px; border: 1px solid #e4e1da; border-radius: 4px; background: #ffffff; font-family: inherit; font-size: 12px; cursor: pointer;">Deshacer</button>
+      </div>
+
+      <div class="panel" style="display: flex; align-items: center; gap: 12px; padding: 15px 17px; border-color: #2f6f4e;">
+        <svg style="flex: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2f6f4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2" stroke-width="1.6"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+        <div>
+          <p style="margin: 0; font-size: 14px; font-weight: 500;">Marca actualizada</p>
+          <p style="margin: 3px 0 0; font-size: 12px; color: #6b6862;">Todos verán el nuevo logo al recargar.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Eliminar -->
+  <section style="margin-bottom: 40px;">
+    <p class="cap">Regla 3 · eliminar</p>
+    <p class="note">Rojo, ícono <span class="mono" style="font-size: 12px;">X</span>, y confirmación que nombra lo que se va a borrar. Nunca se elimina en un solo clic.</p>
+
+    <div style="display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start;">
+
+      <div class="panel" style="padding: 24px;">
+        <p class="cap" style="margin-bottom: 16px;">Disparadores</p>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span class="btn" style="background: #ffffff; border: 1px solid #b3261e; color: #b3261e; align-self: flex-start;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Eliminar vacante
+          </span>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid #e4e1da; border-radius: 4px; background: #ffffff; cursor: pointer;" aria-label="Quitar archivo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b3261e" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+            <span style="font-size: 12px; color: #6b6862;">Icónico, dentro de listas y adjuntos</span>
+          </div>
+        </div>
+        <p class="note" style="margin: 20px 0 0; font-size: 12px;">El rojo <span class="mono">#B3261E</span> está reservado para destruir. No se usa para alertas ni para énfasis.</p>
+      </div>
+
+      <div style="padding: 32px 24px; background: rgba(20,20,15,0.28); border: 1px solid #e4e1da;">
+        <div class="panel" style="max-width: 440px; margin: 0 auto; padding: 26px;">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;">
+            <h3 class="serif" style="margin: 0; font-size: 23px; line-height: 1.25;">¿Eliminar la vacante de Analista de Compensaciones?</h3>
+            <button style="flex: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid #e4e1da; border-radius: 4px; background: #ffffff; cursor: pointer;" aria-label="Cerrar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <p style="margin: 14px 0 0; font-size: 14px; line-height: 1.65; color: #3a3830;">Se borran también <strong class="num" style="font-weight: 500;">24 postulaciones</strong>, sus notas y su historial. Los candidatos no reciben ningún aviso. Esto no se puede deshacer.</p>
+          <div style="display: flex; gap: 10px; margin-top: 24px;">
+            <button style="height: 42px; padding: 0 20px; background: #b3261e; border: 1px solid #b3261e; border-radius: 5px; font-family: inherit; font-size: 14px; font-weight: 500; color: #ffffff; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              Sí, eliminar
+            </button>
+            <button style="height: 42px; padding: 0 20px; background: #ffffff; border: 1px solid #e4e1da; border-radius: 5px; font-family: inherit; font-size: 14px; color: #14140f; cursor: pointer;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Menú flotante -->
+  <section>
+    <p class="cap">Regla 4 · menú principal flotante</p>
+    <p class="note">Acompaña la pantalla sin invadirla: se oculta al bajar, reaparece al subir, y el contenido siempre reserva su espacio. El indicador se desliza entre secciones con <span class="mono" style="font-size: 12px;">layoutId</span>.</p>
+
+    <div class="panel" style="padding: 32px 24px;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 26px;">
+
+        <div style="display: flex; align-items: center; gap: 2px; padding: 6px; border: 1px solid #14140f; border-radius: 28px; background: #14140f;">
+          <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; background: #faf9f7; color: #14140f; font-size: 13px; font-weight: 500;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V20h14V9.8"/></svg>
+            Inicio
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; color: rgba(250,249,247,0.62); font-size: 13px; font-weight: 500;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+            Vacantes
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; color: rgba(250,249,247,0.62); font-size: 13px; font-weight: 500;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 20v-2a4 4 0 0 0-3-3.9"/></svg>
+            Candidatos
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; color: rgba(250,249,247,0.62); font-size: 13px; font-weight: 500;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
+            Pipeline
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; color: rgba(250,249,247,0.62); font-size: 13px; font-weight: 500;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            Ajustes
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; width: 100%; padding-top: 26px; border-top: 1px solid #e4e1da;">
+          <div>
+            <p style="margin: 0; font-size: 13px; font-weight: 500;">En móvil</p>
+            <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: #6b6862;">Solo íconos, con la etiqueta visible únicamente en el ítem activo. Respeta <span class="mono" style="font-size: 12px;">safe-area-inset-bottom</span>.</p>
+          </div>
+          <div>
+            <p style="margin: 0; font-size: 13px; font-weight: 500;">Según el rol</p>
+            <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: #6b6862;">El colaborador ve tres ítems: Empleos, Mis referidos, Mis reportes. Máximo cinco en cualquier rol.</p>
+          </div>
+          <div>
+            <p style="margin: 0; font-size: 13px; font-weight: 500;">Nunca tapa contenido</p>
+            <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: #6b6862;">El <span class="mono" style="font-size: 12px;">body</span> reserva <span class="mono num" style="font-size: 12px;">7rem</span> de padding inferior. Sin eso, la barra corta el último elemento de toda lista.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>

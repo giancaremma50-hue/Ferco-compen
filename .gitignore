@@ -49,3 +49,6 @@ desktop.ini
 # original logo source files (already copied to public/ with clean names)
 Logo FERCO NEGRO.png
 Logo Ferco Ceramica Letra Blanca 3.png
+
+# Canvas de diseño generado (se re-genera desde design/)
+ats-pantallas.html

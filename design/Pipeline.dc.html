@@ -1,0 +1,271 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: #14140f; background: #faf9f7; }
+    a { color: #1f4d3d; text-decoration: none; } a:hover { color: #14140f; }
+    .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+    .num { font-variant-numeric: tabular-nums; }
+    .label { font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: #6b6862; }
+    .col { display: flex; flex-direction: column; min-width: 0; }
+    .colhead { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 10px; border-bottom: 1px solid #14140f; margin-bottom: 12px; }
+    .card { border: 1px solid #e4e1da; background: #ffffff; padding: 13px; margin-bottom: 10px; }
+    .name { margin: 0; font-size: 14px; font-weight: 500; line-height: 1.3; }
+    .sub { margin: 4px 0 0; font-size: 12px; color: #6b6862; line-height: 1.4; }
+    .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; padding-top: 10px; border-top: 1px solid #f2f0ec; }
+    .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid #e4e1da; border-radius: 3px; font-size: 11px; color: #6b6862; }
+    .navitem { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; font-size: 13px; font-weight: 500; color: rgba(250,249,247,0.62); }
+    .navitem.on { background: #faf9f7; color: #14140f; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1440px; height: 960px; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 40px; border-bottom: 1px solid #e4e1da; background: #ffffff;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <a href="#" style="display: flex; align-items: center; gap: 7px; font-size: 13px; color: #6b6862;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        Vacantes
+      </a>
+      <span style="color: #e4e1da;">/</span>
+      <span style="font-size: 13px; font-weight: 500;">Analista de Compensaciones</span>
+      <span class="num" style="font-size: 12px; color: #6b6862;">VAC-2026-000118</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #e4e1da; border-radius: 4px; background: #faf9f7;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+        <span style="font-size: 13px; color: #6b6862;">Filtrar</span>
+      </div>
+      <button style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; background: #14140f; border: 1px solid #14140f; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 500; color: #faf9f7; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Agregar candidato
+      </button>
+    </div>
+  </header>
+
+  <div style="padding: 28px 40px 0;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 26px;">
+      <div>
+        <p class="label" style="margin: 0;">Recursos Humanos · Guatemala · Abierta hace 12 días</p>
+        <h1 class="serif" style="margin: 8px 0 0; font-size: 36px; line-height: 1.1;">Analista de Compensaciones</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <div style="text-align: right;">
+          <p class="label" style="margin: 0;">En proceso</p>
+          <p class="serif num" style="margin: 5px 0 0; font-size: 26px; line-height: 1;">24</p>
+        </div>
+        <div style="width: 1px; height: 34px; background: #e4e1da;"></div>
+        <div style="text-align: right;">
+          <p class="label" style="margin: 0;">Descartados</p>
+          <p class="serif num" style="margin: 5px 0 0; font-size: 26px; line-height: 1; color: #6b6862;">37</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tablero -->
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px;">
+
+      <!-- Postulado -->
+      <div class="col">
+        <div class="colhead">
+          <span style="font-size: 13px; font-weight: 500;">Postulado</span>
+          <span class="num" style="font-size: 12px; color: #6b6862;">9</span>
+        </div>
+        <div class="card">
+          <p class="name">Ana Lucía Morales</p>
+          <p class="sub">Analista de RH · Cementos GT</p>
+          <div class="foot">
+            <span class="tag">Portal</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">1 d</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="name">Diego Estrada</p>
+          <p class="sub">Asistente de Nómina · Banco AZ</p>
+          <div class="foot">
+            <span class="tag">Portal</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">1 d</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="name">Karla Ruiz</p>
+          <p class="sub">Consultora · Mercer</p>
+          <div class="foot">
+            <span class="tag" style="border-color: #1f4d3d; color: #1f4d3d;">Referida</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">2 d</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; height: 38px; border: 1px dashed #e4e1da; font-size: 12px; color: #6b6862;">6 más</div>
+      </div>
+
+      <!-- Preselección -->
+      <div class="col">
+        <div class="colhead">
+          <span style="font-size: 13px; font-weight: 500;">Preselección</span>
+          <span class="num" style="font-size: 12px; color: #6b6862;">6</span>
+        </div>
+        <div class="card">
+          <p class="name">Josué Hernández</p>
+          <p class="sub">Analista Sr. · Grupo Q</p>
+          <div class="foot">
+            <div style="display: flex; gap: 2px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#e4e1da" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            </div>
+            <span class="num" style="font-size: 11px; color: #6b6862;">3 d</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="name">Melissa Aguilar</p>
+          <p class="sub">Coord. de Compensaciones</p>
+          <div class="foot">
+            <span class="tag">Búsqueda</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">4 d</span>
+          </div>
+        </div>
+        <div class="card" style="border-color: #9a6b1f;">
+          <p class="name">Óscar Pineda</p>
+          <p class="sub">Analista de Datos · Pollo Rey</p>
+          <div class="foot">
+            <span class="tag" style="border-color: #9a6b1f; color: #9a6b1f;">Sin mover</span>
+            <span class="num" style="font-size: 11px; color: #9a6b1f;">9 d</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; height: 38px; border: 1px dashed #e4e1da; font-size: 12px; color: #6b6862;">3 más</div>
+      </div>
+
+      <!-- Entrevista RH -->
+      <div class="col">
+        <div class="colhead">
+          <span style="font-size: 13px; font-weight: 500;">Entrevista RH</span>
+          <span class="num" style="font-size: 12px; color: #6b6862;">4</span>
+        </div>
+        <div class="card">
+          <p class="name">Sofía Marroquín</p>
+          <p class="sub">Analista Sr. · Walmart CA</p>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 9px; font-size: 11px; color: #1f4d3d;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+            Jue 3 sep · 10:00
+          </div>
+          <div class="foot">
+            <span class="tag">Portal</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">5 d</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="name">Luis Fernando Paz</p>
+          <p class="sub">Especialista · Tigo</p>
+          <div class="foot">
+            <span class="tag" style="border-color: #1f4d3d; color: #1f4d3d;">Referido</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">6 d</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; height: 38px; border: 1px dashed #e4e1da; font-size: 12px; color: #6b6862;">2 más</div>
+      </div>
+
+      <!-- Entrevista con jefe -->
+      <div class="col">
+        <div class="colhead">
+          <span style="font-size: 13px; font-weight: 500;">Entrevista con jefe</span>
+          <span class="num" style="font-size: 12px; color: #6b6862;">3</span>
+        </div>
+        <div class="card">
+          <p class="name">Gabriela Solís</p>
+          <p class="sub">Jefa de Compensaciones · CMI</p>
+          <div class="foot">
+            <div style="display: flex; gap: 2px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#9a6b1f" stroke="none"><path d="M12 2l3 6.5 7 .9-5 4.8 1.2 7-6.2-3.4L5.8 21 7 14.2 2 9.4l7-.9z"/></svg>
+            </div>
+            <span class="num" style="font-size: 11px; color: #6b6862;">8 d</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="name">Marco Villatoro</p>
+          <p class="sub">Analista Sr. · Cervecería</p>
+          <div class="foot">
+            <span class="tag">Portal</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">9 d</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Oferta -->
+      <div class="col">
+        <div class="colhead">
+          <span style="font-size: 13px; font-weight: 500;">Oferta</span>
+          <span class="num" style="font-size: 12px; color: #6b6862;">1</span>
+        </div>
+        <div class="card" style="border-color: #1f4d3d;">
+          <p class="name">Andrea Chacón</p>
+          <p class="sub">Analista de Compensaciones · Nestlé</p>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 9px; font-size: 11px; color: #1f4d3d;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            Oferta enviada · espera respuesta
+          </div>
+          <div class="foot">
+            <span class="num tag" style="border-color: #1f4d3d; color: #1f4d3d;">Q 14,500</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">2 d</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contratado -->
+      <div class="col">
+        <div class="colhead" style="border-bottom-color: #2f6f4e;">
+          <span style="font-size: 13px; font-weight: 500; color: #2f6f4e;">Contratado</span>
+          <span class="num" style="font-size: 12px; color: #2f6f4e;">1</span>
+        </div>
+        <div class="card">
+          <p class="name">Rodrigo Barrientos</p>
+          <p class="sub">Ingresa el 15 de septiembre</p>
+          <div class="foot">
+            <span class="tag" style="border-color: #2f6f4e; color: #2f6f4e;">Contratado</span>
+            <span class="num" style="font-size: 11px; color: #6b6862;">—</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Menú principal flotante -->
+  <nav style="position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 6px; border: 1px solid #14140f; border-radius: 28px; background: #14140f;">
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V20h14V9.8"/></svg>
+      Inicio
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+      Vacantes
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 20v-2a4 4 0 0 0-3-3.9"/></svg>
+      Candidatos
+    </div>
+    <div class="navitem on">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
+      Pipeline
+    </div>
+    <div class="navitem">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      Ajustes
+    </div>
+  </nav>
+
+</div>
+</x-dc>
+</body>
+</html>

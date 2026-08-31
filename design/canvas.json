@@ -1,0 +1,46 @@
+{
+  "pages": [
+    { "id": "producto", "name": "Producto" },
+    { "id": "sistema", "name": "Sistema y errores" }
+  ],
+  "artboards": [
+    { "file": "Login.dc.html", "page": "producto", "title": "1 · Inicio de sesión", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Empleos.dc.html", "page": "producto", "title": "2 · Portal público de vacantes", "x": 1560, "y": 0, "w": 1440, "h": 1320 },
+    { "file": "Vacante.dc.html", "page": "producto", "title": "3 · Vacante y postulación", "x": 3120, "y": 0, "w": 1440, "h": 1440 },
+    { "file": "Main.dc.html", "page": "producto", "title": "4 · Inicio del reclutador", "x": 0, "y": 1580, "w": 1440, "h": 960 },
+    { "file": "Pipeline.dc.html", "page": "producto", "title": "5 · Pipeline de la vacante", "x": 1560, "y": 1580, "w": 1440, "h": 960 },
+    { "file": "Candidato.dc.html", "page": "producto", "title": "6 · Perfil de candidato", "x": 3120, "y": 1580, "w": 1440, "h": 1180 },
+
+    { "file": "Configurador.dc.html", "page": "sistema", "title": "7 · Configurador de marca", "x": 0, "y": 0, "w": 1440, "h": 1000 },
+    { "file": "CentroErrores.dc.html", "page": "sistema", "title": "8 · Centro de errores", "x": 1560, "y": 0, "w": 1440, "h": 1020 },
+    { "file": "ErrorAmigable.dc.html", "page": "sistema", "title": "9 · Mensajes de error", "x": 3120, "y": 0, "w": 1180, "h": 1140 },
+    { "file": "Componentes.dc.html", "page": "sistema", "title": "10 · Reglas de interacción", "x": 4420, "y": 0, "w": 1180, "h": 1440 }
+  ],
+  "annotations": [
+    {
+      "id": "nota-producto",
+      "page": "producto",
+      "x": 0,
+      "y": -190,
+      "w": 900,
+      "text": "El recorrido completo, en orden.\nArriba: lo que ve el candidato desde fuera (login, portal, postulación).\nAbajo: lo que ve el equipo de reclutamiento (inicio, pipeline, perfil).\nLas tres pantallas internas llevan el menú flotante inferior — nunca una sidebar."
+    },
+    {
+      "id": "nota-sistema",
+      "page": "sistema",
+      "x": 0,
+      "y": -190,
+      "w": 900,
+      "text": "El configurador de marca alimenta el login y el portal.\nEl centro de errores es un canal de ida y vuelta: el usuario cuenta qué pasó, el super admin responde en el mismo hilo.\nEl último artboard fija las cuatro reglas de interacción como componentes."
+    },
+    {
+      "id": "nota-tipografia",
+      "page": "producto",
+      "x": 4700,
+      "y": 0,
+      "w": 340,
+      "text": "Sistema visual\n\nFondo #FAF9F7 · tinta #14140F\nBorde #E4E1DA de 1px — la elevación se hace con borde, nunca con sombra.\nAcento #1F4D3D, configurable por organización.\nInstrument Serif en títulos y cifras, Geist en interfaz y datos.\nCifras siempre con tabular-nums."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "producto" }
+}
