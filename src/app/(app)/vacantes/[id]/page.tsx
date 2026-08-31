@@ -78,6 +78,11 @@ export default async function VacanteDetailPage({
       <div className="mt-10 flex flex-wrap items-center gap-2.5 border-t border-border pt-6">
         <ApprovalActions job={job} role={profile.role} actorId={profile.id} />
         {canRefer && <ReferCandidateDialog jobId={job.id} />}
+        {profile.role !== "colaborador" && !["borrador", "pendiente_aprobacion"].includes(job.status) && (
+          <Link href={`/vacantes/${job.id}/pipeline`} className="text-sm font-medium text-accent underline">
+            Ver pipeline
+          </Link>
+        )}
       </div>
     </div>
   );

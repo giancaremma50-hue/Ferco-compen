@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Briefcase, Home, Settings } from "lucide-react";
+import { Briefcase, Home, Settings, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import type { Database } from "@/lib/supabase/database.types";
@@ -13,13 +13,16 @@ type Role = Database["public"]["Enums"]["app_role"];
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
-// A medida que la Fase 5 agregue rutas (Candidatos, Pipeline), se suman
-// aquí. Máximo 5 ítems por rol.
+// Máximo 5 ítems por rol.
 function itemsForRole(role: Role): NavItem[] {
   const base: NavItem[] = [
     { href: "/inicio", label: "Inicio", icon: Home },
     { href: "/vacantes", label: "Vacantes", icon: Briefcase },
   ];
+  // Un colaborador refiere candidatos pero no gestiona el pipeline.
+  if (role === "gestor" || ADMIN_ROLES.has(role)) {
+    base.push({ href: "/candidatos", label: "Candidatos", icon: Users });
+  }
   if (ADMIN_ROLES.has(role)) {
     base.push({ href: "/configuracion", label: "Ajustes", icon: Settings });
   }
