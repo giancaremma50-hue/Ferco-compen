@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ATS — Plataforma de reclutamiento
 
-## Getting Started
+Sistema de seguimiento de candidatos (Applicant Tracking System): publicar vacantes, recibir postulaciones, mover candidatos por un pipeline y decidir contrataciones con trazabilidad completa.
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router) · TypeScript · Tailwind v4 · shadcn/ui · Supabase (Postgres + RLS, Auth Google, Storage, Realtime) · Resend · Vercel.
+
+## Puesta en marcha
 
 ```bash
+npm install
+cp .env.example .env.local   # y llenar los valores
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Comandos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript sin emitir |
+| `npm run email` | Vista previa de las plantillas de correo |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Roles
 
-## Learn More
+| Rol | Alcance |
+|---|---|
+| `colaborador` | Empleado: ve vacantes publicadas, refiere candidatos, sigue a sus referidos |
+| `gestor` | Jefe de área: solicita plazas y opera el pipeline **de sus vacantes** |
+| `admin` | RH: opera todo el reclutamiento y la configuración |
+| `super_admin` | Control total + centro de errores + marca + bitácora |
 
-To learn more about Next.js, take a look at the following resources:
+El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no subiendo el rol global.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Seguridad
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **RLS activo en todas las tablas**, deny-by-default. Una tabla sin política es un bug bloqueante.
+- Rol y organización viajan en el JWT; las políticas leen `auth.jwt()` y nunca consultan `profiles`.
+- CVs en bucket privado con URL firmada de 60 s.
+- HSTS y cabeceras de seguridad en `next.config.ts`.
+- `SUPABASE_SERVICE_ROLE_KEY` y `RESEND_API_KEY` solo en el servidor.
 
-## Deploy on Vercel
+## Para agentes de IA
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Lee **`AGENTS.md`** antes de trabajar: contiene el uso obligatorio de skills, las reglas de interacción no negociables y las reglas de diseño visual.
+Lee **`.claude/napkin.md`**: trampas conocidas, empezando por que en Next.js 16 el middleware ahora se llama `proxy.ts`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Herramientas requeridas
+
+Las skills están versionadas en `.claude/skills/` y aplican solas. El único componente externo es el servidor MCP de memoria de código:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+```
+
+Instala el binario en `~/.local/bin`; `.mcp.json` ya lo tiene configurado. No requiere API keys ni servicios externos.
