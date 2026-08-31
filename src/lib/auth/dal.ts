@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ADMIN_ROLES } from "./role-labels";
 import type { Tables } from "@/lib/supabase/database.types";
 
 export type Profile = Tables<"profiles">;
@@ -43,12 +44,10 @@ export async function requireProfile(): Promise<Profile> {
   return profile;
 }
 
-const ADMIN_ROLES = ["admin", "super_admin"] as const;
-
 /** Redirige con un mensaje amigable si el rol no alcanza — nunca un 403 crudo. */
 export async function requireAdminOrAbove(): Promise<Profile> {
   const profile = await requireProfile();
-  if (!ADMIN_ROLES.includes(profile.role as (typeof ADMIN_ROLES)[number])) {
+  if (!ADMIN_ROLES.has(profile.role)) {
     redirect("/auth/auth-error?motivo=sin_permiso");
   }
   return profile;

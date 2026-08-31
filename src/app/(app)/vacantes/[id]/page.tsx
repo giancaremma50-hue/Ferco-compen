@@ -1,0 +1,93 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { requireProfile } from "@/lib/auth/dal";
+import { getJobById } from "@/lib/jobs/get-jobs";
+import { canEditJob, TERMINAL_JOB_STATUSES } from "@/lib/jobs/permissions";
+import { JobStatusBadge } from "@/components/vacantes/job-status-badge";
+import { ApprovalActions } from "@/components/vacantes/approval-actions";
+import { ReferCandidateDialog } from "@/components/vacantes/refer-candidate-dialog";
+import { NotifyOnMount } from "@/components/ui/notify-on-mount";
+import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
+import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
+
+export default async function VacanteDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ creada?: string }>;
+}) {
+  const { id } = await params;
+  const { creada } = await searchParams;
+  const profile = await requireProfile();
+  const job = await getJobById(id);
+
+  if (!job) notFound();
+
+  const isOpenForCandidates = !TERMINAL_JOB_STATUSES.has(job.status);
+  const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
+  const canEdit = canEditJob(profile.role, profile.id, job);
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      {creada && <NotifyOnMount message="Vacante creada" />}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs tabular-nums text-muted-foreground">{job.code}</p>
+          <h1 className="font-serif mt-1.5 text-[34px] leading-tight">{job.title}</h1>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <JobStatusBadge status={job.status} />
+          {canEdit && (
+            <Link href={`/vacantes/${job.id}/editar`} className="text-xs text-muted-foreground underline">
+              Editar
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-border py-6 text-sm sm:grid-cols-3">
+        <Item label="País" value={job.country ?? "—"} />
+        <Item label="Ubicación" value={job.location ?? "—"} />
+        <Item label="Modalidad" value={job.work_mode ? WORK_MODE_LABEL[job.work_mode as WorkMode] : "—"} />
+        <Item
+          label="Tipo de contrato"
+          value={job.employment_type ? EMPLOYMENT_TYPE_LABEL[job.employment_type as EmploymentType] : "—"}
+        />
+        <Item label="Plazas" value={String(job.headcount)} />
+        <Item
+          label="Rango salarial"
+          value={
+            job.salary_min || job.salary_max
+              ? `${job.salary_min ?? "?"} – ${job.salary_max ?? "?"}`
+              : "No especificado"
+          }
+        />
+      </dl>
+
+      <section className="mt-8">
+        <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Descripción</h2>
+        <p className="mt-2.5 whitespace-pre-wrap text-sm leading-relaxed">{job.description}</p>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Requisitos</h2>
+        <p className="mt-2.5 whitespace-pre-wrap text-sm leading-relaxed">{job.requirements}</p>
+      </section>
+
+      <div className="mt-10 flex flex-wrap items-center gap-2.5 border-t border-border pt-6">
+        <ApprovalActions job={job} role={profile.role} actorId={profile.id} />
+        {canRefer && <ReferCandidateDialog jobId={job.id} />}
+      </div>
+    </div>
+  );
+}
+
+function Item({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">{label}</dt>
+      <dd className="mt-1 tabular-nums">{value}</dd>
+    </div>
+  );
+}

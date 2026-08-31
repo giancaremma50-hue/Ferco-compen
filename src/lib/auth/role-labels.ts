@@ -9,3 +9,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   super_admin: "Super admin",
 };
+
+/** Única fuente de verdad para "es admin o superior" — evita que cada
+ * archivo redeclare su propio Set y se desincronicen entre sí. */
+export const ADMIN_ROLES = new Set<AppRole>(["admin", "super_admin"]);
