@@ -1,5 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-08-31 (Fase 4)_
+_Última actualización: 2026-08-31 (Fase 5)_
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
@@ -90,6 +90,25 @@ _Última actualización: 2026-08-31 (Fase 4)_
 8. **[2026-08-31] Todo validador de Zod en un formulario en español necesita su propio `{ error: "..." }` — incluso los que "seguro nunca van a fallar".**
    Causa: `.int()` sin mensaje propio, cuando `.positive()` sí lo tiene, deja pasar el texto default de Zod en inglés apenas alguien manda un valor no entero (posible con una llamada directa al endpoint, sin pasar por el `<input type="number">` del navegador).
    Do instead: revisar cada eslabón de una cadena Zod (`.int()`, `.min()`, `.max()`, `.positive()`, no solo el último), sobre todo en preprocesadores compartidos por varios campos (`optionalNumber` en `schema.ts`).
+
+---
+
+## Pipeline y candidatos (Fase 5) — MÁXIMA PRIORIDAD
+
+1. **[2026-08-31] BUG REAL: usar `!` sobre un join embebido de Supabase asume que RLS siempre lo deja pasar — a veces no.**
+   Causa: `applications_select` deja ver una postulación a un colaborador que refirió al candidato (`candidate_referred_by_me`), sin exigir nada sobre el estado de la vacante. Pero `jobs_select`/`job_stages_select` sí exigen que la vacante siga pública+abierta o que el actor tenga acceso interno. Si la vacante se pausa o cierra después, ese mismo colaborador sigue viendo la postulación pero el `jobs(title)`/`job_stages(name)` embebido en el mismo `select()` vuelve `null` — `app.jobs!.title` truena con un `TypeError` en producción, justo el "stack crudo frente al usuario" que AGENTS.md prohíbe.
+   Do instead: cuando dos tablas relacionadas en un mismo `.select()` tienen políticas RLS **distintas** (una más permisiva que la otra), el campo embebido de la tabla más restrictiva es opcional de verdad — tipar como `T | null`, usar `?.` y mostrar un texto de reemplazo ("Vacante no disponible"), nunca `!`. Antes de asumir que un join embebido siempre viene, comparar las políticas RLS de ambas tablas, no solo la de la tabla principal del `select()`.
+
+2. **[2026-08-31] BUG REAL (forma de IDOR): un id que es clave primaria global (no particionada por padre) no prueba que la fila pertenezca al padre correcto.**
+   Causa: `moveApplicationStage(applicationId, fromStageId, toStageId)` actualizaba `applications.stage_id` sin verificar que `fromStageId`/`toStageId` fueran etapas de la MISMA vacante que la postulación — `job_stages.id` es un UUID global, cualquier etapa de cualquier vacante de la organización es "válida" para el `UPDATE` mientras no se compare contra `job_id`. Una Server Action es un endpoint invocable por red, no solo lo que la UI de arrastre manda.
+   Do instead: cuando un id de un recurso "hijo" (etapa, columna, ítem de catálogo) llega desde el cliente para actualizar un recurso "padre" (postulación, vacante), verificar explícitamente `SELECT ... WHERE id IN (...) AND parent_id = ?` antes del `UPDATE` — el tipo de la columna (UUID) no garantiza pertenencia al padre correcto, eso es una regla de negocio que hay que comprobar aparte.
+
+3. **[2026-08-31] PostgREST convierte `*` en `%` para `ilike`/`like` ANTES de que Postgres vea el patrón — no se puede escapar con `\`.**
+   Causa: es un alias documentado (evita tener que codificar `%` en la URL), pero significa que un término de búsqueda con un `*` literal se vuelve un comodín real sin que el backslash-escape de siempre (`\%`, `\_`, `\\`) lo evite — el alias ocurre en una capa anterior a donde el escape de SQL aplicaría.
+   Do instead: para búsquedas de texto libre construidas con `.or("campo.ilike.%...%")`, quitar `*` del término del usuario (no intentar escaparlo) además de escapar `%`/`_`/`\` de la forma normal, y de quitar `,`/`(`/`)` (sintaxis de filtros de PostgREST). Tres capas de caracteres especiales distintas en una sola búsqueda — fácil olvidar una.
+
+4. **[2026-08-31] El compare-and-swap de Fase 4 (`.eq("status", estadoViejo")`) se reusa tal cual para el drag-and-drop del kanban.**
+   Do instead: `moveApplicationStage` agrega `.eq("stage_id", fromStageId)` al `UPDATE`, igual que las transiciones de vacante — dos arrastres simultáneos sobre la misma tarjeta (dos pestañas, o un evento de red que tarda) no se pisan en silencio, el segundo simplemente no afecta filas y se reporta como conflicto.
 
 ---
 

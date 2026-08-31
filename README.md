@@ -52,7 +52,8 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 2 — Base de datos y RLS | ✅ |
 | 3 — Auth con Google y configurador | ✅ |
 | 4 — Vacantes, portal público y postulación | ✅ |
-| 5-8 | Pendientes |
+| 5 — Pipeline kanban y perfil de candidato | ✅ |
+| 6-8 | Pendientes |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).
