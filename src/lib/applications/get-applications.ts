@@ -17,17 +17,14 @@ export type KanbanData = { stages: KanbanStage[]; cards: KanbanCard[] };
 export async function getKanbanData(jobId: string): Promise<KanbanData> {
   const supabase = await createClient();
 
-  const { data: stages } = await supabase
-    .from("job_stages")
-    .select("id, name, position")
-    .eq("job_id", jobId)
-    .order("position");
-
-  const { data: applications } = await supabase
-    .from("applications")
-    .select("id, stage_id, rating, applied_at, candidates(id, full_name)")
-    .eq("job_id", jobId)
-    .eq("status", "activa");
+  const [{ data: stages }, { data: applications }] = await Promise.all([
+    supabase.from("job_stages").select("id, name, position").eq("job_id", jobId).order("position"),
+    supabase
+      .from("applications")
+      .select("id, stage_id, rating, applied_at, candidates(id, full_name)")
+      .eq("job_id", jobId)
+      .eq("status", "activa"),
+  ]);
 
   const cards: KanbanCard[] = (applications ?? []).map((a) => ({
     id: a.id,
@@ -61,9 +58,9 @@ export type ApplicationDetail = {
   status: Database["public"]["Enums"]["application_status"];
   rating: number | null;
   stageId: string;
-  stageName: string;
+  stageName: string | null;
   jobId: string;
-  jobTitle: string;
+  jobTitle: string | null;
   candidateId: string;
   candidateName: string;
   candidateEmail: string;
@@ -74,6 +71,15 @@ export type ApplicationDetail = {
   notes: ApplicationNote[];
 };
 
+/**
+ * jobTitle/stageName pueden venir null aunque la fila de `applications`
+ * exista: `applications_select` deja ver esta postulación a un colaborador
+ * que refirió al candidato (`candidate_referred_by_me`) sin exigir nada
+ * sobre el estado de la vacante, pero `jobs_select`/`job_stages_select`
+ * exigen que la vacante siga pública+abierta o que el actor tenga acceso
+ * interno — si la vacante se pausó o cerró después, esos joins vuelven
+ * `null` para ese mismo colaborador aunque la postulación siga visible.
+ */
 export async function getApplicationDetail(applicationId: string): Promise<ApplicationDetail | null> {
   const supabase = await createClient();
 
@@ -105,9 +111,9 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
     status: app.status,
     rating: app.rating,
     stageId: app.stage_id,
-    stageName: app.job_stages!.name,
+    stageName: app.job_stages?.name ?? null,
     jobId: app.job_id,
-    jobTitle: app.jobs!.title,
+    jobTitle: app.jobs?.title ?? null,
     candidateId: app.candidate_id,
     candidateName: app.candidates!.full_name,
     candidateEmail: app.candidates!.email,

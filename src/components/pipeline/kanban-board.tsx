@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { moveApplicationStage } from "@/lib/applications/actions";
-import { notifyError } from "@/lib/notifications/toast";
+import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { KanbanColumn } from "./kanban-column";
 import type { KanbanData } from "@/lib/applications/get-applications";
 
@@ -27,6 +27,8 @@ export function KanbanBoard({ initialData }: { initialData: KanbanData }) {
       if (res.error) {
         setCards(previousCards);
         notifyError(res.error);
+      } else {
+        notifySuccess(res.success ?? "Etapa actualizada");
       }
     });
   }

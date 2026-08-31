@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { NoteSchema, RejectSchema } from "./schema";
+import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string };
 
@@ -18,6 +18,31 @@ export async function moveApplicationStage(
   if (fromStageId === toStageId) return { success: "Sin cambios" };
 
   const supabase = await createClient();
+
+  // Una Server Action es un endpoint de red, no solo lo que el kanban
+  // manda al arrastrar: sin este chequeo, nada impide pasar el id de una
+  // etapa de OTRA vacante — job_stages.id es una PK global, no está
+  // particionada por vacante. Confirmar que ambas etapas pertenecen a la
+  // misma vacante que esta postulación antes de tocar la fila.
+  const { data: application } = await supabase
+    .from("applications")
+    .select("job_id")
+    .eq("id", applicationId)
+    .single();
+  if (!application) return { error: "No se encontró la postulación." };
+
+  const { data: validStages } = await supabase
+    .from("job_stages")
+    .select("id")
+    .eq("job_id", application.job_id)
+    .in("id", [fromStageId, toStageId]);
+  if (!validStages || validStages.length !== 2) {
+    // Puede ser que la etapa sea de otra vacante, o que RLS haya escondido
+    // job_stages porque este actor no tiene acceso a esa vacante — no hay
+    // forma barata de distinguir los dos casos, y en ambos la acción debe
+    // bloquearse igual, así que el mensaje cubre ambos con honestidad.
+    return { error: "No se pudo mover: verifica que la etapa y el acceso a esta vacante sean correctos." };
+  }
 
   // Compare-and-swap: si alguien más ya la movió desde que esta pantalla
   // cargó, `fromStageId` ya no coincide con la fila real y el UPDATE no
@@ -85,7 +110,7 @@ export async function addNote(
 
 export async function setRating(applicationId: string, rating: number): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  const parsed = z.number().int().min(0).max(5).safeParse(rating);
+  const parsed = z.number().int().min(0).max(RATING_MAX).safeParse(rating);
   if (!parsed.success) return { error: "Calificación inválida." };
 
   const supabase = await createClient();

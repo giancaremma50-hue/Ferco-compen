@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const RATING_MIN = 1;
+// El rango visible/calificable es 1-RATING_MAX; 0 es el valor especial que
+// representa "sin calificar" (limpia el campo), no un mínimo calificable.
 export const RATING_MAX = 5;
 
 export const NoteSchema = z.object({

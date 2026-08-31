@@ -27,7 +27,7 @@ export default async function ApplicationDetailPage({
     <div className="mx-auto grid max-w-4xl gap-10 lg:grid-cols-[1fr_320px]">
       <div>
         <p className="text-xs text-muted-foreground">
-          {application.jobTitle} · {application.stageName}
+          {application.jobTitle ?? "Vacante no disponible"} · {application.stageName ?? "Etapa no disponible"}
         </p>
         <h1 className="font-serif mt-1.5 text-[32px]">{application.candidateName}</h1>
         <p className="mt-1 text-sm text-muted-foreground">

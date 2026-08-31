@@ -20,10 +20,15 @@ export default async function CandidatosPage({
   const term = q?.trim();
   if (term) {
     // ilike SÍ es correcto aquí (a diferencia del dedupe de Fase 4): es
-    // búsqueda de texto libre para un humano, no una clave de igualdad. Se
-    // quitan `,`, `(` y `)` porque tienen significado especial en la
-    // sintaxis de filtros de PostgREST y este texto viene de la URL.
-    const safeTerm = term.replace(/[,()]/g, "");
+    // búsqueda de texto libre para un humano, no una clave de igualdad.
+    // Tres cosas hay que neutralizar: `,`/`(`/`)` tienen significado especial
+    // en la sintaxis de filtros de PostgREST (este texto viene de la URL);
+    // `%`/`_`/`\` son comodines de ILIKE (Postgres ya usa `\` como escape
+    // por defecto); y `*` es el alias que PostgREST sustituye por `%` ANTES
+    // de que Postgres vea el patrón — ni siquiera escapado con `\` queda
+    // literal, así que simplemente se quita (un correo o nombre real nunca
+    // trae un asterisco).
+    const safeTerm = term.replace(/[,()*]/g, "").replace(/[%_\\]/g, (c) => `\\${c}`);
     query = query.or(`full_name.ilike.%${safeTerm}%,email.ilike.%${safeTerm}%`, {
       referencedTable: "candidates",
     });
