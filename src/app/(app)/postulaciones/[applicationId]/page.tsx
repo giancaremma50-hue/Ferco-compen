@@ -1,0 +1,79 @@
+import { notFound } from "next/navigation";
+import { requireProfile } from "@/lib/auth/dal";
+import { createClient } from "@/lib/supabase/server";
+import { getApplicationDetail } from "@/lib/applications/get-applications";
+import { CvLink } from "@/components/postulaciones/cv-link";
+import { ApplicationTimeline } from "@/components/postulaciones/application-timeline";
+import { NoteForm } from "@/components/postulaciones/note-form";
+import { NoteList } from "@/components/postulaciones/note-list";
+import { RatingStars } from "@/components/postulaciones/rating-stars";
+import { RejectDialog } from "@/components/postulaciones/reject-dialog";
+import { HireButton } from "@/components/postulaciones/hire-button";
+
+export default async function ApplicationDetailPage({
+  params,
+}: {
+  params: Promise<{ applicationId: string }>;
+}) {
+  const { applicationId } = await params;
+  const profile = await requireProfile();
+  const application = await getApplicationDetail(applicationId);
+  if (!application) notFound();
+
+  const supabase = await createClient();
+  const { data: reasons } = await supabase.from("rejection_reasons").select("id, label").eq("is_active", true);
+
+  return (
+    <div className="mx-auto grid max-w-4xl gap-10 lg:grid-cols-[1fr_320px]">
+      <div>
+        <p className="text-xs text-muted-foreground">
+          {application.jobTitle} · {application.stageName}
+        </p>
+        <h1 className="font-serif mt-1.5 text-[32px]">{application.candidateName}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {application.candidateEmail} · {application.candidatePhone ?? "sin teléfono"}
+        </p>
+
+        <div className="mt-6">
+          <CvLink cvFilePath={application.cvFilePath} />
+        </div>
+
+        {application.status !== "activa" && (
+          <p className="mt-4 text-sm">
+            Estado: <strong>{application.status}</strong>
+            {application.rejectionReasonLabel && ` — ${application.rejectionReasonLabel}`}
+          </p>
+        )}
+
+        {application.status === "activa" && profile.role !== "colaborador" && (
+          <div className="mt-6 flex items-center gap-3">
+            <HireButton applicationId={application.id} />
+            <RejectDialog applicationId={application.id} reasons={reasons ?? []} />
+          </div>
+        )}
+
+        <section className="mt-10">
+          <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Notas</h2>
+          <div className="mt-3">
+            <NoteForm applicationId={application.id} />
+          </div>
+          <div className="mt-5">
+            <NoteList notes={application.notes} />
+          </div>
+        </section>
+      </div>
+
+      <div>
+        <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Calificación</h2>
+        <div className="mt-3">
+          <RatingStars applicationId={application.id} rating={application.rating} />
+        </div>
+
+        <h2 className="mt-8 text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Actividad</h2>
+        <div className="mt-3">
+          <ApplicationTimeline events={application.events} />
+        </div>
+      </div>
+    </div>
+  );
+}
