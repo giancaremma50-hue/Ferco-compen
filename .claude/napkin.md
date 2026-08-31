@@ -62,28 +62,32 @@ _Última actualización: 2026-08-31 (Fase 4)_
 
 ## Vacantes y postulación (Fase 4) — MÁXIMA PRIORIDAD
 
-1. **[2026-08-31] BUG REAL, crítico: usar el cliente de sesión para leer tablas admin-only rompe el flujo principal del producto.**
+1. **[2026-08-31] BUG REAL, crítico: la ruta de Storage del CV no coincidía con lo que la política RLS de `storage.objects` espera — encontrado al empezar Fase 5, no en Fase 4.**
+   Causa: `cvs_privado_select`/`cvs_privado_delete` (creadas en Fase 2) exigen que el **segundo** segmento de la ruta sea el `candidate_id` (`private.can_access_candidate((storage.foldername(name))[2]::uuid)`). El Route Handler de Fase 4 subía el CV a `{organization_id}/{email}/{timestamp}.pdf` — el segundo segmento era un correo, no un UUID. Cualquier intento real de leer o firmar esa URL habría fallado (el cast `::uuid` de un email lanza una excepción de Postgres), dejando el control de acceso a CVs completamente roto desde el primer commit de Fase 4, sin que nada en el flujo de postulación lo hiciera evidente (subir y crear seguían funcionando).
+   Do instead: **antes de subir cualquier archivo a un bucket privado, leer la política RLS de `storage.objects` para ese bucket y confirmar el formato de ruta exacto que espera** (`storage.foldername(name)` da un array; su índice depende de qué escribió la política, no de lo que parezca lógico). Aquí significó resolver/crear el candidato ANTES de subir el CV (no después), para poder construir la ruta con su id real — ver `findOrCreateCandidate`/`createApplicationForCandidate` en `src/lib/jobs/create-application.ts`.
+
+2. **[2026-08-31] BUG REAL, crítico: usar el cliente de sesión para leer tablas admin-only rompe el flujo principal del producto.**
    Causa: `materializeJobStages()` (copia la plantilla de pipeline al crear una vacante) usaba el cliente de sesión del actor. `pipeline_templates` y `job_stages` solo tienen políticas de escritura/lectura para `admin+` (`pipeline_templates_admin`, `job_stages_write_admin`) — un `gestor` puede crear su propia vacante (RLS de `jobs_insert` sí lo permite), pero su `SELECT` a `pipeline_templates` siempre vuelve vacío. Resultado: **todo gestor que solicitaba una vacante recibía "No hay una plantilla de pipeline configurada"**, aunque sí existiera — el caso de uso principal del producto ("gestor solicita plazas") estaba roto en Fase 4 desde el primer commit.
    Do instead: cualquier operación que necesite una verdad de la organización que no dependa de lo que el actor de turno puede ver por RLS (copiar una plantilla, deduplicar un candidato por correo) usa `createAdminClient()` internamente, sin importar qué cliente pasó el llamador — nunca asumir que "ya está autenticado" es suficiente para leer una tabla que RLS reserva a otro rol. Antes de dar una función por buena, simular con el rol de menor privilegio que la va a usar de verdad (aquí: `gestor`, no `admin`).
 
-2. **[2026-08-31] Deduplicar por email con `.ilike()` es un bug, no una mejora — `%` y `_` son comodines de SQL.**
+3. **[2026-08-31] Deduplicar por email con `.ilike()` es un bug, no una mejora — `%` y `_` son comodines de SQL.**
    Do instead: usar siempre `.eq("email", email)` (con el email ya en minúsculas) para un lookup de igualdad exacta. `ilike` solo tiene sentido para búsquedas de texto libre, nunca para una clave de deduplicación — un correo con `_` (frecuentísimo en direcciones corporativas) puede matchear una fila completamente distinta.
 
-3. **[2026-08-31] Un `.update(objeto)` de Supabase nunca puede *borrar* un campo si ese campo llega como `undefined`.**
+4. **[2026-08-31] Un `.update(objeto)` de Supabase nunca puede *borrar* un campo si ese campo llega como `undefined`.**
    Causa: `JSON.stringify` omite las claves `undefined` antes de mandar el PATCH — Supabase nunca se entera de que existían. Con los preprocesadores de Zod que convierten `""` a `undefined` (patrón ya usado en Fase 2/3), un formulario de edición que "vacía" un campo opcional en realidad deja el valor viejo intacto en la base, con un toast de éxito engañoso.
    Do instead: normalizar explícitamente los campos opcionales a `null` (nunca dejarlos en `undefined`) justo antes de armar el objeto que se pasa a `.update()`/`.insert()`.
 
-4. **[2026-08-31] Toda transición de estado compartido (aprobar/cancelar/publicar) necesita compare-and-swap, no solo "leer, validar, escribir".**
+5. **[2026-08-31] Toda transición de estado compartido (aprobar/cancelar/publicar) necesita compare-and-swap, no solo "leer, validar, escribir".**
    Causa: dos clics casi simultáneos (dos pestañas, o un doble clic entre dos botones distintos que comparten el mismo `useTransition`) pueden ejecutar dos `UPDATE` sobre la misma fila después de que ambos leyeron el mismo estado "viejo" — el segundo pisa al primero en silencio, cada uno con su propio toast de éxito.
    Do instead: agregar `.eq("status", estadoQueSeLeyó)` al `UPDATE` (no solo `.eq("id", ...)`). Si la fila ya cambió, el `UPDATE` afecta 0 filas y el código ya trata eso como error — mismo patrón (más liviano) que el advisory lock de Fase 3 para el caso del último super admin.
 
-5. **[2026-08-31] Un `UNIQUE` a nivel de aplicación (check-then-insert) siempre tiene una ventana de carrera — maneja el código `23505`, no solo el camino feliz.**
+6. **[2026-08-31] Un `UNIQUE` a nivel de aplicación (check-then-insert) siempre tiene una ventana de carrera — maneja el código `23505`, no solo el camino feliz.**
    Do instead: si el `INSERT` falla con `error.code === "23505"` justo después de que el `SELECT` de deduplicación no encontró nada, es casi seguro una carrera (doble clic, dos requests casi simultáneas) — volver a hacer el `SELECT` y usar esa fila en vez de fallar con un mensaje genérico. Aplica a cualquier dedup por email/slug construido como "buscar, si no existe crear".
 
-6. **[2026-08-31] `published_at` solo se marca la primera vez que se publica, nunca en cada transición hacia "abierta".**
+7. **[2026-08-31] `published_at` solo se marca la primera vez que se publica, nunca en cada transición hacia "abierta".**
    Do instead: `if (!current.published_at)`, no `if (current.status !== "abierta")` — lo segundo reinicia la fecha cada vez que se reabre tras una pausa, y el portal público (ordenado por `published_at`) muestra una vacante de semanas como si fuera nueva.
 
-7. **[2026-08-31] Todo validador de Zod en un formulario en español necesita su propio `{ error: "..." }` — incluso los que "seguro nunca van a fallar".**
+8. **[2026-08-31] Todo validador de Zod en un formulario en español necesita su propio `{ error: "..." }` — incluso los que "seguro nunca van a fallar".**
    Causa: `.int()` sin mensaje propio, cuando `.positive()` sí lo tiene, deja pasar el texto default de Zod en inglés apenas alguien manda un valor no entero (posible con una llamada directa al endpoint, sin pasar por el `<input type="number">` del navegador).
    Do instead: revisar cada eslabón de una cadena Zod (`.int()`, `.min()`, `.max()`, `.positive()`, no solo el último), sobre todo en preprocesadores compartidos por varios campos (`optionalNumber` en `schema.ts`).
 

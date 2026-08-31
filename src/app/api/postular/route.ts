@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { findOrCreateApplication } from "@/lib/jobs/create-application";
+import {
+  findOrCreateCandidate,
+  createApplicationForCandidate,
+  rollbackIfNewCandidate,
+} from "@/lib/jobs/create-application";
 
 const ApplySchema = z.object({
   job_id: z.uuid({ error: "Vacante inválida." }),
@@ -107,18 +111,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const cvPath = `${job.organization_id}/${email}/${Date.now()}.pdf`;
-  const { error: uploadError } = await admin.storage.from("cvs-privado").upload(cvPath, cv, {
-    contentType: ALLOWED_CV_TYPE,
-  });
-  if (uploadError) {
-    return NextResponse.json({ error: "No se pudo subir tu CV. Inténtalo de nuevo." }, { status: 500 });
-  }
-
-  const result = await findOrCreateApplication(
-    admin,
+  // El candidato se resuelve/crea ANTES de subir el CV: cvs_privado_select
+  // (política de Storage) exige que el segundo segmento de la ruta sea el
+  // candidate_id — subir primero y crear el candidato después dejaría el
+  // archivo en una ruta que ninguna política de lectura puede evaluar.
+  const candidateResult = await findOrCreateCandidate(
     job.organization_id,
-    job.id,
     {
       full_name: parsed.data.full_name,
       email,
@@ -126,27 +124,46 @@ export async function POST(request: NextRequest) {
       current_title: parsed.data.current_title ?? null,
       years_experience: parsed.data.years_experience ?? null,
       source: "portal",
-      cv_file_path: cvPath,
     },
     existingCandidate?.id,
   );
 
-  if ("error" in result) {
-    await admin.storage.from("cvs-privado").remove([cvPath]);
-    return NextResponse.json({ error: result.error }, { status: result.duplicate ? 409 : 500 });
+  if ("error" in candidateResult) {
+    return NextResponse.json({ error: candidateResult.error }, { status: 500 });
+  }
+  const { candidateId, isNewCandidate } = candidateResult;
+
+  const cvPath = `${job.organization_id}/${candidateId}/${Date.now()}.pdf`;
+  const { error: uploadError } = await admin.storage.from("cvs-privado").upload(cvPath, cv, {
+    contentType: ALLOWED_CV_TYPE,
+  });
+  if (uploadError) {
+    await rollbackIfNewCandidate(candidateId, isNewCandidate);
+    return NextResponse.json({ error: "No se pudo subir tu CV. Inténtalo de nuevo." }, { status: 500 });
   }
 
-  if (!result.isNewCandidate) {
-    // Candidato existente que vuelve a postular a otra vacante: el CV nuevo
-    // pasa a ser el vigente en su perfil; el anterior queda en attachments.
-    // Se actualiza solo hasta aquí, con la postulación ya confirmada — antes
-    // de esto un fallo habría dejado cv_file_path apuntando a un archivo que
-    // el rollback de arriba ya borró. Best-effort igual que el bloque de
-    // abajo: si esto falla, la postulación y el attachment ya quedaron bien
-    // registrados — el candidato solo se queda con el cv_file_path anterior
-    // en su perfil hasta la próxima vez que actualice o postule de nuevo.
-    await admin.from("candidates").update({ cv_file_path: cvPath }).eq("id", result.candidateId);
+  const applicationResult = await createApplicationForCandidate(
+    admin,
+    job.organization_id,
+    job.id,
+    candidateId,
+    isNewCandidate,
+  );
+
+  if ("error" in applicationResult) {
+    await admin.storage.from("cvs-privado").remove([cvPath]);
+    return NextResponse.json(
+      { error: applicationResult.error },
+      { status: applicationResult.duplicate ? 409 : 500 },
+    );
   }
+
+  // El CV nuevo pasa a ser el vigente en el perfil; si ya tenía uno de una
+  // postulación anterior, queda igual en attachments (no se borra). Best
+  // effort: si esto falla, la postulación y el attachment de abajo ya
+  // quedaron bien registrados — el candidato solo se queda con el
+  // cv_file_path anterior en su perfil hasta la próxima vez que postule.
+  await admin.from("candidates").update({ cv_file_path: cvPath }).eq("id", candidateId);
 
   // Best-effort: la postulación en sí ya quedó registrada (lo que le importa
   // al candidato), así que un fallo aquí no debe convertir un éxito real en
@@ -156,8 +173,8 @@ export async function POST(request: NextRequest) {
   await Promise.all([
     admin.from("attachments").insert({
       organization_id: job.organization_id,
-      candidate_id: result.candidateId,
-      application_id: result.applicationId,
+      candidate_id: candidateId,
+      application_id: applicationResult.applicationId,
       file_path: cvPath,
       file_name: cv.name || "cv.pdf",
       file_size_bytes: cv.size,
@@ -165,7 +182,7 @@ export async function POST(request: NextRequest) {
     }),
     admin.from("application_events").insert({
       organization_id: job.organization_id,
-      application_id: result.applicationId,
+      application_id: applicationResult.applicationId,
       type: "postulacion_creada",
       payload: { origen: "portal" },
     }),

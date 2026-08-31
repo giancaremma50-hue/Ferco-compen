@@ -6,81 +6,85 @@ import type { Database } from "@/lib/supabase/database.types";
 type CandidateInsert = Database["public"]["Tables"]["candidates"]["Insert"];
 type CandidateInput = Omit<CandidateInsert, "organization_id" | "email"> & { email: string };
 
-export type CreateApplicationResult =
-  | { error: string; duplicate?: boolean }
-  | { candidateId: string; applicationId: string; isNewCandidate: boolean };
+export type FindCandidateResult = { error: string } | { candidateId: string; isNewCandidate: boolean };
 
 /**
- * Compartido entre el portal público (/api/postular, cliente admin) y los
- * referidos internos (referCandidate, cliente de sesión).
- *
- * La búsqueda/creación/reversión del candidato usa SIEMPRE el cliente admin,
- * nunca el `supabase` recibido: la deduplicación por email debe ser una
- * verdad de toda la organización, no lo que candidates_select deja ver al
- * actor de turno. Con el cliente de sesión, un colaborador sin acceso al
- * candidato que otro ya refirió no lo encontraría (`existing` = null) y
- * crearía una fila duplicada para el mismo correo — exactamente lo que este
- * dedup existe para evitar. Por la misma razón, revertir un candidato recién
- * creado también necesita el cliente admin: candidates_delete_admin exige
- * ser admin+, así que un colaborador nunca podría borrar ni el candidato que
- * él mismo acaba de crear.
- *
- * El insert de `applications`, en cambio, sí usa el `supabase` recibido: ahí
- * es donde debe aplicar el permiso real por vacante (RLS de applications_insert).
+ * Busca al candidato por email dentro de la organización y lo crea si no
+ * existe. SIEMPRE usa el cliente admin, nunca uno de sesión: la
+ * deduplicación por email debe ser una verdad de toda la organización, no
+ * lo que candidates_select deja ver al actor de turno — con el cliente de
+ * sesión, un colaborador sin acceso al candidato que otro ya refirió no lo
+ * encontraría y crearía una fila duplicada para el mismo correo.
  */
-export async function findOrCreateApplication(
-  supabase: SupabaseClient<Database>,
+export async function findOrCreateCandidate(
   organizationId: string,
-  jobId: string,
   candidateInput: CandidateInput,
-  // El llamador puede pasar un id ya resuelto (ver postular/route.ts, que
-  // hace este mismo lookup antes para decidir si vale la pena subir el CV)
-  // y así evitar repetir la misma consulta dos veces en la misma request.
   knownCandidateId?: string,
-): Promise<CreateApplicationResult> {
+): Promise<FindCandidateResult> {
   const admin = createAdminClient();
   const email = candidateInput.email.toLowerCase();
 
-  let candidateId = knownCandidateId;
-  if (!candidateId) {
-    const { data: existing } = await admin
+  if (knownCandidateId) return { candidateId: knownCandidateId, isNewCandidate: false };
+
+  const { data: existing } = await admin
+    .from("candidates")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existing) return { candidateId: existing.id, isNewCandidate: false };
+
+  const { data: created, error: createError } = await admin
+    .from("candidates")
+    .insert({ ...candidateInput, organization_id: organizationId, email })
+    .select("id")
+    .single();
+
+  if (createError?.code === "23505") {
+    // Carrera: otra solicitud casi simultánea (doble clic, dos
+    // postulaciones a vacantes distintas) ya insertó este correo entre el
+    // select de arriba y este insert.
+    const { data: raceWinner } = await admin
       .from("candidates")
       .select("id")
       .eq("organization_id", organizationId)
       .eq("email", email)
       .maybeSingle();
-    candidateId = existing?.id;
+    if (!raceWinner) return { error: "No se pudo registrar al candidato." };
+    return { candidateId: raceWinner.id, isNewCandidate: false };
   }
-  let isNewCandidate = !candidateId;
+  if (createError || !created) return { error: "No se pudo registrar al candidato." };
 
-  if (!candidateId) {
-    const { data: created, error: createError } = await admin
-      .from("candidates")
-      .insert({ ...candidateInput, organization_id: organizationId, email })
-      .select("id")
-      .single();
+  return { candidateId: created.id, isNewCandidate: true };
+}
 
-    if (createError?.code === "23505") {
-      // Carrera: otra solicitud casi simultánea (doble clic, dos
-      // postulaciones a vacantes distintas) ya insertó este correo entre el
-      // select de arriba y este insert. No es un candidato nuevo de esta
-      // llamada — no hay que revertirlo si algo falla más adelante.
-      const { data: raceWinner } = await admin
-        .from("candidates")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("email", email)
-        .maybeSingle();
-      if (!raceWinner) return { error: "No se pudo registrar al candidato." };
-      candidateId = raceWinner.id;
-      isNewCandidate = false;
-    } else if (createError || !created) {
-      return { error: "No se pudo registrar al candidato." };
-    } else {
-      candidateId = created.id;
-    }
-  }
+export type CreateApplicationResult =
+  | { error: string; duplicate?: boolean }
+  | { applicationId: string };
 
+/** Revierte el candidato SOLO si se acababa de crear en esta misma operación — nunca uno preexistente. */
+export async function rollbackIfNewCandidate(candidateId: string, isNewCandidate: boolean): Promise<void> {
+  if (!isNewCandidate) return;
+  await createAdminClient().from("candidates").delete().eq("id", candidateId);
+}
+
+/**
+ * Registra la postulación en la primera etapa del pipeline de la vacante.
+ * `supabase` sí importa aquí (a diferencia de findOrCreateCandidate): el
+ * permiso real por vacante lo decide applications_insert vía RLS, así que
+ * este insert usa el cliente del actor (de sesión) o el admin (portal
+ * público), según quién esté llamando. Si falla, revierte el candidato con
+ * `rollbackIfNewCandidate` — el llamador debe usar la misma función si
+ * necesita revertir en un paso previo (ej. la subida del CV en el portal).
+ */
+export async function createApplicationForCandidate(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  jobId: string,
+  candidateId: string,
+  isNewCandidate: boolean,
+): Promise<CreateApplicationResult> {
   const { data: firstStage } = await supabase
     .from("job_stages")
     .select("id")
@@ -90,7 +94,7 @@ export async function findOrCreateApplication(
     .single();
 
   if (!firstStage) {
-    if (isNewCandidate) await admin.from("candidates").delete().eq("id", candidateId);
+    await rollbackIfNewCandidate(candidateId, isNewCandidate);
     return { error: "Esta vacante no tiene un proceso configurado todavía." };
   }
 
@@ -106,7 +110,7 @@ export async function findOrCreateApplication(
     .single();
 
   if (applicationError || !application) {
-    if (isNewCandidate) await admin.from("candidates").delete().eq("id", candidateId);
+    await rollbackIfNewCandidate(candidateId, isNewCandidate);
 
     // 23505 = violación de UNIQUE(job_id, candidate_id): ya había postulado.
     // Cualquier otro código (ej. RLS negó el insert porque este actor no
@@ -118,5 +122,5 @@ export async function findOrCreateApplication(
     return { error: "No se pudo registrar la postulación. Inténtalo de nuevo." };
   }
 
-  return { candidateId, applicationId: application.id, isNewCandidate };
+  return { applicationId: application.id };
 }

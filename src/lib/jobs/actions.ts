@@ -11,7 +11,7 @@ import type { JobStatus, JobFormValues } from "./schema";
 import { materializeJobStages } from "./materialize-stages";
 import { generateJobSlug } from "./slug";
 import { TERMINAL_JOB_STATUSES } from "./permissions";
-import { findOrCreateApplication } from "./create-application";
+import { findOrCreateCandidate, createApplicationForCandidate } from "./create-application";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -278,7 +278,7 @@ export async function referCandidate(
     return { error: "Esta vacante ya no acepta candidatos." };
   }
 
-  const result = await findOrCreateApplication(supabase, profile.organization_id, jobId, {
+  const candidateResult = await findOrCreateCandidate(profile.organization_id, {
     full_name: parsed.data.full_name,
     email: parsed.data.email,
     phone: parsed.data.phone,
@@ -286,17 +286,26 @@ export async function referCandidate(
     referred_by: profile.id,
     created_by: profile.id,
   });
+  if ("error" in candidateResult) return { error: candidateResult.error };
 
-  if ("error" in result) {
+  const applicationResult = await createApplicationForCandidate(
+    supabase,
+    profile.organization_id,
+    jobId,
+    candidateResult.candidateId,
+    candidateResult.isNewCandidate,
+  );
+
+  if ("error" in applicationResult) {
     // RLS puede negar el insert de la postulación si este colaborador no
     // tiene acceso a la vacante — el mensaje genérico cubre ese caso además
-    // del error real reportado por findOrCreateApplication.
-    return { error: result.error };
+    // del error real reportado por createApplicationForCandidate.
+    return { error: applicationResult.error };
   }
 
   await supabase.from("application_events").insert({
     organization_id: profile.organization_id,
-    application_id: result.applicationId,
+    application_id: applicationResult.applicationId,
     type: "postulacion_creada",
     actor_id: profile.id,
     payload: { origen: "referido_interno" },
