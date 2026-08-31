@@ -43,8 +43,9 @@ next-env.d.ts
 # windows
 desktop.ini
 
-# claude session files
-.claude/
+# .claude/ SÍ se versiona (skills, napkin.md) — es la bitácora obligatoria
+# del proyecto. Solo se ignora configuración local de sesión, no compartida.
+.claude/settings.local.json
 
 # original logo source files (already copied to public/ with clean names)
 Logo FERCO NEGRO.png
