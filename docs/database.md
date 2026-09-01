@@ -363,6 +363,54 @@ resultado del guardado deja al actor sin acceso a su propia fila
 listado con un mensaje concreto en vez de al paso 6, que le daría 404 sin
 explicación.
 
+## Creación de vacante basada en plantilla (Fase 18, 7/7)
+
+`createJob` (`src/lib/jobs/actions.ts`) se reescribió por completo: la
+plantilla ahora es obligatoria (ya no existe "vacante en blanco"). El
+cliente solo manda `template_id` + lo que de verdad queda editable (país,
+modalidad, salario, plazas, tipo/motivo de vacante, equipo de
+reclutamiento) — título, descripción, requisitos, candidatura, preguntas y
+etapas se releen server-side desde `job_templates`/`job_template_stages`/
+`job_template_questions` y se copian a `jobs`/`job_stages`/`job_questions`
+con `createAdminClient()` (mismo motivo que Fase 4/17: un `gestor` puede
+crear su propia vacante pero no tiene RLS de escritura directa sobre esas
+tablas). "Reclutador encargado" pasa a ser una elección explícita en
+`jobs.owner_id` (antes se autoasignaba solo si el actor era admin+);
+colaboradores adicionales se insertan en `job_collaborators` con
+`permission = 'viewer'`.
+
+`src/lib/jobs/materialize-stages.ts` se borró — quedó sin ningún llamador
+tras este cambio (createJob ya no usa `pipeline_template_id` para nada).
+
+**Compatibilidad con el diálogo plano (Fase 15)**: ese diálogo no tiene un
+paso "Etapas" como el wizard, así que una plantilla creada ahí nunca tendría
+`job_template_stages` — y `createJob` exige al menos una. Se agregó
+`syncTemplateStagesFromPipeline()` (`src/lib/job-templates/
+sync-stages-from-pipeline.ts`), llamada al crear (siempre) y al editar
+(solo si `pipeline_template_id` de verdad cambió, para no pisar un ajuste
+manual hecho después desde el wizard) — copia las etapas del
+`pipeline_template` elegido (o el predeterminado de la organización si no
+se elige ninguno, mismo fallback que tenía `materializeJobStages`) en el
+mismo formato de "Bandeja de entrada fija + intermedias + Contratado/
+Descartado fijas" que usa el wizard.
+
+**5 hallazgos reales en `/code-review` antes de commitear:**
+1. Enter en el input de "nuevo motivo" (dentro del `<form>` de crear
+   vacante) disparaba el envío implícito del form completo — corregido con
+   `onKeyDown`/`preventDefault()`.
+2. El botón "Agregar" de ese mismo input usaba un `<button>` crudo en vez
+   de `<ActionButton>`, sin toast de éxito — corregido.
+3. `updateJobTemplate` no resincronizaba `job_template_stages` al cambiar
+   `pipeline_template_id` desde el diálogo — una vacante creada después
+   heredaba el kanban del pipeline VIEJO en silencio. Corregido comparando
+   el valor antes/después de guardar.
+4. `syncTemplateStagesFromPipeline` no filtraba por `organization_id` en
+   sus propias consultas (cliente admin, sin RLS) — corregido, defensa en
+   profundidad.
+5. 4 copias casi idénticas de "verificar que un id pertenece a la
+   organización" cruzaron el umbral de 3-4 copias documentado en
+   napkin.md (Fase 9) — extraídas a `src/lib/assert-belongs-to-org.ts`.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración

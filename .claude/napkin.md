@@ -1,5 +1,18 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 6/7 — wizard completo)_
+_Última actualización: 2026-09-01 (Fase 18, 7/7 — creación de vacante)_
+
+## Creación de vacante basada en plantilla (Fase 18, 7/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL DE TYPO, encontrado por revisión propia antes de que llegara a review: una variable con caracteres corruptos (cirílico/CJK mezclados en el mismo nombre, dos variantes distintas) compiló porque JS/TS no valida que un identificador "se vea bien", solo que sea consistente.**
+   `sync-stages-from-pipeline.ts` tenía `source櫲PipelineId` en la declaración y `sourceпPipelineId` en el uso — dos identificadores DISTINTOS pero visualmente casi idénticos, típico de un artefacto de generación/autocompletado. TypeScript no lo marcó como error de sintaxis inmediatamente reconocible en el diff porque cada uno de los dos nombres corruptos SÍ era válido como identificador aislado. Do instead: después de escribir cualquier archivo con contenido generado de una sola pasada larga, correr `grep -nP "[^\x00-\x7F]"` sobre el archivo y revisar cada match a mano — no asumir que un identificador "raro" se habría marcado solo.
+
+2. **[2026-09-01] BUG REAL: un input de texto dentro de un `<form>` dispara el envío IMPLÍCITO de ese form al presionar Enter — incluso si el botón "propio" del widget es `type="button"` y nunca se toca.**
+   `EmploymentReasonSelect` vive dentro del `<form>` de "Crear vacante" (no puede tener su propio `<form>`, HTML no permite anidarlos). El input de "nuevo motivo" no tenía `onKeyDown`, así que Enter usaba el ÚNICO botón `type="submit"` real del DOM — el de crear la vacante, no el de agregar el motivo. Do instead: cualquier `<input type="text">` dentro de un `<form>` ajeno (un widget que vive dentro de un form más grande, sin ser su propio form) necesita `onKeyDown` que intercepte Enter (`preventDefault()` + la acción propia del widget) — no asumir que un botón `type="button"` cercano alcanza para evitar el envío implícito.
+
+3. **[2026-09-01] Patrón nuevo: `<ActionButton>` fuera de un `<form>` (o dentro de uno ajeno) sigue funcionando pasándole `pending` explícito — no hace falta que viva dentro de SU PROPIO `<form action={...}>` para tener el spinner/disabled consistente.**
+   `pending ?? formStatus.pending` en `action-button.tsx`: si se pasa `pending={isPending}` (de un `useTransition` propio), gana sobre el `useFormStatus()` ambiente del form que lo rodee (que ni siquiera es el que le importa a este botón). Do instead: cuando un botón que muta datos no puede vivir en su propio `<form>` (widget anidado dentro de un form más grande), usar `<ActionButton type="button" pending={isPendingPropio}>` en vez de inventar un botón crudo con estado manual — sigue siendo la regla no negociable, solo cambia de dónde sale el estado de carga.
+
+---
 
 ## Wizard de plantillas — pasos 5-6, cierre (Fase 18, 6/7) — MÁXIMA PRIORIDAD
 

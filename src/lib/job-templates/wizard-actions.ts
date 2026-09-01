@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema, WizardStep4Schema, WizardStep5Schema } from "./wizard-schema";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import { assertBelongsToOrg } from "@/lib/assert-belongs-to-org";
 
 export type WizardActionResult = { error?: string };
 
@@ -16,28 +15,6 @@ export type WizardActionResult = { error?: string };
 // de qué filas existen no es confiable (0 preguntas o 0 etapas intermedias
 // son estados válidos, no "paso sin completar"). No retrocede si se
 // revisita un paso anterior ya avanzado más allá — aceptado, ver napkin.md.
-
-/**
- * El <select> del formulario ya solo ofrece departamentos de la propia
- * organización, pero una Server Action es un endpoint de red — mismo motivo
- * y misma forma que assertValidDepartment en jobs/actions.ts. No se extrae
- * todavía a un helper compartido: es la 2ª copia, no la 3ª (ver AGENTS.md /
- * napkin.md, Fase 9 — el umbral de este proyecto es 3-4 copias, no 2).
- */
-async function assertValidDepartment(
-  supabase: SupabaseClient<Database>,
-  organizationId: string,
-  departmentId: string | undefined,
-): Promise<string | null> {
-  if (!departmentId) return null;
-  const { data } = await supabase
-    .from("departments")
-    .select("id")
-    .eq("id", departmentId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  return data ? null : "Ese departamento no es válido.";
-}
 
 /**
  * Paso 1 del wizard: crea la plantilla en `status = 'draft'` (default de la
@@ -55,7 +32,7 @@ export async function createTemplateDraftStep1(
 
   const supabase = await createClient();
 
-  const departmentError = await assertValidDepartment(supabase, profile.organization_id, parsed.data.department_id);
+  const departmentError = await assertBelongsToOrg(supabase, "departments", parsed.data.department_id, profile.organization_id, "Ese departamento no es válido.");
   if (departmentError) return { error: departmentError };
 
   const { data: template, error } = await supabase
@@ -100,7 +77,7 @@ export async function updateTemplateStep1(
 
   const supabase = await createClient();
 
-  const departmentError = await assertValidDepartment(supabase, profile.organization_id, parsed.data.department_id);
+  const departmentError = await assertBelongsToOrg(supabase, "departments", parsed.data.department_id, profile.organization_id, "Ese departamento no es válido.");
   if (departmentError) return { error: departmentError };
 
   const { data, error } = await supabase
@@ -397,6 +374,20 @@ export async function publishTemplate(
 ): Promise<WizardActionResult> {
   const profile = await requireAdminOrAbove();
   const supabase = await createClient();
+
+  // El wizard es secuencial solo en la UI — nada impide llegar al paso 6
+  // por URL directa sin haber pasado por el paso 4. Sin al menos una etapa,
+  // la vacante creada desde esta plantilla nacería con un kanban vacío
+  // (createJob copia job_template_stages tal cual, sin plantilla de
+  // respaldo — ver jobs/actions.ts). Se bloquea acá, no en createJob: mejor
+  // avisar al publicar que al crear la vacante, más tarde y más confuso.
+  const { count: stageCount } = await supabase
+    .from("job_template_stages")
+    .select("id", { count: "exact", head: true })
+    .eq("job_template_id", templateId);
+  if (!stageCount) {
+    return { error: "Esta plantilla todavía no tiene etapas — completá el paso \"Etapas\" antes de publicarla." };
+  }
 
   const { data, error } = await supabase
     .from("job_templates")

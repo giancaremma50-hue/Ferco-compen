@@ -4,31 +4,10 @@ import { revalidatePath } from "next/cache";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { JobTemplateSchema } from "./schema";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import { syncTemplateStagesFromPipeline } from "./sync-stages-from-pipeline";
+import { assertBelongsToOrg } from "@/lib/assert-belongs-to-org";
 
 export type JobTemplateActionResult = { error?: string; success?: string };
-
-/**
- * El <select> del formulario ya solo ofrece plantillas de pipeline de la
- * propia organización, pero una Server Action es un endpoint de red — nada
- * impide un POST fabricado a mano con el id de una plantilla de otra
- * organización. Mismo patrón que assertValidDepartment en jobs/actions.ts.
- */
-async function assertValidPipelineTemplate(
-  supabase: SupabaseClient<Database>,
-  organizationId: string,
-  pipelineTemplateId: string | undefined,
-): Promise<string | null> {
-  if (!pipelineTemplateId) return null;
-  const { data } = await supabase
-    .from("pipeline_templates")
-    .select("id")
-    .eq("id", pipelineTemplateId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  return data ? null : "Esa plantilla de pipeline no es válida.";
-}
 
 export async function createJobTemplate(
   _prevState: JobTemplateActionResult | undefined,
@@ -40,20 +19,29 @@ export async function createJobTemplate(
 
   const supabase = await createClient();
 
-  const pipelineError = await assertValidPipelineTemplate(supabase, profile.organization_id, parsed.data.pipeline_template_id);
+  const pipelineError = await assertBelongsToOrg(supabase, "pipeline_templates", parsed.data.pipeline_template_id, profile.organization_id, "Esa plantilla de pipeline no es válida.");
   if (pipelineError) return { error: pipelineError };
 
-  const { error } = await supabase.from("job_templates").insert({
-    organization_id: profile.organization_id,
-    // `status` default es 'draft' (Fase 18, pensado para el wizard paso a
-    // paso) — este diálogo sigue siendo de un solo paso, todo el contenido
-    // ya llegó completo en este mismo submit, así que nace publicada
-    // directo. Sin esto, toda plantilla creada desde este diálogo quedaría
-    // invisible para "Solicitar vacante" (getPublishedJobTemplates).
-    status: "published",
-    ...parsed.data,
-  });
-  if (error) return { error: "No se pudo crear la plantilla." };
+  const { data: template, error } = await supabase
+    .from("job_templates")
+    .insert({
+      organization_id: profile.organization_id,
+      // `status` default es 'draft' (Fase 18, pensado para el wizard paso a
+      // paso) — este diálogo sigue siendo de un solo paso, todo el contenido
+      // ya llegó completo en este mismo submit, así que nace publicada
+      // directo. Sin esto, toda plantilla creada desde este diálogo quedaría
+      // invisible para "Solicitar vacante" (getPublishedJobTemplates).
+      status: "published",
+      ...parsed.data,
+    })
+    .select("id")
+    .single();
+  if (error || !template) return { error: "No se pudo crear la plantilla." };
+
+  // Este diálogo no tiene un paso "Etapas" propio como el wizard — sin
+  // esto, job_template_stages quedaría vacía y createJob (Fase 18) rechaza
+  // cualquier plantilla sin al menos una etapa.
+  await syncTemplateStagesFromPipeline(profile.organization_id, template.id, parsed.data.pipeline_template_id ?? null);
 
   revalidatePath("/configuracion/plantillas-vacante");
   return { success: "Plantilla creada" };
@@ -70,8 +58,25 @@ export async function updateJobTemplate(
 
   const supabase = await createClient();
 
-  const pipelineError = await assertValidPipelineTemplate(supabase, profile.organization_id, parsed.data.pipeline_template_id);
+  const pipelineError = await assertBelongsToOrg(supabase, "pipeline_templates", parsed.data.pipeline_template_id, profile.organization_id, "Esa plantilla de pipeline no es válida.");
   if (pipelineError) return { error: pipelineError };
+
+  // Se lee el pipeline ANTES de guardar — solo si de verdad cambió vale la
+  // pena resincronizar job_template_stages. Sin este chequeo, guardar la
+  // plantilla por cualquier otro motivo (ej. corregir un typo en la
+  // descripción) borraría y reconstruiría las etapas cada vez, pisando
+  // cualquier ajuste manual hecho después desde el paso "Etapas" del
+  // wizard. Si SÍ cambió, no resincronizar dejaría job_template_stages con
+  // las etapas del pipeline viejo — una vacante creada después heredaría un
+  // kanban distinto al que el admin acaba de elegir, en silencio.
+  const { data: before } = await supabase
+    .from("job_templates")
+    .select("pipeline_template_id")
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  const newPipelineId = parsed.data.pipeline_template_id ?? null;
+  const pipelineChanged = before !== null && before.pipeline_template_id !== newPipelineId;
 
   const { error } = await supabase
     .from("job_templates")
@@ -80,10 +85,14 @@ export async function updateJobTemplate(
       // undefined en un .update() de Supabase omite la columna en vez de
       // limpiarla — si se quitó la plantilla de pipeline (vuelve a "Sin
       // asignar"), hay que mandar null explícito para que sí se borre.
-      pipeline_template_id: parsed.data.pipeline_template_id ?? null,
+      pipeline_template_id: newPipelineId,
     })
     .eq("id", templateId);
   if (error) return { error: "No se pudo actualizar la plantilla." };
+
+  if (pipelineChanged) {
+    await syncTemplateStagesFromPipeline(profile.organization_id, templateId, newPipelineId);
+  }
 
   revalidatePath("/configuracion/plantillas-vacante");
   return { success: "Plantilla actualizada" };

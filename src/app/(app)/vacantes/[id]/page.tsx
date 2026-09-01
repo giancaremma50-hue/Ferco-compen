@@ -12,6 +12,8 @@ import { CollaboratorsPanel } from "@/components/vacantes/collaborators-panel";
 import { CompetenciesPanel } from "@/components/vacantes/competencies-panel";
 import { getJobCompetencies } from "@/lib/competencies/get-competencies";
 import { NotifyOnMount } from "@/components/ui/notify-on-mount";
+import { CopyJobLink } from "@/components/vacantes/copy-job-link";
+import { getEmailContext } from "@/lib/notifications/notify";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
 
@@ -28,6 +30,11 @@ export default async function VacanteDetailPage({
   const job = await getJobById(id);
 
   if (!job) notFound();
+
+  // Vale la pena solo si el link de verdad funciona hoy — /api/postular
+  // exige exactamente esta misma combinación (status "abierta" + is_public).
+  const showPublicLink = job.status === "abierta" && job.is_public && job.slug;
+  const publicUrl = showPublicLink ? `${(await getEmailContext()).siteUrl}/empleos/${job.slug}` : null;
 
   const isOpenForCandidates = !TERMINAL_JOB_STATUSES.has(job.status);
   const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
@@ -58,6 +65,16 @@ export default async function VacanteDetailPage({
           )}
         </div>
       </div>
+
+      {publicUrl && (
+        <div className="mt-6">
+          <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Link público</p>
+          <p className="mt-1 mb-2 text-xs text-muted-foreground">
+            Para publicar donde ya publiquen hoy — LinkedIn, Computrabajo, u otra bolsa.
+          </p>
+          <CopyJobLink url={publicUrl} />
+        </div>
+      )}
 
       <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-border py-6 text-sm sm:grid-cols-3">
         <Item label="País" value={job.country ?? "—"} />

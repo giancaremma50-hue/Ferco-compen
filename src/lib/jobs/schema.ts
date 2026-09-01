@@ -66,3 +66,53 @@ export const JobFormSchema = JobBaseSchema.refine(
   { error: "El salario mínimo no puede ser mayor que el máximo.", path: ["salary_max"] },
 );
 export type JobFormValues = z.infer<typeof JobFormSchema>;
+
+export const VACANCY_TYPE_LABEL = {
+  nueva_posicion: "Nueva posición",
+  reemplazo: "Reemplazo",
+  crecimiento: "Crecimiento / expansión",
+} as const;
+export type VacancyType = keyof typeof VACANCY_TYPE_LABEL;
+
+// Creación de vacante desde plantilla (Fase 18) — a diferencia de
+// JobFormSchema (edición libre, Fase 4), acá solo viven los campos que
+// quedan editables al crear: todo lo demás (título, descripción,
+// requisitos, candidatura, preguntas, etapas) se copia server-side desde la
+// plantilla elegida, nunca del cliente (ver createJob en actions.ts).
+export const CreateJobFromTemplateSchema = z
+  .object({
+    template_id: z.uuid({ error: "Elige una plantilla." }),
+    country: z.string().trim().min(2, { error: "Indica el país." }).max(60),
+    work_mode: z.enum(["presencial", "remoto", "hibrido"], { error: "Elige una modalidad." }),
+    salary_min: optionalNumber,
+    salary_max: optionalNumber,
+    headcount: z.preprocess(
+      (v) => (v === "" || v == null ? 1 : Number(v)),
+      z
+        .number()
+        .int({ error: "El número de plazas debe ser un número entero." })
+        .positive({ error: "El número de plazas debe ser al menos 1." }),
+    ),
+    vacancy_type: z.enum(["nueva_posicion", "reemplazo", "crecimiento"], { error: "Elige el tipo de vacante." }),
+    employment_reason_id: optionalUuid,
+    owner_id: z.uuid({ error: "Elige quién queda como reclutador encargado." }),
+    // Llega como JSON serializado desde CollaboratorsPicker — un <select
+    // multiple> perdería todas las opciones salvo la última al pasar por
+    // Object.fromEntries(formData), que no soporta claves repetidas.
+    collaborator_ids: z.preprocess(
+      (v) => (v === "" || v == null ? "[]" : v),
+      z.string().transform((value, ctx) => {
+        try {
+          return JSON.parse(value);
+        } catch {
+          ctx.addIssue({ code: "custom", message: "Colaboradores inválidos." });
+          return z.NEVER;
+        }
+      }),
+    ).pipe(z.array(z.uuid()).max(30, { error: "Máximo 30 colaboradores adicionales." })),
+  })
+  .refine((data) => data.salary_min == null || data.salary_max == null || data.salary_min <= data.salary_max, {
+    error: "El salario mínimo no puede ser mayor que el máximo.",
+    path: ["salary_max"],
+  });
+export type CreateJobFromTemplateValues = z.infer<typeof CreateJobFromTemplateSchema>;
