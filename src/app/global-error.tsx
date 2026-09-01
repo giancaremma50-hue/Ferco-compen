@@ -1,12 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import { ERROR_CATALOG } from "@/lib/errors/catalog";
 
 // global-error reemplaza el root layout cuando se activa: debe declarar sus
-// propios <html> y <body>.
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+// propios <html> y <body>, y no tiene acceso a Tailwind/globals.css (por
+// eso los estilos inline) — sin diálogo de reporte aquí, ReportErrorDialog
+// depende de esas clases. El caso real (fallo en el root layout) es raro y
+// crítico; error.tsx cubre el reporte para todo lo demás.
+export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   const entry = ERROR_CATALOG.desconocido;
+
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
 
   return (
     <html lang="es">
@@ -21,7 +29,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
             <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.6, color: "#6b6862" }}>{entry.queHacer}</p>
             <button
               type="button"
-              onClick={reset}
+              onClick={retry}
               style={{ marginTop: 28, height: 42, padding: "0 20px", background: "#14140f", border: "1px solid #14140f", borderRadius: 6, color: "#faf9f7", fontSize: 14, fontWeight: 500, cursor: "pointer" }}
             >
               Reintentar

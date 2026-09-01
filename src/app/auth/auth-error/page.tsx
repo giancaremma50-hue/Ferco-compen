@@ -3,6 +3,7 @@ import { getErrorEntry } from "@/lib/errors/catalog";
 import { signOut } from "@/lib/auth/actions";
 import { ActionButton } from "@/components/ui/action-button";
 import { ErrorCard } from "@/components/errors/error-card";
+import { ReportErrorDialog } from "@/components/errors/report-error-dialog";
 
 export default async function AuthErrorPage({
   searchParams,
@@ -33,6 +34,7 @@ export default async function AuthErrorPage({
           Volver a intentar
         </Link>
       )}
+      {entry.reportable && <ReportErrorDialog title={entry.titulo} code={motivo ?? "desconocido"} />}
     </ErrorCard>
   );
 }

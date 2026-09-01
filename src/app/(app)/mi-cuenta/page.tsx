@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { PREFERENCE_TYPES, NOTIFICATION_TYPE_LABEL } from "@/lib/notifications/preferences-schema";
@@ -38,6 +39,19 @@ export default async function MiCuentaPage() {
             );
           })}
         </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Soporte</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Lo que le has contado al soporte y su seguimiento.
+        </p>
+        <Link
+          href="/mis-reportes"
+          className="mt-4 inline-flex h-[42px] items-center justify-center rounded-md border border-border bg-card px-5 text-sm font-medium text-foreground"
+        >
+          Mis reportes
+        </Link>
       </section>
     </div>
   );

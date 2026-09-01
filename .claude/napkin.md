@@ -1,5 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 6)_
+_Última actualización: 2026-09-01 (Fase 7)_
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
@@ -125,6 +125,40 @@ _Última actualización: 2026-09-01 (Fase 6)_
 9. **Pendiente para Fase 8 (hardening), no bloqueante ahora: `getSiteUrl()` cae al header `Host` del request si falta `NEXT_PUBLIC_SITE_URL`, y Fase 6 empezó a usarlo desde `/api/postular` (ruta pública, sin sesión) para armar el link de "Ver la postulación" en el correo que le llega a RH.**
    Riesgo: si en producción se olvida configurar `NEXT_PUBLIC_SITE_URL`, un solicitante malicioso podría mandar un `Host` falso y que el correo interno de "nueva postulación" incluya un link de phishing. `getSiteUrl()` documenta que su único uso sensible conocido era `signInWithGoogle()` (protegido por la lista de Redirect URLs de Supabase) — ya no es cierto, revisar ese comentario al tocar Fase 8.
    Do instead en Fase 8: verificar que `NEXT_PUBLIC_SITE_URL` esté seteado en Vercel antes de desplegar, y considerar que `getSiteUrl()` rechace el fallback a `Host` para cualquier link que salga en un correo (no solo para el OAuth redirect).
+
+---
+
+## Centro de errores (Fase 7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Next 16.3 sanea el error antes de que cruce a `error.tsx`/`global-error.tsx` en producción — no se puede mostrar un catálogo distinto según el error real.**
+   Causa: `error.message` que llega al cliente es genérico en Server Components/Server Functions; solo `error.digest` es correlacionable con logs del servidor. Verificado en `node_modules/next/dist/docs/.../error.md` antes de diseñar el flujo (regla de AGENTS.md sobre este Next).
+   Do instead: `error.tsx`/`global-error.tsx` siempre muestran `ERROR_CATALOG.desconocido` — ES lo correcto, no una limitación a resolver. `AppError` (clase tipada) sirve para correlacionar el `console.error` del SERVIDOR con un código de catálogo, nunca para diferenciar la UI del cliente.
+
+2. **BUG REAL: `retry`/`reset` — el rename de prop en Next 16.3 dejó una referencia rota a `reset` en `global-error.tsx` que habría lanzado `ReferenceError` al hacer clic en "Reintentar".**
+   Causa: al actualizar la firma de la función de `{ reset }` a `{ error, retry }` (Next 16.3 estabilizó `retry`, que sí re-ejecuta el fetch del segmento en vez de solo limpiar estado), quedó una línea vieja `onClick={reset}` sin actualizar — justo en el boundary más crítico (fallo del root layout), donde un segundo bug sería invisible hasta que alguien lo dispare en producción.
+   Do instead: al renombrar un parámetro destructurado, `grep` el nombre viejo en TODO el archivo antes de dar el cambio por terminado — el compilador de TS no lo marca porque `reset` seguía existiendo como identificador libre hasta el build/lint (en este caso sí lo hubiera atrapado `no-undef`, pero no confiar solo en eso).
+
+3. **BUG REAL: el fingerprint de agrupación usaba el texto libre del usuario ("qué intentabas hacer") en vez de la firma técnica del error.**
+   Causa: `buildFingerprint(code, user_message)` — dos personas con el mismo bug casi nunca describen su intención con las mismas palabras, así que nunca iban a agrupar aunque fuera literalmente el mismo error.
+   Do instead: hashear `code + technical_detail (o stack)`, nunca el mensaje del usuario — la única señal que representa el error EN SÍ, no la experiencia de quien lo reportó. Encontrado en `/code-review`, no al escribir la función.
+
+4. **Un formulario de reporte alcanzable sin sesión (por diseño: falla de login, error genérico) es una superficie pública — necesita el mismo rate limit que `/api/postular`.**
+   Do instead: `checkRateLimit` con la misma IP del último salto confiable (`x-forwarded-for` recortado), aunque el disparador sea una Server Action y no un Route Handler — `headers()` funciona igual en ambos contextos.
+
+5. **Reutilizar un solo `notification_type` para dos audiencias distintas ("nuevo reporte" al super admin, "respuesta" al reportero) rompe la promesa de la preferencia si el label no lo dice.**
+   Causa: `respuesta_reporte_error` etiquetado como "Respuestas del soporte" — un super admin que apaga eso pensando "ya no quiero que me avisen cuando responden a MIS reportes" también se queda ciego a reportes NUEVOS sin triar, porque `notify()` lee la misma preferencia para ambos casos.
+   Do instead: si se reutiliza un tipo de notificación para direcciones distintas de un mismo hilo (evitar una migración de enum), el label en `NOTIFICATION_TYPE_LABEL` tiene que describir el alcance real ("Actividad en reportes de error"), no la mitad más obvia del caso de uso. Alternativa correcta pero más cara: un segundo valor de enum si algún día hace falta separar las preferencias de verdad.
+
+6. **Reportero anónimo (login fallido) es representable: `error_reports.reporter_id` es nullable — verificado en el schema antes de escribir la Server Action, no asumido.**
+   Do instead: `getProfile()` (no `requireProfile()`) en `createErrorReport` — si no hay perfil, usar `createAdminClient()` + `organization_id` de `getOrganization()` (única org, lectura pública) y `reporter_id: null`. Sin esto, el único caso donde de verdad urge poder reportar ("no puedo ni iniciar sesión") sería el único que fallaría al reportarlo.
+
+7. **`useActionState` en un componente que NO se desmonta (un diálogo que solo se oculta con `open && ...` en el padre) arrastra el estado `success` entre aperturas.**
+   Causa: el hook vivía en el componente que envuelve el `<dialog>`, cuyo `open` es un simple booleano — cerrar el diálogo no desmonta nada, así que un segundo intento de reportar mostraba directo la pantalla de éxito del primero.
+   Do instead: mover el `useActionState` a un componente hijo que solo se monta `{open && <Hijo/>}` — al cerrar y reabrir, React lo desmonta/remonta de cero y el estado vuelve a `undefined`. Más simple que manejar un `key` manual.
+
+8. **Filtros de URL con "limpiar este filtro" vs "no tocar este filtro" no se pueden mezclar con `??` sobre un solo objeto parcial.**
+   Causa: `filterHref({status: undefined})` con `next.status ?? validStatus` no distingue "quiero limpiarlo" de "no lo mandé" — ambos casos son `undefined` en el input, así que el pill "Todos" nunca lograba limpiar el filtro activo.
+   Do instead: cuando una función arma una URL a partir de dos filtros independientes, que reciba SIEMPRE los dos valores explícitos (nunca un merge parcial con `??`) — cada pill pasa el estado completo que quiere, no un parche.
 
 ---
 

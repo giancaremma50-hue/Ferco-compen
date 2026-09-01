@@ -94,6 +94,18 @@ Quedan como advertencias aceptadas, no corregidas:
 
 Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `referCandidate` en `src/lib/jobs/actions.ts`; `moveApplicationStage` en `src/lib/applications/actions.ts`; `POST /api/postular`) corren su notificación/correo con `after()` de Next (`notifyBestEffort()`), nunca `await` antes de responder — un fallo de Resend o de la propia inserción en `notifications` no debe convertir una mutación ya guardada en un error de cara al usuario. Ver `.claude/napkin.md`, sección "Notificaciones in-app y correo (Fase 6)", para el detalle de cada hallazgo (incluye un bug real que rompía `next build` por instanciar el cliente de Resend a nivel de módulo).
 
+## Centro de errores (Fase 7)
+
+`error_reports` y `error_report_messages` se crearon completas en Fase 2 (columnas, RLS, `code` autogenerado `ERR-YYYY-NNNN` por secuencia) — Fase 7 fue pura capa de aplicación, **sin migraciones nuevas**. RLS se reverificó por SQL antes de escribir cualquier query (no se asumió que seguía igual desde Fase 2):
+
+- `error_reports_select`: `reporter_id = auth.uid() or is_super_admin()`. `error_reports_insert`: `organization_id = auth_org_id() and reporter_id = auth.uid()` — un reporte sin sesión usable no puede pasar por esta policy con el cliente de sesión, necesita `createAdminClient()`.
+- `error_report_messages_select`/`_insert`: mismo actor si es el reporter del `error_reports` padre, o super admin. Sin política de UPDATE/DELETE — el hilo es append-only a propósito, es un historial de soporte.
+- `error_reports.reporter_id` es NULLABLE — representa un reporte sin usuario autenticado detrás (p. ej. un login que falló antes de crear el perfil). `createErrorReport()` usa `getProfile()` (no `requireProfile()`) y cae a `createAdminClient()` + `organization_id` de `getOrganization()` cuando no hay perfil.
+- Un solo `notification_type` (`respuesta_reporte_error`) cubre las dos direcciones del hilo (nuevo reporte/mensaje → super admin; respuesta/cierre → reportero) — evita una migración de enum para una distinción que las preferencias actuales no explotan. El label en `NOTIFICATION_TYPE_LABEL` describe el alcance completo ("Actividad en reportes de error"), no solo la mitad "respuestas".
+- `fingerprint` agrupa por la firma técnica (`code` de catálogo + `technical_detail`/`stack`), nunca por lo que el usuario escribió en sus propias palabras.
+
+Ver `.claude/napkin.md`, sección "Centro de errores (Fase 7)", para el bug real de `retry`/`reset` en `global-error.tsx` y el resto de hallazgos.
+
 ## Storage
 
 | Bucket | Público | Contenido |
