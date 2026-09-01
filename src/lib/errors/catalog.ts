@@ -1,8 +1,9 @@
 /**
  * Redacción obligatoria: qué pasó en humano → qué no se perdió → qué puede
  * hacer ahora. Nunca culpar al usuario, nunca jerga, nunca un código sin
- * explicación. Se amplía en la Fase 7 (Centro de errores) con reporte y
- * seguimiento; por ahora cubre los casos que ya existen (auth).
+ * explicación. `reportable` habilita "Contarle al soporte" (Fase 7,
+ * src/lib/errors/actions.ts) — solo para motivos donde ya existe un perfil
+ * real al que atar el reporte.
  */
 export type ErrorEntry = {
   titulo: string;
@@ -15,8 +16,12 @@ export const ERROR_CATALOG: Record<string, ErrorEntry> = {
   fallo_inicio: {
     titulo: "No pudimos iniciar tu sesión",
     mensaje: "Google no confirmó tu identidad esta vez. No perdiste nada.",
-    queHacer: "Vuelve a intentarlo en unos segundos.",
-    reportable: true,
+    queHacer: "Vuelve a intentarlo en unos segundos. Si se repite, contacta a tu administrador directamente.",
+    // No reportable: puede ocurrir con una sesión de auth.users válida pero
+    // SIN fila en profiles todavía — el reporte necesita organization_id/
+    // reporter_id de un perfil real (Fase 7), así que no hay a quién
+    // adjuntarlo. Si persiste, la única salida real es contactar a un admin.
+    reportable: false,
   },
   inactivo: {
     titulo: "Tu cuenta está desactivada",

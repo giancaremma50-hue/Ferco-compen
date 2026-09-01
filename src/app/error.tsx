@@ -3,9 +3,11 @@
 import { ERROR_CATALOG } from "@/lib/errors/catalog";
 import { ErrorCard } from "@/components/errors/error-card";
 
-export default function ErrorBoundary({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const technicalDetail = error.digest ? `${error.message}\n(digest: ${error.digest})` : error.message;
+
   return (
-    <ErrorCard entry={ERROR_CATALOG.desconocido}>
+    <ErrorCard entry={ERROR_CATALOG.desconocido} motivo="desconocido" technicalDetail={technicalDetail}>
       <button
         type="button"
         onClick={reset}

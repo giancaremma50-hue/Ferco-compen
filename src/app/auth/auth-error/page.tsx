@@ -20,7 +20,7 @@ export default async function AuthErrorPage({
   const needsSignOut = motivo === "inactivo" || motivo === "fallo_inicio";
 
   return (
-    <ErrorCard entry={entry}>
+    <ErrorCard entry={entry} motivo={motivo ?? "desconocido"}>
       {needsSignOut ? (
         <form action={signOut}>
           <ActionButton pendingLabel="Cerrando sesión…">Cerrar sesión</ActionButton>

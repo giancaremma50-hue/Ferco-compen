@@ -1,5 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 6)_
+_Última actualización: 2026-09-01 (Fase 7)_
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
@@ -13,6 +13,17 @@ _Última actualización: 2026-09-01 (Fase 6)_
 1. **[2026-08-31] `npm run dev` en este sandbox NO puede llamar a `*.supabase.co` directo — solo el MCP de Supabase tiene canal permitido.**
    Síntoma: cualquier página que dependa de datos de Supabase (branding, sesión) los recibe como `null` al probar con curl/Playwright contra el dev server local, aunque el código y la política RLS estén correctos (verificado por separado con SQL directo vía MCP). El error real es `"Host not in allowlist: <ref>.supabase.co"`.
    Do instead: verificar la lógica por inspección + typecheck/build + SQL directo contra la base (vía MCP), no por curl/Playwright al dev server para nada que dependa de red hacia Supabase. En producción (Vercel) esto no aplica — tiene salida a internet real. No perder tiempo intentando arreglarlo como si fuera un bug de la app.
+
+2. **[2026-09-01] Puede haber DOS conectores MCP de Supabase a la vez, uno de ellos apuntando a un proyecto que NO es este.**
+   Síntoma real: el conector `mcp__supabase__*` (sin `project_id` como parámetro, pinneado a un solo proyecto) resolvió a `cihcimdzwlmhedpprmhf` — un proyecto legado ajeno (nombres de política en español, `is_administrador()`) — mientras el proyecto real de este repo es `cgudnnlcwcotovcslgzu` ("V1-motoslam", ver `docs/database.md`). El conector correcto para este repo es el que SÍ acepta `project_id` en cada tool (`list_projects`/`execute_sql`/`apply_migration` con ese parámetro) — permite elegir el proyecto explícito por `list_projects()` en vez de confiar en cuál quedó pineado por la cuenta.
+   Do instead: antes de la PRIMERA query o migración de una sesión nueva, correr `get_project_url()` (o `list_projects()` + comparar el `ref`) y confirmarlo contra `cgudnnlcwcotovcslgzu` — nunca asumir que "el MCP de supabase" conectado es el de este repo solo porque el nombre de la tool coincide.
+
+3. **[2026-09-01] `apply_migration` (DDL) contra este proyecto es bloqueado por el clasificador de auto-modo, incluso para un cambio aditivo y trivial (`ALTER TYPE ... ADD VALUE`).**
+   Do instead: no asumir que cualquier feature nueva necesita su propia migración — reutilizar un enum/columna ya existente si el caso de uso lo permite (ver Fase 7 abajo). Si de verdad hace falta DDL, ese paso queda pendiente de aprobación explícita del usuario en el chat, no se reintenta con otra forma de saltarlo.
+
+4. **[2026-09-01] Este worktree no trae su propio `node_modules` — un git worktree nuevo necesita `npm install` propio antes de poder correr `next build`.**
+   Síntoma engañoso: `npm run typecheck`/`npm run lint` corren bien SIN `node_modules` local porque Node resuelve `tsc`/`eslint` subiendo a un `node_modules` ancestro (otro worktree/repo principal) — pero `next build` (Turbopack) restringe la resolución de paquetes a la raíz del workspace detectado y falla con "Could not find the Next.js package" aunque el resto compile.
+   Do instead: si typecheck/lint pasan "sospechosamente rápido" en un worktree recién creado, no dar por bueno el build sin correrlo — `npm install` primero si no hay `node_modules` local.
 
 ---
 
@@ -58,6 +69,10 @@ _Última actualización: 2026-09-01 (Fase 6)_
    Causa: `handle_new_user` es un trigger `AFTER INSERT` en `auth.users` — solo se dispara una vez, al crear la cuenta. Si el callback rechaza esa sesión sin borrar la cuenta, un reintento de login reutiliza la misma fila de `auth.users` (no hay INSERT nuevo) y el trigger nunca vuelve a correr.
    Do instead: en **todo** camino de rechazo post-login (perfil faltante, dominio no permitido, inactivo no cuenta porque ahí sí hay perfil válido) llamar `createAdminClient().auth.admin.deleteUser(user.id)` antes de redirigir a la página de error — no solo en el caso que se te ocurrió primero. Se encontró porque un review notó que solo la rama de dominio-rechazado borraba la cuenta.
 
+10. **[2026-09-01] BUG REAL (pendiente, no corregido): `error_reports_select`/`error_report_messages_select` no validan `organization_id` en la rama `is_super_admin()`.**
+    Causa: la política es `reporter_id = auth.uid() OR is_super_admin()` — `private.is_super_admin()` solo mira el rol del JWT, nunca la organización. Hoy sin impacto real (un solo tenant), pero es el mismo patrón de fuga cross-tenant que la regla de AGENTS.md pide evitar.
+    Do instead (cuando se apruebe una migración): agregar `organization_id = (select private.auth_org_id())` a ambas políticas. Mientras tanto, Fase 7 lo mitiga filtrando `organization_id` explícito en cada función de `src/lib/errors/get-error-reports.ts` y `src/lib/errors/actions.ts` — mitigación de capa de app, no reemplaza el fix real en la política.
+
 ---
 
 ## Vacantes y postulación (Fase 4) — MÁXIMA PRIORIDAD
@@ -90,6 +105,25 @@ _Última actualización: 2026-09-01 (Fase 6)_
 8. **[2026-08-31] Todo validador de Zod en un formulario en español necesita su propio `{ error: "..." }` — incluso los que "seguro nunca van a fallar".**
    Causa: `.int()` sin mensaje propio, cuando `.positive()` sí lo tiene, deja pasar el texto default de Zod en inglés apenas alguien manda un valor no entero (posible con una llamada directa al endpoint, sin pasar por el `<input type="number">` del navegador).
    Do instead: revisar cada eslabón de una cadena Zod (`.int()`, `.min()`, `.max()`, `.positive()`, no solo el último), sobre todo en preprocesadores compartidos por varios campos (`optionalNumber` en `schema.ts`).
+
+---
+
+## Centro de errores (Fase 7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Ya existía infraestructura de bitácora genérica antes de Fase 7 — buscarla antes de inventar una nueva.**
+   `private.audit_row_change(org_id, action, entity_type, entity_id, diff jsonb)` (SECURITY DEFINER) ya estaba escrita y ya hay un trigger real usándola (`audit_error_report_status` en `error_reports`, dispara en cada cambio de `status`). Fase 8 (bitácora) probablemente es solo la pantalla de lectura sobre `audit_log`, no construir el mecanismo de escritura desde cero.
+   Do instead: antes de agregar logging/auditoría nueva a cualquier tabla, `select proname from pg_proc where prosrc ilike '%audit_log%'` primero.
+
+2. **[2026-09-01] Contexto auto-capturado del navegador (mensaje de excepción, URL, user agent) se trunca ANTES de pasar por Zod, nunca después.**
+   Causa: el límite de `ReportErrorSchema` está pensado para lo que escribe una persona (2000 caracteres es generoso para texto humano, corto para un `error.message` con causas anidadas o un stack serializado). Si se valida primero, el reporte del error real que se quiere reportar es exactamente el que falla el schema.
+   Do instead: `truncate()` en `src/lib/errors/actions.ts` antes del `safeParse` — cualquier campo que venga de `window`/`navigator`/una excepción real, no de un `<input>` del usuario, se recorta antes de validar.
+
+3. **[2026-09-01] Decisión consciente: un solo valor de enum `notification_type` (`respuesta_reporte_error`) cubre 3 direcciones distintas (reporte nuevo, respuesta de soporte, respuesta del reportante).**
+   Motivo: agregar un segundo valor de enum es DDL, y el clasificador de auto-modo bloqueó incluso un `ALTER TYPE ... ADD VALUE` aditivo (ver categoría de arriba). Costo real: la preferencia de notificación es todo-o-nada para las 3 direcciones — un super admin no puede separar "avísame de reportes nuevos" de "avísame de respuestas en hilos que ya sigo".
+   Do instead (si se aprueba una migración más adelante): dividir en 2-3 valores de enum reales y migrar `PREFERENCE_TYPES`/`NOTIFICATION_TYPE_LABEL` — no urgente mientras la organización tenga pocos super admin.
+
+4. **[2026-09-01] Fase 7 no manda correo — solo notificación in-app.** Los `notify()` de `src/lib/errors/actions.ts` no pasan el campo `email`, a propósito: escribir las plantillas de React Email para "nuevo reporte"/"te respondieron" queda pendiente. El toggle de correo en Mis Preferencias para este tipo no hace nada todavía — no es un bug, pero si un review lo marca, la respuesta es "diseño, no falta terminar el campo".
+   Do instead: si se pide correo real para esto, seguir el patrón de Fase 6 (`emails/`, `getEmailContext()`), no inventar uno nuevo.
 
 ---
 
