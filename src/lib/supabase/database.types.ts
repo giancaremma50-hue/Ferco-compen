@@ -968,6 +968,7 @@ export type Database = {
       }
       job_templates: {
         Row: {
+          competencies: Json
           country: string
           created_at: string
           description: string
@@ -976,12 +977,14 @@ export type Database = {
           location: string
           name: string
           organization_id: string
+          pipeline_template_id: string | null
           requirements: string
           title: string
           updated_at: string
           work_mode: string
         }
         Insert: {
+          competencies?: Json
           country: string
           created_at?: string
           description: string
@@ -990,12 +993,14 @@ export type Database = {
           location: string
           name: string
           organization_id: string
+          pipeline_template_id?: string | null
           requirements: string
           title: string
           updated_at?: string
           work_mode: string
         }
         Update: {
+          competencies?: Json
           country?: string
           created_at?: string
           description?: string
@@ -1004,6 +1009,7 @@ export type Database = {
           location?: string
           name?: string
           organization_id?: string
+          pipeline_template_id?: string | null
           requirements?: string
           title?: string
           updated_at?: string
@@ -1015,6 +1021,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_templates_pipeline_template_id_fkey"
+            columns: ["pipeline_template_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_templates"
             referencedColumns: ["id"]
           },
         ]

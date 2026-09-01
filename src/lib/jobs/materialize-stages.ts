@@ -2,10 +2,12 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Copia la plantilla de pipeline por defecto de la organización a job_stages
- * en el momento de crear la vacante — así editar la plantilla después no
- * altera procesos en curso. También deja jobs.pipeline_template_id apuntando
- * a la plantilla usada, para que Fase 5 sepa de dónde salió el pipeline.
+ * Copia una plantilla de pipeline a job_stages en el momento de crear la
+ * vacante — así editar la plantilla después no altera procesos en curso.
+ * También deja jobs.pipeline_template_id apuntando a la plantilla usada,
+ * para que Fase 5 sepa de dónde salió el pipeline. Si `pipelineTemplateId`
+ * viene de una plantilla de vacante (Fase 15), se usa esa; si no, la
+ * predeterminada de la organización — mismo comportamiento de siempre.
  *
  * Usa el cliente admin a propósito: pipeline_templates y job_stages solo
  * tienen políticas de escritura/lectura para admin+ (pipeline_templates_admin,
@@ -18,15 +20,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function materializeJobStages(
   jobId: string,
   organizationId: string,
+  pipelineTemplateId?: string | null,
 ): Promise<{ error?: string }> {
   const admin = createAdminClient();
 
-  const { data: template } = await admin
-    .from("pipeline_templates")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("is_default", true)
-    .single();
+  // .eq("organization_id", ...) además de .eq("id", ...) cuando viene de una
+  // plantilla de vacante: no confiar en que el id ya fue validado más arriba
+  // en la cadena de llamadas — este archivo no sabe de dónde vino el valor.
+  let templateQuery = admin.from("pipeline_templates").select("id").eq("organization_id", organizationId);
+  templateQuery = pipelineTemplateId ? templateQuery.eq("id", pipelineTemplateId) : templateQuery.eq("is_default", true);
+  const { data: template } = await templateQuery.single();
 
   if (!template) return { error: "No hay una plantilla de pipeline configurada para tu organización." };
 

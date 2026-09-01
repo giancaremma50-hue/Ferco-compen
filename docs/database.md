@@ -144,13 +144,25 @@ Sin acciones masivas ni paginación real todavía — `.limit(100)` con un aviso
 
 `JobTemplateSchema` (`src/lib/job-templates/schema.ts`) se deriva de `JobBaseSchema.pick({...}).extend({name})` en vez de retipar los campos — `src/lib/jobs/schema.ts` se separó en `JobBaseSchema` (sin `.refine()`) y `JobFormSchema = JobBaseSchema.refine(...)` porque Zod v4 no permite `.pick()` sobre un schema ya refinado.
 
-`/vacantes/nueva` gana un selector de plantilla (`TemplatePicker`, navega a `?template=id`) que prellena `JobForm` — este último es un formulario no controlado (`defaultValue`), así que tanto `JobForm` como el `<select>` del picker llevan una `key` atada al id de la plantilla elegida para forzar un remount real al cambiar de plantilla (`defaultValue` no se actualiza solo si el componente sigue siendo la misma instancia). El mismo problema, en su variante "editar", apareció en `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo — se corrigió con `key={template.updated_at}`.
+`/vacantes/nueva` gana un selector de plantilla que prellena `JobForm`. El mecanismo original (`TemplatePicker`, navegaba a `?template=id`, remontaba el formulario entero con una `key`) se reemplazó por completo en Fase 17 — ver esa sección.
+
+En `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo (formulario no controlado, `defaultValue` no se actualiza solo) — corregido con `key={template.updated_at}` en el uso del diálogo, esto sigue vigente.
 
 ## Configurador de bolsa pública (Fase 16)
 
 **`organizations.careers_headline`/`careers_intro`** (`text`, nullable) — dos columnas más en la fila de `organizations` que ya existía, no una tabla nueva. RLS de fila cubre las columnas nuevas automáticamente (Postgres no tiene RLS por columna); la política de `UPDATE` sigue siendo `super_admin`-only, deliberado — bajarla a `admin+` en la acción compartida (`updateBranding`) le daría a cualquier admin la capacidad de tocar también logo/color/nombre de la plataforma, la misma fila. Si se necesita que `admin` edite solo el copy de la bolsa, la solución es sacar estas dos columnas a una tabla aparte con su propia política, no relajar `organizations_update_super_admin`.
 
 Reusa por completo el flujo de Marca (Fase 3): mismo formulario (`BrandingForm`), misma acción (`updateBranding`), misma página (`/configuracion/marca`) — sin página ni componente nuevo. `/empleos` (portal público) los lee vía `getOrganization()` (ya cacheada con `cache()`, ya reusada por `empleos/layout.tsx`) con fallback a "Vacantes abiertas" si no están configurados.
+
+## Fusión de plantilla de vacante + pipeline/competencias (Fase 17)
+
+`job_templates` gana `pipeline_template_id` (FK a `pipeline_templates`, nullable, `on delete set null`) y `competencies` (`jsonb`, array de `{name, weight}`). Sin cambio de RLS — cubierto por las políticas de fila ya existentes de `job_templates`.
+
+**Decisión de seguridad, la más importante de esta fase:** `/vacantes/nueva` solo manda `template_id` al servidor, nunca el contenido de la plantilla. `createJob` vuelve a leer `pipeline_template_id`/`competencies` desde `job_templates` con el cliente de SESIÓN (permitido por `job_templates_select`, cualquier miembro de la organización) antes de decidir qué escribir. La primera versión de este cambio mandaba el contenido de la rúbrica (nombre/peso) en un campo oculto y lo insertaba tal cual usando el cliente admin — eso permitía a un `gestor` (sin acceso de escritura directo a `job_competencies`, que exige admin+) fabricar un POST con competencias arbitrarias y saltarse ese permiso por completo. Ver `.claude/napkin.md` para el detalle.
+
+El pipeline se materializa igual que siempre (`materializeJobStages`, Fase 5) pero ahora acepta un `pipelineTemplateId` opcional — si la plantilla de vacante especificó uno, se usa ese en vez de la plantilla de pipeline predeterminada de la organización. Las competencias se insertan en un solo `INSERT` con `position` explícito por índice (mismo patrón que las etapas), con el cliente admin por el mismo motivo que `materializeJobStages` (un gestor no tiene RLS de escritura sobre `job_competencies`, aunque sí puede crear su propia vacante).
+
+`NuevaVacanteForm` fusiona los campos visibles de la plantilla elegida SOLO si están vacíos (`fillIfEmpty`, manipula el DOM directo vía `form.elements.namedItem`) — a diferencia del mecanismo de Fase 15 (remount con `key`, que reemplazaba todo el formulario), esto preserva lo que el usuario ya haya escrito a mano. `JobForm` expone su `<form>` con `forwardRef` para esto, y acepta `children` (el único hidden input `template_id`) en vez de cargar ese campo también en el flujo de editar, que no lo usa.
 
 ## Storage
 

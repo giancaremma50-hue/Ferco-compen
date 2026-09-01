@@ -1,5 +1,23 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 16)_
+_Última actualización: 2026-09-01 (Fase 17)_
+
+## Fusión de plantilla de vacante + conexión a pipeline/competencias (Fase 17) — MÁXIMA PRIORIDAD
+
+Origen: comparación contra un documento de referencia del sistema real (RH-Suite) que el usuario pidió revisar. El documento mostró que "elegir plantilla" en el sistema real FUSIONA campos (no pisa lo ya escrito) y que la plantilla trae su propio pipeline + rúbrica de evaluación — ninguna de las dos cosas existía en la Fase 15 original.
+
+1. **[2026-09-01] BUG DE SEGURIDAD REAL, el más serio de la sesión: el primer diseño de "aplicar plantilla" mandaba el CONTENIDO de la rúbrica (nombre/peso de cada competencia) del cliente al servidor, y `createJob` lo insertaba tal cual usando el cliente admin (que bypasea RLS).**
+   `job_competencies` exige `admin+` para escribir (`job_competencies_write_admin`) — pero `createJob` deja crear vacantes a cualquier `gestor`. La primera versión de este fix insertaba las competencias que llegaban en un campo oculto del formulario usando `createAdminClient()` (mismo motivo que `materializeJobStages`: un gestor no tiene SELECT sobre las tablas admin-only que arman el pipeline). El problema: a diferencia de `materializeJobStages` (que solo recibe un ID de plantilla del cliente y vuelve a consultar el CONTENIDO real en el servidor), esta primera versión insertaba el contenido que el cliente mandó, sin volver a verificarlo contra nada. Un gestor podía fabricar un POST directo a `createJob` con nombres/pesos de competencia inventados y se insertaban igual, evitando por completo el gate admin+ que protege esa tabla en cualquier otro flujo. Corregido: el cliente solo manda `template_id` (una referencia); `createJob` vuelve a leer `job_templates.competencies` desde la base con el cliente de SESIÓN (no el admin — `job_templates_select` ya permite leer a cualquier miembro de la organización) antes de decidir qué insertar. Do instead: cuando el cliente admin (`createAdminClient()`) bypasea RLS para que un rol sin acceso directo pueda completar una acción legítima, **el cliente nunca debe mandar el contenido que se va a escribir — solo un id que el servidor vuelve a resolver.** Si el servidor confía en el contenido en vez de en el id, el bypass de RLS se convierte en un bypass de la regla de negocio completa (aquí, "solo admin+ decide la rúbrica de evaluación").
+
+2. **[2026-09-01] Un formulario no controlado (`defaultValue`) no puede "fusionar" datos nuevos vía props — la fusión real necesita manipular el DOM a mano.**
+   El primer intento de "fusionar en vez de reemplazar" seguía usando el mecanismo de `key`+remount de Fase 15 (que por diseño REEMPLAZA todo el formulario). Eso no es fusión, es "reemplazar con un candado si ya hay algo" — no cumple lo que pedía el documento de referencia (RH-Suite solo llena los campos VACÍOS). La solución real: `JobForm` expone su `<form>` vía `ref` (con `forwardRef`), y quien elige la plantilla (`NuevaVacanteForm`) recorre `form.elements.namedItem(nombre)` campo por campo, escribiendo el valor SOLO si el campo actual está vacío (`fillIfEmpty`). Nada de `key`, nada de remount — el mismo `<form>` sigue vivo, solo se le tocan los campos que el usuario no había tocado.
+
+3. **[2026-09-01] Reabrir "Nueva plantilla" tras crear una mostraba la rúbrica de la plantilla recién creada — `formRef.current.reset()` (nativo) no toca estado de React.**
+   `CompetencyListEditor` guarda sus filas en `useState`, no en `defaultValue` de inputs — un `reset()` nativo del formulario no lo alcanza. Se corrigió exponiendo un `ref` imperativo (`useImperativeHandle`) con un método `clear()`, llamado junto al `reset()` nativo. Do instead: cualquier editor de lista tipo `PipelineStagesEditor`/`CompetencyListEditor` (estado de React serializado a un input oculto) necesita su PROPIO mecanismo de limpieza — el `reset()` de un `<form>` nativo solo alcanza inputs/textareas/selects no controlados.
+
+4. **[2026-09-01] `react-hooks/set-state-in-effect` bloquea `setState` dentro de un `useEffect` incluso llamado a través de un ref imperativo indirecto si el linter lo puede rastrear — pero SÍ permite llamar un método imperativo expuesto por OTRO componente (`ref.current?.clear()`), porque no puede ver dentro de él.**
+   Confirma el mismo patrón ya documentado en Fase 12 (`message-form.tsx`): cuando ESLint bloquea un `setState` directo dentro de un efecto, la salida no es "sacar la lógica del efecto" — es mover el `setState` a un componente hijo y exponerlo como un método imperativo (`useImperativeHandle`) en vez de una prop de estado (`key`).
+
+---
 
 ## Configurador de bolsa pública (Fase 16) — MÁXIMA PRIORIDAD
 

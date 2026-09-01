@@ -64,7 +64,8 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 14 — Segmentos y filtros de candidatos | ✅ |
 | 15 — Motor de plantillas de vacante | ✅ |
 | 16 — Configurador de bolsa pública | ✅ |
-| 17+ | Pendientes |
+| 17 — Fusión de plantilla de vacante + pipeline/competencias | ✅ |
+| 18+ | Pendientes |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).

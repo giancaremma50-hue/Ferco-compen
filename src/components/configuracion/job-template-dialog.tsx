@@ -6,18 +6,26 @@ import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
 import { DialogShell, type DialogShellHandle } from "@/components/ui/dialog-shell";
 import { LabelSelect } from "@/components/ui/label-select";
+import { CompetencyListEditor, type CompetencyListEditorHandle } from "@/components/configuracion/competency-list-editor";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { JobTemplate } from "@/lib/job-templates/get-job-templates";
 
 export function JobTemplateDialog({
   template,
+  pipelineTemplates,
   trigger,
 }: {
   template?: JobTemplate;
+  pipelineTemplates: { id: string; name: string }[];
   trigger: React.ReactNode;
 }) {
   const dialogRef = useRef<DialogShellHandle>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  // CompetencyListEditor lleva su propio estado de React (no inputs no
+  // controlados) — formRef.reset() no lo toca. Este ref imperativo es la
+  // única forma de vaciarlo de verdad entre una creación y la siguiente
+  // (el diálogo nunca se desmonta solo por cerrarse).
+  const competencyEditorRef = useRef<CompetencyListEditorHandle>(null);
   const action = template ? updateJobTemplate.bind(null, template.id) : createJobTemplate;
   const [state, formAction] = useActionState(action, undefined);
 
@@ -27,9 +35,12 @@ export function JobTemplateDialog({
       notifySuccess(state.success);
       dialogRef.current?.close();
       // Solo para "Nueva plantilla": este diálogo no se desmonta entre
-      // aperturas, así que sin reset() la próxima vez que se abra para
-      // crear otra plantilla seguiría mostrando lo que se acaba de guardar.
-      if (!template) formRef.current?.reset();
+      // aperturas, así que sin esto la próxima vez que se abra para crear
+      // otra plantilla seguiría mostrando lo que se acaba de guardar.
+      if (!template) {
+        formRef.current?.reset();
+        competencyEditorRef.current?.clear();
+      }
     }
   }, [state, template]);
 
@@ -124,6 +135,32 @@ export function JobTemplateDialog({
                 className="rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-foreground"
               />
             </label>
+
+            <label className="flex flex-col gap-1 border-t border-border pt-4">
+              <span className="text-xs text-muted-foreground">Plantilla de pipeline (opcional)</span>
+              <select
+                name="pipeline_template_id"
+                defaultValue={template?.pipeline_template_id ?? ""}
+                className="h-[38px] rounded-md border border-border bg-background px-2.5 text-sm"
+              >
+                <option value="">Usar la de la organización (por defecto)</option>
+                {pipelineTemplates.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">
+                Si no eliges una, la vacante nace con la plantilla de pipeline predeterminada de tu organización.
+              </span>
+            </label>
+
+            <div>
+              <span className="text-xs text-muted-foreground">Rúbrica de evaluación (opcional)</span>
+              <div className="mt-1.5">
+                <CompetencyListEditor ref={competencyEditorRef} initialCompetencies={template?.competencies ?? []} />
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-2.5">

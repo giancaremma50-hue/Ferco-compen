@@ -19,6 +19,19 @@ export async function getPipelineTemplates(organizationId: string): Promise<Pipe
   })) as PipelineTemplateRow[];
 }
 
+export type PipelineTemplateOption = { id: string; name: string };
+
+/** Para un <select> (ej. elegir la plantilla de pipeline de una plantilla de vacante) — no necesita el conteo de etapas ni el resto de columnas. */
+export async function getPipelineTemplateOptions(organizationId: string): Promise<PipelineTemplateOption[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("pipeline_templates")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .order("name");
+  return data ?? [];
+}
+
 export async function getPipelineTemplate(
   id: string,
 ): Promise<{ template: Tables<"pipeline_templates">; stages: PipelineTemplateStageRow[] } | null> {

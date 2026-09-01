@@ -16,6 +16,8 @@ import { findOrCreateCandidate, createApplicationForCandidate } from "./create-a
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { VacantePendienteAprobacionEmail } from "@/emails/vacante-pendiente-aprobacion";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
+import { optionalUuid } from "@/lib/zod-helpers";
+import type { CompetencyDraft } from "@/lib/job-templates/schema";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -80,6 +82,28 @@ export async function createJob(
   const departmentError = await assertValidDepartment(supabase, profile.organization_id, parsed.data.department_id);
   if (departmentError) return { error: departmentError };
 
+  // El id de la plantilla es la única cosa que viaja del cliente para este
+  // flujo — nunca su contenido. job_templates_select ya deja leer a
+  // cualquier miembro de la organización, así que re-consultar acá con el
+  // cliente de sesión (no el admin) es gratis y evita confiar en un
+  // pipeline_template_id/competencies fabricado a mano en el POST.
+  const templateId = optionalUuid("Plantilla inválida.").safeParse(formData.get("template_id"));
+  if (!templateId.success) return { error: "La plantilla elegida no es válida." };
+
+  let pipelineTemplateId: string | null = null;
+  let competencies: CompetencyDraft[] = [];
+  if (templateId.data) {
+    const { data: template } = await supabase
+      .from("job_templates")
+      .select("pipeline_template_id, competencies")
+      .eq("id", templateId.data)
+      .eq("organization_id", profile.organization_id)
+      .maybeSingle();
+    if (!template) return { error: "Esa plantilla ya no está disponible." };
+    pipelineTemplateId = template.pipeline_template_id;
+    competencies = (template.competencies as CompetencyDraft[]) ?? [];
+  }
+
   // Toda vacante nace en "borrador" — RLS solo permite a quien no es admin
   // editar su propia fila mientras está en ese estado; enviarla a aprobación
   // es un paso explícito (submitForApproval), no algo que se decida aquí.
@@ -100,11 +124,40 @@ export async function createJob(
     return { error: "No se pudo crear la vacante. Inténtalo de nuevo." };
   }
 
-  const { error: stagesError } = await materializeJobStages(job.id, profile.organization_id);
+  const { error: stagesError } = await materializeJobStages(job.id, profile.organization_id, pipelineTemplateId);
   if (stagesError) {
     // La vacante ya existe pero sin pipeline — se deja visible para que un
     // admin la revise en vez de deshacer el insert silenciosamente.
     return { error: stagesError };
+  }
+
+  if (competencies.length > 0) {
+    // job_competencies_write_admin exige admin+ — un gestor SÍ puede crear
+    // su propia vacante desde una plantilla con rúbrica, así que esta
+    // escritura puntual necesita el cliente admin (mismo motivo que
+    // materializeJobStages, ver el comentario de ese archivo). Un solo
+    // INSERT con `position` explícito por índice — igual que
+    // materializeJobStages hace con las etapas — en vez de una fila a la
+    // vez: así el orden de la plantilla no depende de que cada INSERT
+    // separado reciba un created_at distinto.
+    const admin = createAdminClient();
+    const { error: competenciesError } = await admin.from("job_competencies").insert(
+      competencies.map((c, i) => ({
+        organization_id: profile.organization_id,
+        job_id: job.id,
+        name: c.name,
+        weight: c.weight,
+        position: i,
+      })),
+    );
+    // No bloquea la creación — la vacante ya existe y una rúbrica vacía es
+    // un estado normal (ver Fase 11), a diferencia de un pipeline vacío. Sí
+    // se registra: a diferencia de "sin rúbrica" (elección válida), "la
+    // rúbrica de la plantilla no se pudo copiar" es un fallo real que un
+    // admin debería poder investigar si la vacante llega sin competencias.
+    if (competenciesError) {
+      console.error("createJob: no se pudieron copiar las competencias de la plantilla", competenciesError);
+    }
   }
 
   revalidatePath("/vacantes");

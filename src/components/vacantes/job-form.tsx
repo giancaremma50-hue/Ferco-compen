@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { forwardRef, useActionState, useEffect } from "react";
 import { ActionButton } from "@/components/ui/action-button";
 import { LabelSelect } from "@/components/ui/label-select";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
@@ -10,17 +10,25 @@ import type { JobDetail } from "@/lib/jobs/get-jobs";
 
 type Department = { id: string; name: string };
 
-export function JobForm({
-  action,
-  departments,
-  defaultValues,
-  submitLabel,
-}: {
-  action: (prevState: JobActionResult | undefined, formData: FormData) => Promise<JobActionResult>;
-  departments: Department[];
-  defaultValues?: Partial<JobDetail>;
-  submitLabel: string;
-}) {
+/**
+ * `ref` expone el <form> — lo usa NuevaVacanteForm para fusionar los datos
+ * de una plantilla de vacante campo por campo (solo los que están vacíos),
+ * sin pasar por `defaultValues` (que un formulario no controlado solo lee
+ * al montar, nunca al recibir props nuevas).
+ */
+export const JobForm = forwardRef<
+  HTMLFormElement,
+  {
+    action: (prevState: JobActionResult | undefined, formData: FormData) => Promise<JobActionResult>;
+    departments: Department[];
+    defaultValues?: Partial<JobDetail>;
+    submitLabel: string;
+    // Solo NuevaVacanteForm lo usa (un <input type="hidden" name="template_id">
+    // que va dentro del <form> real) — editar/page.tsx no lo necesita y no
+    // debe cargar con marcado de un flujo del que no participa.
+    children?: React.ReactNode;
+  }
+>(function JobForm({ action, departments, defaultValues, submitLabel, children }, ref) {
   const [state, formAction] = useActionState(action, undefined);
 
   useEffect(() => {
@@ -29,7 +37,9 @@ export function JobForm({
   }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form ref={ref} action={formAction} className="flex flex-col gap-5">
+      {children}
+
       <Field id="title" label="Título del puesto">
         <input
           id="title"
@@ -172,7 +182,7 @@ export function JobForm({
       </div>
     </form>
   );
-}
+});
 
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
