@@ -1,5 +1,14 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 7/7 — creación de vacante)_
+_Última actualización: 2026-09-01 (Fase 18 — tooltips del menú flotante)_
+
+## Tooltips del menú flotante (Fase 18) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL: un tooltip `absolute` sin `z-index` propio puede quedar tapado por un elemento hermano opaco que sí tiene su propio contexto de apilamiento — incluso sin que ninguno declare `z-index` explícito, el orden del DOM decide, y un vecino "activo" puede pintar encima.**
+   El indicador del ítem activo del menú flotante (`bg-background`, opaco) y el tooltip nuevo de un ítem vecino podían superponerse visualmente (tooltips más anchos que su propio botón, gap chico entre ítems) — sin `z-index`, gana quien esté después en el DOM, no necesariamente el tooltip. Corregido con `z-10` explícito en el tooltip. Do instead: cualquier tooltip/popover `absolute` que pueda superponerse con un elemento hermano opaco necesita `z-index` explícito, no asumir que "está encima en el árbol visual" alcanza.
+
+2. **[2026-09-01] No se pudo probar en navegador — limitación ya documentada del sandbox, no un bug de la app.** El menú flotante vive dentro del layout autenticado (requiere `requireProfile()` con datos reales de Supabase) y este entorno no tiene salida de red hacia `*.supabase.co` (ver la entrada de Fase 17/entorno de desarrollo remoto). Verificado por inspección de código + `typecheck`/`lint`/`build`, no por interacción real en un navegador — pendiente de confirmación visual del usuario o en producción (Vercel sí tiene salida a internet real).
+
+---
 
 ## Creación de vacante basada en plantilla (Fase 18, 7/7) — MÁXIMA PRIORIDAD
 
