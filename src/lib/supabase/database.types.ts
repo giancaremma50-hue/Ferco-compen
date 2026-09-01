@@ -1339,6 +1339,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          wizard_step: number
           work_mode: string
         }
         Insert: {
@@ -1361,6 +1362,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          wizard_step?: number
           work_mode: string
         }
         Update: {
@@ -1383,6 +1385,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          wizard_step?: number
           work_mode?: string
         }
         Relationships: [

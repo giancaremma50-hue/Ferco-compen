@@ -334,6 +334,35 @@ filtros de candidatos, kanban). Se reemplazó `kind` por `type
 job_stage_type` (tabla vacía en ese momento, sin backfill) antes de que
 nadie hubiera usado este paso todavía.
 
+## Wizard de plantillas de vacante — Pasos 5-6 y cierre (Fase 18, 6/7)
+
+Con `/configuracion/plantillas-vacante/[id]/paso-5` (Confidencial) y
+`paso-6` (Cierre: "Crear plantilla" publica, "Crear borrador" vuelve al
+listado sin publicar) el wizard queda completo, 6 de 6 pasos.
+
+`job_templates.wizard_step` (smallint, `NOT NULL DEFAULT 1`) — cada acción
+de guardado lo avanza a "el próximo paso a retomar"; el botón "Continuar"
+del listado lo usa para saber a dónde volver en un borrador sin terminar.
+No se infiere de qué filas existen (0 preguntas o 0 etapas intermedias son
+estados válidos, no "paso sin completar") y no retrocede si se revisita un
+paso anterior ya superado — aceptado, ver napkin.md.
+
+**Bug real encontrado en `/code-review`, el más sutil de esta fase**:
+`updateTemplateStep5` podía dejar al propio actor sin poder ver la fila que
+acababa de guardar. `job_templates_update_admin` (escritura) no exige nada
+sobre `is_confidential`/`created_by`, pero `job_templates_select`
+(`can_view_job_template`) sí — un admin que NO es el creador y activa
+Confidencial deja de cumplir esa política desde el mismo `UPDATE` que
+acaba de correr. El `.select("id")` (RETURNING) del código quedaba filtrado
+por esa misma política DESPUÉS de escribir, así que devolvía vacío — un
+falso "no se pudo guardar" pese a que sí se guardó, seguido de un 404 real
+al llegar al paso 6. Corregido: la existencia se confirma con un `SELECT`
+aparte ANTES del `UPDATE` (no con el RETURNING de después), y si el
+resultado del guardado deja al actor sin acceso a su propia fila
+(confidencial + no es el creador + no es super_admin), se lo manda al
+listado con un mensaje concreto en vez de al paso 6, que le daría 404 sin
+explicación.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración

@@ -1,5 +1,16 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 5/7)_
+_Última actualización: 2026-09-01 (Fase 18, 6/7 — wizard completo)_
+
+## Wizard de plantillas — pasos 5-6, cierre (Fase 18, 6/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, el más sutil de la sesión: un UPDATE que cambia si el propio actor va a seguir cumpliendo la política de SELECT de esa misma fila no puede confiar en el RETURNING de ese UPDATE para saber si "se guardó".**
+   `updateTemplateStep5` dejaba activar `is_confidential` a cualquier admin+ (la política de escritura no mira quién es `created_by`), pero la política de lectura sí — un admin que no es el creador, al activar el switch, deja de cumplir esa política desde el mismo `UPDATE`. El código pedía `.select("id")` sobre ese UPDATE para confirmar éxito: como el RETURNING se filtra por la política de SELECT DESPUÉS de escribir, volvía vacío — `data.length === 0` se leía como "no se guardó", cuando en realidad sí se había guardado. El siguiente paso (redirigir al paso 6) además le daba un 404 real, sin ninguna pista de que su cambio sí había funcionado.
+   Do instead: cuando un UPDATE puede cambiar si el actor sigue teniendo SELECT sobre la fila que acaba de tocar, la confirmación de éxito no puede depender del RETURNING de ese mismo UPDATE — confirmar existencia con un SELECT aparte ANTES de escribir, y decidir el resultado del `UPDATE` solo por su `error`, no por si el actor todavía puede leer la fila después.
+
+2. **[2026-09-01] Decisión, consecuencia del bug de arriba: si el guardado del paso 5 deja al actor sin poder ver su propia plantilla, no se lo manda al paso siguiente — se lo manda al listado con un mensaje que explica por qué.**
+   Mandarlo al paso 6 de todos modos le habría dado un 404 sin contexto (ya no cumple `can_view_job_template`). En vez de "arreglar" el síntoma escondiendo el 404, se cambia el destino del redirect según si el actor va a poder seguir viendo la fila o no — la excepción a la regla "todo paso avanza al siguiente" está documentada en el propio código, no es un caso suelto.
+
+---
 
 ## Wizard de plantillas — paso 4 "Etapas" (Fase 18, 5/7) — MÁXIMA PRIORIDAD
 

@@ -4,11 +4,18 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema, WizardStep4Schema } from "./wizard-schema";
+import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema, WizardStep4Schema, WizardStep5Schema } from "./wizard-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type WizardActionResult = { error?: string };
+
+// `job_templates.wizard_step` guarda "el próximo paso a retomar", no el
+// último completado — cada acción de guardado lo avanza a N+1 al terminar.
+// Sirve para que "Continuar" en el listado sepa a qué paso volver: inferirlo
+// de qué filas existen no es confiable (0 preguntas o 0 etapas intermedias
+// son estados válidos, no "paso sin completar"). No retrocede si se
+// revisita un paso anterior ya avanzado más allá — aceptado, ver napkin.md.
 
 /**
  * El <select> del formulario ya solo ofrece departamentos de la propia
@@ -65,6 +72,7 @@ export async function createTemplateDraftStep1(
       description: parsed.data.description,
       requirements: parsed.data.requirements,
       competencies: parsed.data.competencies,
+      wizard_step: 2,
     })
     .select("id")
     .single();
@@ -108,6 +116,7 @@ export async function updateTemplateStep1(
       description: parsed.data.description,
       requirements: parsed.data.requirements,
       competencies: parsed.data.competencies,
+      wizard_step: 2,
     })
     .eq("id", templateId)
     .eq("organization_id", profile.organization_id)
@@ -137,7 +146,7 @@ export async function updateTemplateStep2(
 
   const { data, error } = await supabase
     .from("job_templates")
-    .update({ candidacy_fields: { ...parsed.data, email: "required" } })
+    .update({ candidacy_fields: { ...parsed.data, email: "required" }, wizard_step: 3 })
     .eq("id", templateId)
     .eq("organization_id", profile.organization_id)
     .select("id");
@@ -221,6 +230,16 @@ export async function updateTemplateStep3(
     }
   }
 
+  // Las preguntas ya quedaron guardadas — un fallo acá no debe convertir eso
+  // en un error de cara al usuario, solo significa que "Continuar" en el
+  // listado podría mandarlo de vuelta al paso 3 en vez del 4 la próxima vez.
+  const { error: stepError } = await supabase
+    .from("job_templates")
+    .update({ wizard_step: 4 })
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id);
+  if (stepError) console.error("updateTemplateStep3: no se pudo avanzar wizard_step", stepError);
+
   revalidatePath("/configuracion/plantillas-vacante");
   revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-3`);
   redirect(`/configuracion/plantillas-vacante/${templateId}/paso-4?guardado=1`);
@@ -271,7 +290,122 @@ export async function updateTemplateStep4(
   const { error: insertError } = await supabase.from("job_template_stages").insert(rows);
   if (insertError) return { error: "No se pudieron guardar las etapas." };
 
+  const { error: stepError } = await supabase
+    .from("job_templates")
+    .update({ wizard_step: 5 })
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id);
+  if (stepError) console.error("updateTemplateStep4: no se pudo avanzar wizard_step", stepError);
+
   revalidatePath("/configuracion/plantillas-vacante");
   revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-4`);
-  redirect(`/configuracion/plantillas-vacante?guardado=1`);
+  redirect(`/configuracion/plantillas-vacante/${templateId}/paso-5?guardado=1`);
+}
+
+/**
+ * Paso 5 ("Permisos y usos") — un solo switch, un solo campo que guardar.
+ *
+ * Este paso puede dejar al propio actor sin poder ver la fila que acaba de
+ * guardar: `job_templates_update_admin` (escritura) no exige nada sobre
+ * `is_confidential`/`created_by`, pero `job_templates_select`
+ * (`can_view_job_template`) sí — si un admin que NO es el creador activa el
+ * switch, el UPDATE escribe bien pero él mismo deja de cumplir la política
+ * de lectura a partir de esa misma fila. Por eso:
+ * 1. La existencia se confirma ANTES del update con un SELECT aparte — un
+ *    `.select("id")` sobre el UPDATE (RETURNING) se habría filtrado por la
+ *    política de lectura DESPUÉS de escribir, dando `data: []` (falso
+ *    negativo: "no se pudo guardar" aunque sí se guardó) en vez de reflejar
+ *    si la fila existía de verdad.
+ * 2. Si el actor se queda sin acceso a la fila (recién confidencial y no es
+ *    su creador ni super_admin), no se lo manda al paso 6 — ahí
+ *    `getJobTemplateForWizard` ya no la vería y caería en un 404 sin
+ *    explicación. Se lo manda al listado con un mensaje concreto en su lugar.
+ */
+export async function updateTemplateStep5(
+  templateId: string,
+  _prevState: WizardActionResult | undefined,
+  formData: FormData,
+): Promise<WizardActionResult> {
+  const profile = await requireAdminOrAbove();
+  const parsed = WizardStep5Schema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa los datos." };
+
+  const supabase = await createClient();
+
+  const { data: template } = await supabase
+    .from("job_templates")
+    .select("id, created_by")
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (!template) return { error: "La plantilla ya no existe." };
+
+  const { error } = await supabase
+    .from("job_templates")
+    .update({ is_confidential: parsed.data.is_confidential, wizard_step: 6 })
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id);
+
+  if (error) return { error: "No se pudo guardar." };
+
+  revalidatePath("/configuracion/plantillas-vacante");
+  revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-5`);
+
+  const losesAccess = parsed.data.is_confidential && template.created_by !== profile.id && profile.role !== "super_admin";
+  if (losesAccess) {
+    redirect(`/configuracion/plantillas-vacante?confidencial=1`);
+  }
+  redirect(`/configuracion/plantillas-vacante/${templateId}/paso-6?guardado=1`);
+}
+
+/**
+ * Paso 6 ("Cierre") — sin campos propios, todo lo demás ya se guardó paso a
+ * paso. "Crear borrador" solo confirma y vuelve al listado (la plantilla ya
+ * está en `status = 'draft'` desde que se creó); "Crear plantilla" es la
+ * única acción que la marca `published` — recién ahí aparece en el
+ * selector de "Solicitar vacante" (getPublishedJobTemplates).
+ */
+export async function saveTemplateAsDraft(
+  templateId: string,
+  _prevState: WizardActionResult | undefined,
+  _formData: FormData,
+): Promise<WizardActionResult> {
+  const profile = await requireAdminOrAbove();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("job_templates")
+    .select("status")
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (!data) return { error: "La plantilla ya no existe." };
+
+  // "Crear borrador" no debe decir que guardó como borrador una plantilla
+  // que ya estaba publicada — este botón no la des-publica, no toca
+  // `status` en absoluto. En la práctica esto solo se alcanza escribiendo la
+  // URL a mano (el wizard nunca la ofrece para una plantilla publicada), no
+  // hace falta un flujo distinto, solo no mentir en el mensaje.
+  revalidatePath("/configuracion/plantillas-vacante");
+  redirect(`/configuracion/plantillas-vacante?${data.status === "published" ? "publicada" : "borrador"}=1`);
+}
+
+export async function publishTemplate(
+  templateId: string,
+  _prevState: WizardActionResult | undefined,
+  _formData: FormData,
+): Promise<WizardActionResult> {
+  const profile = await requireAdminOrAbove();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("job_templates")
+    .update({ status: "published" })
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .select("id");
+  if (error || !data || data.length === 0) return { error: "No se pudo publicar la plantilla." };
+
+  revalidatePath("/configuracion/plantillas-vacante");
+  redirect(`/configuracion/plantillas-vacante?publicada=1`);
 }

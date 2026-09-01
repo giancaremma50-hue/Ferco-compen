@@ -9,10 +9,16 @@ import { NotifyOnMount } from "@/components/ui/notify-on-mount";
 export default async function PlantillasVacantePage({
   searchParams,
 }: {
-  searchParams: Promise<{ guardado?: string }>;
+  // El wizard redirige acá recién en el cierre (paso 6) — cada paso
+  // intermedio confirma en su propia página (ver paso-2 a paso-6), este
+  // listado solo confirma el resultado final. "confidencial" llega desde el
+  // paso 5 cuando quien la marcó confidencial no es su creador — a partir de
+  // ahí ya no la ve ni en este mismo listado, así que no tiene sentido
+  // mandarlo al paso 6 (le daría 404).
+  searchParams: Promise<{ borrador?: string; publicada?: string; confidencial?: string }>;
 }) {
   const profile = await requireAdminOrAbove();
-  const { guardado } = await searchParams;
+  const { borrador, publicada, confidencial } = await searchParams;
   const [templates, pipelineOptions] = await Promise.all([
     getJobTemplates(profile.organization_id),
     getPipelineTemplateOptions(profile.organization_id),
@@ -20,7 +26,9 @@ export default async function PlantillasVacantePage({
 
   return (
     <section className="border border-border bg-card p-5">
-      {guardado && <NotifyOnMount message="Detalles guardados" />}
+      {borrador && <NotifyOnMount message="Guardada como borrador" />}
+      {publicada && <NotifyOnMount message="Plantilla publicada" />}
+      {confidencial && <NotifyOnMount message="Guardado — como no la creaste vos, ya no te aparece" />}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-serif text-2xl">Plantillas de vacante</h2>

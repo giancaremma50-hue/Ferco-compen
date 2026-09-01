@@ -110,3 +110,9 @@ export const WizardStep4Schema = z.object({
   ).pipe(z.array(TemplateStageDraftSchema).max(15, { error: "Máximo 15 etapas intermedias." })),
 });
 export type WizardStep4Values = z.infer<typeof WizardStep4Schema>;
+
+// Paso 5 ("Permisos y usos") — un solo switch.
+export const WizardStep5Schema = z.object({
+  is_confidential: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()),
+});
+export type WizardStep5Values = z.infer<typeof WizardStep5Schema>;

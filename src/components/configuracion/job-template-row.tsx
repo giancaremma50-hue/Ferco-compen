@@ -29,7 +29,7 @@ export function JobTemplateRow({
       <div className="flex flex-none items-center gap-2">
         {template.status === "draft" && (
           <Link
-            href={`/configuracion/plantillas-vacante/${template.id}/paso-2`}
+            href={`/configuracion/plantillas-vacante/${template.id}/paso-${template.wizard_step}`}
             className="flex h-8 items-center rounded-md border border-border px-3 text-xs"
           >
             Continuar
