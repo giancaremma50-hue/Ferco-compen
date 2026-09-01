@@ -130,6 +130,14 @@ La capa de aplicación es más estricta que Tareas a propósito: `scheduleInterv
 
 Sin integración real con la API de Google Calendar (requeriría OAuth con scope `calendar.events`, guardado de refresh token y configuración manual en Google Cloud Console). En su lugar, `src/lib/interviews/calendar-link.ts` arma un enlace `calendar.google.com/calendar/render` — cada quien agrega el evento a su propio calendario con un clic, sin credenciales nuevas. El correo al candidato muestra la hora en UTC explícito (el servidor no conoce la zona horaria de la organización ni la del candidato) y remite al enlace, que sí ajusta la hora a la zona de quien lo abre.
 
+## Segmentos y filtros de candidatos (Fase 14)
+
+**`candidate_segments`** (organización, nombre, `filters` jsonb, autor). Compartidos entre toda la organización: `SELECT` para cualquier miembro (igual que `message_templates`/`rejection_reasons`), `INSERT` fuerza `created_by = auth.uid()` en el `WHERE CHECK` (no se puede falsificar el autor), `DELETE` solo `created_by` o admin+.
+
+`/candidatos` se reescribió con filtros (vacante, tipo de etapa, estado, texto libre) validados con un único schema Zod (`CandidateFiltersSchema`) reusado tanto para leer la URL como para el formulario de guardar segmento — antes había una validación ad hoc con el operador `in` sobre un mapa de etiquetas, vulnerable a la cadena de prototipos de JS (`?stage_type=constructor` pasaba la validación). El filtro por tipo de etapa se aplica en JS después de traer las filas, no con `.eq()` sobre un embed `job_stages!inner` — ese `!inner` forzado reintroducía el bug de Fase 5 (RLS de `job_stages` más estricta que la de `applications`, la fila entera desaparecía en silencio en vez de solo la etapa).
+
+Sin acciones masivas ni paginación real todavía — `.limit(100)` con un aviso en la UI cuando el resultado llega justo a ese límite, para no fingir que la lista está completa. Ver `.claude/napkin.md` para el detalle de alcance recortado.
+
 ## Storage
 
 | Bucket | Público | Contenido |

@@ -43,6 +43,15 @@ export async function getJobsForViewer(): Promise<JobListItem[]> {
   return data ?? [];
 }
 
+export type JobTitleOption = { id: string; title: string };
+
+/** Para un <select> de vacante (ej. filtro de candidatos) — no necesita el resto de columnas de JobListItem. */
+export async function getJobTitlesForViewer(): Promise<JobTitleOption[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("jobs").select("id, title").order("title");
+  return data ?? [];
+}
+
 export async function getJobById(id: string): Promise<JobDetail | null> {
   const supabase = await createClient();
   const { data } = await supabase

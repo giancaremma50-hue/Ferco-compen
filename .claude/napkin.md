@@ -1,5 +1,24 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 13)_
+_Última actualización: 2026-09-01 (Fase 14)_
+
+## Segmentos y filtros de candidatos (Fase 14) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, el más serio de esta fase: forzar `!inner` sobre un embed de Supabase para poder filtrar por su columna reintrodujo un bug ya documentado y corregido en Fase 5 — pero esta vez borraba la fila COMPLETA en silencio, no solo lanzaba un error de acceso nulo.**
+   `job_stages`/`jobs` tienen RLS más estricta que `applications` (un colaborador sigue viendo la postulación de su referido aunque la vacante ya no le sea visible). `job_stages!inner(name, type)` sin condición — puesto ahí solo para poder hacer `.eq("job_stages.type", ...)` — hace que PostgREST exija una fila de `job_stages` unible para devolver la fila padre, así que cualquier candidato cuya etapa dejó de ser visible desaparecía por completo de `/candidatos`, sin filtro de etapa activo siquiera. Corregido quitando el `!inner` (vuelve a ser `job_stages(name, type)`, nullable) y filtrando por tipo de etapa en JS después de traer las filas. Do instead: cuando se necesite filtrar por una columna de un embed, preguntar primero si la tabla embebida tiene RLS más estricta que la tabla principal — si sí, **nunca** usar `!inner` sin condición; o se filtra en JS después de un left join normal, o se hace `!inner` solo cuando ese filtro específico está realmente activo.
+
+2. **[2026-09-01] BUG REAL: validar un valor de la URL con `valor in objetoDeEtiquetas` es vulnerable a la cadena de prototipos de JavaScript.**
+   `"constructor" in STAGE_TYPE_LABEL` da `true` (existe en `Object.prototype`), aunque `STAGE_TYPE_LABEL` nunca declaró esa clave — `/candidatos?stage_type=constructor` pasaba la validación y el string `"constructor"` llegaba como literal de enum a Postgres. Corregido reemplazando el chequeo `in` por un parseo real con Zod (`CandidateFiltersSchema.safeParse`), que ya existía para el formulario de guardar segmento — una sola fuente de verdad para ambos casos. Do instead: nunca validar un valor externo contra las claves de un objeto plano con el operador `in` — usar `Object.prototype.hasOwnProperty.call(obj, key)`, un `Set`, o (mejor, si ya existe) el schema de Zod correspondiente.
+
+3. **[2026-09-01] Reuso perdido: `STAGE_TYPE_LABEL` y la lista de 6 valores de `job_stage_type` ya existían en `src/lib/pipeline-templates/schema.ts` (Fase 9) — se reescribieron desde cero sin buscar primero si ya existían.**
+   Corregido reexportando `STAGE_TYPE_LABEL` desde `pipeline-templates/schema.ts` en `src/lib/candidates/labels.ts`, y reusando `StageSchema.shape.type` (el enum de Zod ya construido) en vez de una lista literal nueva. Do instead: antes de escribir un mapa de etiquetas o un enum de Zod para un valor de la base de datos, grep del nombre del enum (`job_stage_type`, `application_status`, etc.) en todo `src/lib/` — es muy probable que una fase anterior ya lo haya necesitado.
+
+4. **[2026-09-01] Decisión: sin paginación real todavía — `.limit(100)` con un aviso honesto ("mostrando los N más recientes") en vez de fingir que la lista está completa.**
+   Un segmento guardado ahora persiste un filtro como vista reusable — antes el límite era un detalle menor de una búsqueda de texto efímera, ahora puede esconder resultados de forma indefinida cada vez que alguien abre ese segmento. Paginación completa es un desarrollo aparte (mismo tipo de decisión que "no bulk actions esta fase", ver abajo); el mínimo honesto es no fingir que 100 es "todos".
+
+5. **[2026-09-01] Alcance recortado a propósito: sin acciones masivas (bulk reject/mover etapa) esta fase.**
+   El ítem del roadmap "Segmentos/columnas de Candidatos" incluía acciones masivas como sub-ítem. Se construyó la tabla densa + filtros + segmentos guardados (el núcleo del ítem); acciones masivas queda pendiente, documentado aquí para no perderlo, no implementado.
+
+---
 
 ## Entrevistas + Google Calendar (Fase 13) — MÁXIMA PRIORIDAD
 
