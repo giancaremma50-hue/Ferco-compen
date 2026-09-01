@@ -1,5 +1,21 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 14)_
+_Última actualización: 2026-09-01 (Fase 15)_
+
+## Motor de plantillas de vacante (Fase 15) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL (recurrente, 3ª vez que aparece en la sesión): un diálogo de editar con inputs no controlados (`defaultValue`) no se entera cuando sus props cambian — solo aplica el valor al montar.**
+   `JobTemplateDialog` no se remontaba entre aperturas: tras guardar una edición y reabrir "Editar" sobre la MISMA fila sin recargar la página, los campos mostraban el valor de ANTES de guardar, no el recién guardado. Mismo patrón ya sospechado en `DepartmentDialog`/`MessageTemplateDialog` (no confirmado ahí, pero comparten la exacta misma estructura — probablemente el mismo bug). Corregido acá con `key={template.updated_at}` en el uso del diálogo — cambia cada vez que la fila realmente cambió, forzando un remount con datos frescos. Do instead: cualquier diálogo de "editar" con inputs `defaultValue` necesita una `key` atada a algo que cambie cuando el dato subyacente cambia (`updated_at` es ideal, ya viene gratis en casi toda tabla) — no asumir que basta con que el diálogo cierre y vuelva a abrir.
+
+2. **[2026-09-01] Bug del mismo síntoma, causa distinta: el formulario de CREAR (sin `template`, sin id que cambie entre aperturas) no se limpiaba solo — necesitó `formRef.current?.reset()`, no una `key`.**
+   Una `key` no ayuda acá porque no hay ningún valor que cambie entre "crear la primera plantilla" y "crear la segunda" — el fix es imperativo (`reset()` del form nativo), no declarativo. Do instead: distinguir el síntoma "reabrir muestra datos viejos" en dos causas — edición (usar `key` atada a un campo que cambia) vs. creación (usar `formRef.reset()`), no aplicar la misma solución a ambas.
+
+3. **[2026-09-01] Reuso: `JobTemplateSchema` se derivó de `JobFormSchema` con `.pick()` en vez de retipar los mismos 5 campos — requirió separar `JobBaseSchema` (sin `.refine()`) de `JobFormSchema` (con `.refine()`) en `src/lib/jobs/schema.ts`, porque Zod v4 no permite `.pick()` sobre un schema que ya tiene un refinamiento encima.**
+   `z.object({...}).refine(...).pick({...})` lanza `.pick() cannot be used on object schemas containing refinements` en tiempo de ejecución, no es un error de tipos — se descubre corriendo el código, no compilando. Do instead: si un schema necesita `.refine()` Y otro schema necesita reusar un subconjunto de sus campos con `.pick()`, separar el objeto base (sin refine) del schema final (`base.refine(...)`) desde el principio — no agregar el refine directo al `z.object()` inicial si ya se sabe que otro lugar va a necesitar sus campos sueltos.
+
+4. **[2026-09-01] Reuso: `LabelSelect` extraído a `src/components/ui/` tras la 2ª aparición del mismo `Object.entries(WORK_MODE_LABEL).map(...)` (job-form.tsx ya lo tenía, job-template-dialog.tsx lo iba a repetir).**
+   Distinto del criterio "esperar a la 3ª copia" de Fases 12/14 — acá se extrajo en la 2ª porque dos revisores independientes convergieron en el mismo hallazgo con el mismo fix sugerido, señal más fuerte que "se parece a algo" a secas.
+
+---
 
 ## Segmentos y filtros de candidatos (Fase 14) — MÁXIMA PRIORIDAD
 

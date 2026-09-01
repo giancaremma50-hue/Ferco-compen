@@ -966,6 +966,59 @@ export type Database = {
           },
         ]
       }
+      job_templates: {
+        Row: {
+          country: string
+          created_at: string
+          description: string
+          employment_type: string
+          id: string
+          location: string
+          name: string
+          organization_id: string
+          requirements: string
+          title: string
+          updated_at: string
+          work_mode: string
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          description: string
+          employment_type: string
+          id?: string
+          location: string
+          name: string
+          organization_id: string
+          requirements: string
+          title: string
+          updated_at?: string
+          work_mode: string
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          description?: string
+          employment_type?: string
+          id?: string
+          location?: string
+          name?: string
+          organization_id?: string
+          requirements?: string
+          title?: string
+          updated_at?: string
+          work_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           code: string

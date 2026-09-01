@@ -10,6 +10,7 @@ const TABS = [
   { href: "/configuracion/pipelines", label: "Pipelines", roles: ["admin", "super_admin"] },
   { href: "/configuracion/motivos-rechazo", label: "Motivos de rechazo", roles: ["admin", "super_admin"] },
   { href: "/configuracion/plantillas-mensaje", label: "Plantillas de mensaje", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/plantillas-vacante", label: "Plantillas de vacante", roles: ["admin", "super_admin"] },
   { href: "/configuracion/errores", label: "Centro de errores", roles: ["super_admin"] },
   { href: "/configuracion/bitacora", label: "Bitácora", roles: ["super_admin"] },
 ];

@@ -138,6 +138,14 @@ Sin integración real con la API de Google Calendar (requeriría OAuth con scope
 
 Sin acciones masivas ni paginación real todavía — `.limit(100)` con un aviso en la UI cuando el resultado llega justo a ese límite, para no fingir que la lista está completa. Ver `.claude/napkin.md` para el detalle de alcance recortado.
 
+## Motor de plantillas de vacante (Fase 15)
+
+**`job_templates`** (organización, nombre, título, país, ubicación, modalidad, tipo de contrato, descripción, requisitos). Mismo patrón de RLS que `message_templates`: `SELECT` para cualquier miembro de la organización (gestor necesita leerlas para prellenar `/vacantes/nueva`), `INSERT`/`UPDATE`/`DELETE` solo admin+. Verificación live de las políticas (no simulación de rol nueva — estructura idéntica byte a byte a `message_templates`, ya probada en Fase 12).
+
+`JobTemplateSchema` (`src/lib/job-templates/schema.ts`) se deriva de `JobBaseSchema.pick({...}).extend({name})` en vez de retipar los campos — `src/lib/jobs/schema.ts` se separó en `JobBaseSchema` (sin `.refine()`) y `JobFormSchema = JobBaseSchema.refine(...)` porque Zod v4 no permite `.pick()` sobre un schema ya refinado.
+
+`/vacantes/nueva` gana un selector de plantilla (`TemplatePicker`, navega a `?template=id`) que prellena `JobForm` — este último es un formulario no controlado (`defaultValue`), así que tanto `JobForm` como el `<select>` del picker llevan una `key` atada al id de la plantilla elegida para forzar un remount real al cambiar de plantilla (`defaultValue` no se actualiza solo si el componente sigue siendo la misma instancia). El mismo problema, en su variante "editar", apareció en `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo — se corrigió con `key={template.updated_at}`.
+
 ## Storage
 
 | Bucket | Público | Contenido |

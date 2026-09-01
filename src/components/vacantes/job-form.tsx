@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { ActionButton } from "@/components/ui/action-button";
+import { LabelSelect } from "@/components/ui/label-select";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { JobActionResult } from "@/lib/jobs/actions";
@@ -17,7 +18,7 @@ export function JobForm({
 }: {
   action: (prevState: JobActionResult | undefined, formData: FormData) => Promise<JobActionResult>;
   departments: Department[];
-  defaultValues?: JobDetail;
+  defaultValues?: Partial<JobDetail>;
   submitLabel: string;
 }) {
   const [state, formAction] = useActionState(action, undefined);
@@ -80,40 +81,24 @@ export function JobForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field id="work_mode" label="Modalidad">
-          <select
+          <LabelSelect
             id="work_mode"
             name="work_mode"
             required
-            defaultValue={defaultValues?.work_mode ?? ""}
+            labels={WORK_MODE_LABEL}
+            defaultValue={defaultValues?.work_mode ?? undefined}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="" disabled>
-              Elige una opción
-            </option>
-            {Object.entries(WORK_MODE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
         <Field id="employment_type" label="Tipo de contrato">
-          <select
+          <LabelSelect
             id="employment_type"
             name="employment_type"
             required
-            defaultValue={defaultValues?.employment_type ?? ""}
+            labels={EMPLOYMENT_TYPE_LABEL}
+            defaultValue={defaultValues?.employment_type ?? undefined}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="" disabled>
-              Elige una opción
-            </option>
-            {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
       </div>
 
