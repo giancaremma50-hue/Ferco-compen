@@ -429,6 +429,60 @@ gate de rol en el componente — `audit_log_select` ya filtra a quien tenga
 acceso real a esa vacante, un colaborador sin acceso recibe `[]` directo de
 la base.
 
+## Portal público dinámico (Fase 18)
+
+`/api/postular` deja de tener un `ApplySchema` fijo — `buildApplySchema()`
+(`src/lib/jobs/build-apply-schema.ts`) arma el schema de Zod en cada
+request a partir de `jobs.candidacy_fields` de ESA vacante (releído
+siempre fresco server-side, nunca confiado del cliente). Preguntas
+(`job_questions`/`job_question_options`) se capturan como
+`answer_<questionId>` en el mismo `FormData`, se validan contra las
+preguntas reales de esa vacante (nunca contra ids que mande el cliente), y
+alimentan `computePrequalified()` — determinístico, sin IA: compara la
+opción elegida contra la marcada `is_expected` al armar la plantilla.
+`null` si la vacante no tiene preguntas de opción múltiple o el candidato
+no respondió ninguna; `true`/`false` solo sobre las que sí respondió (las
+que dejó en blanco no cuentan ni a favor ni en contra).
+
+**Migración nueva**: `job_questions`/`job_question_options` solo tenían
+`SELECT` para `can_access_job()` (uso interno) — un visitante anónimo del
+portal (rol `anon`, sin sesión) nunca cumple esa condición. Se agregaron
+`job_questions_select_public`/`job_question_options_select_public`
+(`to anon, authenticated`, mismo criterio que `jobs_select_public`:
+`is_public AND status = 'abierta'`, vía `EXISTS` contra `jobs` porque estas
+tablas no tienen sus propias columnas `is_public`/`status`). Verificado con
+simulación de rol `anon` real: visible para una vacante abierta y pública,
+`0` filas para una en borrador.
+
+`candidates.address`, `applications.cover_letter` se completan desde el
+formulario cuando esos campos no están ocultos. "Archivos adicionales" usa
+`attachments.kind = 'adicional'` (hasta 5 por postulación, PDF/JPG/PNG,
+10 MB c/u) — mismo bucket y mismo contrato de ruta que el CV.
+
+**Hallazgo en `/code-review`**: `job.candidacy_fields`/
+`job_templates.candidacy_fields` se casteaban con `as CandidacyFields` sin
+validar la forma en tiempo de ejecución, en 3 lugares — el peor de ellos,
+el portal público sin autenticar. Se agregó `parseCandidacyFields()`
+(`candidacy-fields.ts`), que valida cada clave contra
+`CANDIDACY_STATE_SCHEMA` y cae a `"required"` (el default más seguro) ante
+cualquier valor ausente o inválido.
+
+## Cierre de la Fase 18: pestaña Bitácora global eliminada
+
+Con la bitácora dentro de la vacante ya construida, se cumple la
+condición que faltaba para quitar la pestaña global (ver napkin.md,
+"no eliminar sin reemplazo listo") — `/configuracion/bitacora` y
+`getAuditLog()` se borran, `ConfigTabs` pierde esa entrada.
+`audit_log_select_super_admin`... la rama `super_admin` de la política
+sigue existiendo (sin datos de otras entidades que dependan de ella hoy),
+solo pierde su única pantalla. `AGENTS.md` se actualiza (la tabla de
+Roles ya no lista "bitácora de auditoría" como capacidad de
+`super_admin`).
+
+La pestaña **Pipelines** NO se quita todavía — su reemplazo ("guardar
+como set reutilizable" desde el wizard) sigue sin construirse, sigue
+siendo el único camino real para crear `pipeline_templates` nuevas.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración

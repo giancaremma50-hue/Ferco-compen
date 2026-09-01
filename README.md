@@ -65,7 +65,7 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 15 — Motor de plantillas de vacante | ✅ |
 | 16 — Configurador de bolsa pública | ✅ |
 | 17 — Fusión de plantilla de vacante + pipeline/competencias | ✅ |
-| 18 — Wizard de plantillas + creación de vacante basada en plantilla | 🚧 falta portal público dinámico, bitácora en vacante, tooltips del menú flotante |
+| 18 — Wizard de plantillas de vacante, creación desde plantilla, portal público dinámico, bitácora en vacante, tooltips | ✅ |
 | 19+ | Pendientes |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":

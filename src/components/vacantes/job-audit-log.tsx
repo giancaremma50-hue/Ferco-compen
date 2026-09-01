@@ -5,7 +5,7 @@ import { JobStatusBadge } from "@/components/vacantes/job-status-badge";
 import type { JobAuditLogRow } from "@/lib/audit/get-job-audit-log";
 import type { JobStatus } from "@/lib/jobs/get-jobs";
 
-/** "Bitácora dentro de la vacante" — mismo listado que /configuracion/bitacora, acotado a esta fila. */
+/** "Bitácora dentro de la vacante" — la única bitácora que queda en la app; la pestaña global de Configuración se quitó (Fase 18). */
 export function JobAuditLog({ entries }: { entries: JobAuditLogRow[] }) {
   if (entries.length === 0) return null;
 

@@ -4,7 +4,7 @@ import { getJobTemplateForWizard } from "@/lib/job-templates/get-job-templates";
 import { WizardStepsNav } from "@/components/configuracion/wizard/wizard-steps-nav";
 import { WizardStep2Form } from "@/components/configuracion/wizard/wizard-step2-form";
 import { NotifyOnMount } from "@/components/ui/notify-on-mount";
-import type { CandidacyFields } from "@/lib/job-templates/candidacy-fields";
+import { parseCandidacyFields } from "@/lib/job-templates/candidacy-fields";
 
 export default async function PlantillaPaso2Page({
   params,
@@ -31,7 +31,7 @@ export default async function PlantillaPaso2Page({
         <p className="mt-1 mb-8 text-sm text-muted-foreground">
           Qué le pedís al candidato al postular a una vacante creada desde esta plantilla.
         </p>
-        <WizardStep2Form templateId={template.id} initialFields={template.candidacy_fields as CandidacyFields} />
+        <WizardStep2Form templateId={template.id} initialFields={parseCandidacyFields(template.candidacy_fields)} />
       </div>
     </div>
   );

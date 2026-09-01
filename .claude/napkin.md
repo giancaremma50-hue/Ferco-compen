@@ -1,5 +1,15 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18 — tooltips del menú flotante)_
+_Última actualización: 2026-09-01 (Fase 18 — portal público dinámico, cierra la fase)_
+
+## Portal público dinámico (Fase 18) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado ANTES de que llegara a producción (se probó con simulación de rol antes de dar la migración por buena): una tabla nueva con SELECT solo para `can_access_job()` es invisible para el portal público sin autenticar — `can_access_job()` nunca contempla el rol `anon`.**
+   `job_questions`/`job_question_options` (Fase 18, esquema) se diseñaron pensando en el uso INTERNO (RH viendo las preguntas de una vacante) y se les olvidó el otro consumidor real: el visitante anónimo del portal, que necesita ver esas mismas preguntas para responderlas. Sin la política `to anon` agregada acá, el portal público habría mostrado un formulario sin preguntas para SIEMPRE, sin ningún error visible — simplemente `[]`. Do instead: toda tabla nueva que un flujo público (sin sesión) necesita leer necesita su PROPIA política con `to anon` — no alcanza con que la tabla "ya tenga RLS", cada rol que de verdad la va a consultar necesita su propia condición explícita. Mismo patrón que `jobs_select_public` (ya existía) — buscarlo como referencia antes de escribir la política nueva, no reinventar el criterio.
+
+2. **[2026-09-01] Decisión: `parseCandidacyFields()` normaliza cualquier `jsonb` no válido a "required" (el default más estricto), no a "hidden" ni a un error 500.**
+   `candidacy_fields` es `Json` sin forma garantizada por TypeScript — un `as CandidacyFields` confía ciegamente. Ante una fila malformada, la opción seguía siendo mostrar el portal público (no romperlo), pero pedir DE MÁS es más seguro que pedir de menos — un campo que aparece de más es una molestia, un campo que debería pedirse y no aparece es un hueco de datos silencioso.
+
+---
 
 ## Tooltips del menú flotante (Fase 18) — MÁXIMA PRIORIDAD
 
