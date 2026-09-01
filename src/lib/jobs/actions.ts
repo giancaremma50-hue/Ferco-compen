@@ -6,12 +6,16 @@ import { z } from "zod";
 import { requireProfile } from "@/lib/auth/dal";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { JobFormSchema } from "./schema";
 import type { JobStatus, JobFormValues } from "./schema";
 import { materializeJobStages } from "./materialize-stages";
 import { generateJobSlug } from "./slug";
 import { TERMINAL_JOB_STATUSES } from "./permissions";
 import { findOrCreateCandidate, createApplicationForCandidate } from "./create-application";
+import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { VacantePendienteAprobacionEmail } from "@/emails/vacante-pendiente-aprobacion";
+import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -225,8 +229,59 @@ const cancelGuard: TransitionGuard = (actorRole, actorId, current) =>
     ? null
     : "No puedes cancelar esta vacante.";
 
+/**
+ * Se invoca siempre envuelta en notifyBestEffort() — corre con after(),
+ * después de responder, así que un fallo aquí nunca hace fallar el envío a
+ * aprobación en sí. Cliente admin porque hace falta ver a TODOS los admin+
+ * de la organización, no solo los que el actor (a menudo un gestor) pueda
+ * ver por RLS.
+ */
+async function notifyPendingApproval(jobId: string, organizationId: string, submitterId: string): Promise<void> {
+  const admin = createAdminClient();
+  const [{ data: job }, { data: approvers }] = await Promise.all([
+    admin.from("jobs").select("title").eq("id", jobId).single(),
+    admin.from("profiles").select("id").eq("organization_id", organizationId).in("role", ["admin", "super_admin"]),
+  ]);
+  if (!job || !approvers) return;
+  // Si quien envió a aprobación es admin+ (permitido por ownerOrAdmin), no
+  // tiene sentido avisarle que su propia acción "está esperando su revisión".
+  const recipients = approvers.filter((approver) => approver.id !== submitterId);
+  if (recipients.length === 0) return;
+
+  const { platformName, siteUrl } = await getEmailContext();
+  const jobUrl = `${siteUrl}/vacantes/${jobId}`;
+
+  await Promise.all(
+    recipients.map((approver) =>
+      notify({
+        organizationId,
+        recipientId: approver.id,
+        type: "vacante_pendiente_aprobacion",
+        title: "Vacante pendiente de aprobación",
+        body: `"${job.title}" está esperando tu revisión.`,
+        url: `/vacantes/${jobId}`,
+        entityType: "job",
+        entityId: jobId,
+        email: {
+          subject: "Vacante pendiente de aprobación",
+          react: VacantePendienteAprobacionEmail({ platformName, jobTitle: job.title, jobUrl }),
+        },
+      }),
+    ),
+  );
+}
+
 export async function submitForApproval(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "pendiente_aprobacion", ownerOrAdmin("Solo quien solicitó la vacante puede enviarla a aprobación."));
+  const profile = await requireProfile();
+  const result = await transitionJob(
+    jobId,
+    "pendiente_aprobacion",
+    ownerOrAdmin("Solo quien solicitó la vacante puede enviarla a aprobación."),
+  );
+  if (result.success) {
+    notifyBestEffort(() => notifyPendingApproval(jobId, profile.organization_id, profile.id));
+  }
+  return result;
 }
 
 export async function approveAndPublish(jobId: string): Promise<JobActionResult> {
@@ -272,7 +327,11 @@ export async function referCandidate(
 
   const supabase = await createClient();
 
-  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).single();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("title, status, owner_id, requested_by")
+    .eq("id", jobId)
+    .single();
   if (!job) return { error: "No se encontró la vacante." };
   if (TERMINAL_JOB_STATUSES.has(job.status)) {
     return { error: "Esta vacante ya no acepta candidatos." };
@@ -310,6 +369,37 @@ export async function referCandidate(
     actor_id: profile.id,
     payload: { origen: "referido_interno" },
   });
+
+  // Best-effort, corre con after(): avisar al dueño de la vacante (o, si
+  // aún no tiene, a quien la solicitó) que llegó un referido — salvo que
+  // sea la misma persona que acaba de referirlo, evitando notificarse a
+  // sí mismo.
+  const jobRecipientId = job.owner_id ?? job.requested_by;
+  if (jobRecipientId && jobRecipientId !== profile.id) {
+    notifyBestEffort(async () => {
+      const { platformName, siteUrl } = await getEmailContext();
+      const applicationUrl = `${siteUrl}/postulaciones/${applicationResult.applicationId}`;
+      await notify({
+        organizationId: profile.organization_id,
+        recipientId: jobRecipientId,
+        type: "nueva_postulacion",
+        title: "Nueva postulación",
+        body: `${parsed.data.full_name} fue referido para "${job.title}".`,
+        url: `/postulaciones/${applicationResult.applicationId}`,
+        entityType: "application",
+        entityId: applicationResult.applicationId,
+        email: {
+          subject: "Nueva postulación",
+          react: NuevaPostulacionEmail({
+            platformName,
+            candidateName: parsed.data.full_name,
+            jobTitle: job.title,
+            applicationUrl,
+          }),
+        },
+      });
+    });
+  }
 
   revalidatePath(`/vacantes/${jobId}`);
   return { success: "Candidato referido" };

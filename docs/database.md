@@ -73,7 +73,7 @@ Capa de aplicación pura sobre `applications`, `application_events`, `notes`, `a
 - **`notes_select` deja ver una nota privada a su propio autor siempre**, sin importar el rol — solo esconde las privadas de OTROS no-admin. Esto significa que un `gestor` puede escribir una nota `is_private` y seguir viéndola después; no hace falta bloquear ese checkbox para ningún rol que ya pueda escribir notas en la vacante.
 - **`applications_select` no depende del estado de la vacante** para el colaborador que refirió al candidato (`candidate_referred_by_me`), pero `jobs_select`/`job_stages_select` sí — un colaborador puede ver su postulación referida con `jobs`/`job_stages` embebidos en `null` si la vacante se pausó o cerró después. Ver `.claude/napkin.md`, sección "Pipeline y candidatos (Fase 5)", punto 1, para el bug real que esto causó y su corrección.
 
-### Ruta de Storage de los CV — contrato con la política, no con el sentido común
+### Rendimiento de políticas RLS — InitPlan
 
 Todas las políticas envuelven las llamadas a `auth.uid()`, `auth.jwt()` y las funciones de `private.*` sin argumentos en `(select ...)`, para que Postgres las evalúe como InitPlan una sola vez por consulta en vez de una vez por fila (hallazgo del advisor de Supabase, `auth_rls_initplan`). Las funciones que sí dependen de una columna de la fila (`can_access_job(id)`, `can_access_candidate(id)`) se dejan sin envolver porque no hay nada que precalcular.
 
@@ -81,6 +81,18 @@ Quedan como advertencias aceptadas, no corregidas:
 - `multiple_permissive_policies` en `jobs`, `profiles`, `departments`, `job_stages`, `job_collaborators`, `rejection_reasons` — la política de admin (`FOR ALL`) solapa con la política de lectura general en `SELECT`. Partirla en políticas separadas por comando eliminaría el solape, pero es una ganancia marginal en tablas de baja cardinalidad; se prioriza esquema simple.
 - `pg_net` instalado en `public` — la extensión no soporta `ALTER EXTENSION SET SCHEMA`; venía preinstalada en el proyecto reutilizado, no la creamos nosotros.
 - Protección de contraseñas filtradas desactivada — no aplica: la única autenticación es Google OAuth, sin contraseñas.
+
+## Notificaciones in-app y correo (Fase 6)
+
+`notifications` y `notification_preferences` se crearon en Fase 2; Fase 6 es la primera capa de aplicación que las usa de verdad, más tres migraciones nuevas:
+
+- **`31_enable_realtime_notifications`** — `alter publication supabase_realtime add table notifications;`. Sin esto, la campana (`postgres_changes` sobre `notifications`) se suscribe sin error pero nunca recibe nada — Realtime no transmite cambios de una tabla que no está en la publicación, y no hay ningún mensaje de fallo que lo delate.
+- **`32_notification_preferences_organization_id`** — se agregó `organization_id uuid not null references organizations(id)` (con índice) a `notification_preferences`, que había quedado sin esa columna desde el esquema de Fase 2 pese a la regla de AGENTS.md ("toda tabla lleva `organization_id`, incluso operando un solo tenant"). La tabla estaba vacía al momento de la migración, así que no hizo falta backfill.
+- **`33_notification_preferences_org_scoped_policy`** — la policy `notification_preferences_own` original solo comprobaba `profile_id = auth.uid()`; se reemplazó por `profile_id = (select auth.uid()) and organization_id = private.auth_org_id()` en `USING`/`WITH CHECK`, para que la nueva columna quede realmente validada contra el JWT y no solo presente de nombre.
+- **`notifications` no tiene política de INSERT para `authenticated`** — a propósito, no un descuido: casi nunca se notifica a uno mismo, y `notify()` (`src/lib/notifications/notify.ts`) necesita leer la preferencia del DESTINATARIO, no la del actor que disparó el evento. Por eso `notify()` usa siempre `createAdminClient()`, sin excepción.
+- **`email_sent_at`** en `notifications` solo se completa cuando Resend confirmó el envío (`sendEmail()` no devolvió error) — una notificación con `email_sent_at is null` pero con preferencia de correo activada es la señal de que el correo falló o nunca se intentó, útil para el Centro de errores de Fase 7.
+
+Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `referCandidate` en `src/lib/jobs/actions.ts`; `moveApplicationStage` en `src/lib/applications/actions.ts`; `POST /api/postular`) corren su notificación/correo con `after()` de Next (`notifyBestEffort()`), nunca `await` antes de responder — un fallo de Resend o de la propia inserción en `notifications` no debe convertir una mutación ya guardada en un error de cara al usuario. Ver `.claude/napkin.md`, sección "Notificaciones in-app y correo (Fase 6)", para el detalle de cada hallazgo (incluye un bug real que rompía `next build` por instanciar el cliente de Resend a nivel de módulo).
 
 ## Storage
 

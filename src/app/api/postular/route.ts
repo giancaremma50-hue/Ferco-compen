@@ -7,6 +7,10 @@ import {
   createApplicationForCandidate,
   rollbackIfNewCandidate,
 } from "@/lib/jobs/create-application";
+import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { sendEmail } from "@/lib/email/send-email";
+import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
+import { PostulacionRecibidaEmail } from "@/emails/postulacion-recibida";
 
 const ApplySchema = z.object({
   job_id: z.uuid({ error: "Vacante inválida." }),
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
 
   const { data: job } = await admin
     .from("jobs")
-    .select("id, organization_id, status, is_public")
+    .select("id, organization_id, status, is_public, title, owner_id, requested_by")
     .eq("id", parsed.data.job_id)
     .single();
 
@@ -187,6 +191,47 @@ export async function POST(request: NextRequest) {
       payload: { origen: "portal" },
     }),
   ]);
+
+  // Best-effort, corre con after() DESPUÉS de responder: la postulación ya
+  // quedó completa arriba, así que ninguna de las dos debe demorar ni
+  // arriesgar la respuesta 201 (mandar el correo implica una llamada de red
+  // a Resend más el render de React Email — no algo para bloquear la
+  // respuesta al candidato). La del candidato es un correo directo con
+  // sendEmail(), no notify() — el candidato no tiene perfil ni fila en
+  // `notifications`, esa tabla es solo para usuarios internos.
+  const jobOwnerId = job.owner_id ?? job.requested_by;
+  notifyBestEffort(async () => {
+    const { platformName, siteUrl } = await getEmailContext();
+    const applicationUrl = `${siteUrl}/postulaciones/${applicationResult.applicationId}`;
+    await Promise.all([
+      sendEmail({
+        to: email,
+        subject: "Recibimos tu postulación",
+        react: PostulacionRecibidaEmail({ platformName, candidateName: parsed.data.full_name, jobTitle: job.title }),
+      }),
+      jobOwnerId
+        ? notify({
+            organizationId: job.organization_id,
+            recipientId: jobOwnerId,
+            type: "nueva_postulacion",
+            title: "Nueva postulación",
+            body: `${parsed.data.full_name} postuló a "${job.title}" desde el portal.`,
+            url: `/postulaciones/${applicationResult.applicationId}`,
+            entityType: "application",
+            entityId: applicationResult.applicationId,
+            email: {
+              subject: "Nueva postulación",
+              react: NuevaPostulacionEmail({
+                platformName,
+                candidateName: parsed.data.full_name,
+                jobTitle: job.title,
+                applicationUrl,
+              }),
+            },
+          })
+        : Promise.resolve(),
+    ]);
+  });
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

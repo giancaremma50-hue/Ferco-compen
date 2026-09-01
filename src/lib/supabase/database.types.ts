@@ -852,6 +852,7 @@ export type Database = {
           email: boolean
           id: string
           in_app: boolean
+          organization_id: string
           profile_id: string
           type: Database["public"]["Enums"]["notification_type"]
         }
@@ -859,6 +860,7 @@ export type Database = {
           email?: boolean
           id?: string
           in_app?: boolean
+          organization_id: string
           profile_id: string
           type: Database["public"]["Enums"]["notification_type"]
         }
@@ -866,10 +868,18 @@ export type Database = {
           email?: boolean
           id?: string
           in_app?: boolean
+          organization_id?: string
           profile_id?: string
           type?: Database["public"]["Enums"]["notification_type"]
         }
         Relationships: [
+          {
+            foreignKeyName: "notification_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notification_preferences_profile_id_fkey"
             columns: ["profile_id"]

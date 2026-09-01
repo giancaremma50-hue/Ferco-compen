@@ -1,5 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-08-31 (Fase 5)_
+_Última actualización: 2026-09-01 (Fase 6)_
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
@@ -90,6 +90,41 @@ _Última actualización: 2026-08-31 (Fase 5)_
 8. **[2026-08-31] Todo validador de Zod en un formulario en español necesita su propio `{ error: "..." }` — incluso los que "seguro nunca van a fallar".**
    Causa: `.int()` sin mensaje propio, cuando `.positive()` sí lo tiene, deja pasar el texto default de Zod en inglés apenas alguien manda un valor no entero (posible con una llamada directa al endpoint, sin pasar por el `<input type="number">` del navegador).
    Do instead: revisar cada eslabón de una cadena Zod (`.int()`, `.min()`, `.max()`, `.positive()`, no solo el último), sobre todo en preprocesadores compartidos por varios campos (`optionalNumber` en `schema.ts`).
+
+---
+
+## Notificaciones in-app y correo (Fase 6) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, rompe el build: instanciar el SDK de un servicio externo a nivel de módulo revienta CUALQUIER página que lo importe, aunque sea indirecto.**
+   Causa: `new Resend(process.env.RESEND_API_KEY)` a nivel de módulo en `send-email.ts` — si la key llega vacía (entorno sin Resend configurado todavía), el constructor lanza de inmediato. Como `notify.ts` importa `send-email.ts` y varias Server Actions (`jobs/actions.ts`, `applications/actions.ts`) importan `notify.ts`, **cualquier página que renderice esas Server Actions** (ni siquiera hace falta llamarlas) falla en `next build` con "Missing API key" al recolectar datos de la página.
+   Do instead: nunca instanciar el cliente de un servicio externo (Resend, Stripe, etc.) a nivel de módulo si la app puede desplegarse sin esa key configurada — envolver la construcción en una función y crearlo perezosamente (memoizado con `??=`, no uno nuevo por llamada) solo cuando de verdad se va a usar. Se encontró al correr `npm run build` después de cablear los primeros disparadores reales de Fase 6, no en el commit que creó `send-email.ts` — probar el build completo, no solo `typecheck`, apenas un archivo nuevo entra en el grafo de imports de una página.
+
+2. **`notifications` NO tiene política de INSERT para `authenticated` — a propósito, no es un descuido.**
+   Do instead: `notify()` SIEMPRE usa `createAdminClient()`, nunca el cliente de sesión del actor que disparó el evento — casi nunca se notifica a uno mismo, y hay que leer la preferencia del DESTINATARIO, no la del actor.
+
+3. **Un fallo al notificar/enviar correo nunca debe convertir una mutación ya exitosa en un error de cara al usuario — usar `after()` de Next, no solo un `try/catch` inline.**
+   Causa real encontrada en `/code-review`: los primeros cuatro sitios que dispararon `notify()`/`sendEmail()` lo hacían con `await` normal justo antes del `return`/`NextResponse.json` — si `notify()` lanzaba (red, un render de React Email que falla), la Server Action/Route Handler entera fallaba pese a que el job/postulación/etapa ya había quedado guardado en la base.
+   Do instead: envolver todo trabajo de notificación best-effort en un helper (`notifyBestEffort()` en `notify.ts`) que use `after()` (`next/server`, estable desde Next 15.1) para correr DESPUÉS de responder, con su propio `try/catch` + `console.error` (no silencioso del todo — hasta que exista Centro de errores en Fase 7). `after()` sí puede leer `headers()`/`cookies()` dentro de Server Actions y Route Handlers (no en Server Components).
+
+4. **Habilitar Realtime en una tabla nueva requiere agregarla explícito a la publicación — no es automático.**
+   Do instead: `alter publication supabase_realtime add table notifications;` (migración aparte). Sin esto, `.channel(...).on("postgres_changes", ...)` se suscribe sin error pero nunca recibe nada — no hay mensaje de fallo visible, solo silencio.
+
+5. **Un listener de Realtime en UPDATE debe ser idempotente usando solo `payload.new` — `payload.old` no trae columnas completas salvo `REPLICA IDENTITY FULL`.**
+   Do instead: si el propio código ya filtra las escrituras que disparan el evento (aquí: `markAsRead`/`markAllAsRead` solo tocan filas con `read_at is null`), cada UPDATE recibido ya implica una transición real — no hace falta diffear contra el valor viejo. Cuidado con doble-contar: si el mismo cliente ya actualizó su estado local de forma optimista (clic propio), el eco de Realtime que vuelve debe detectar que ya estaba contado (comparar contra el estado local) y no restar dos veces.
+
+6. **Toda tabla con `organization_id` necesita que la política RLS lo valide contra el JWT, no solo el resto de columnas — aunque esas otras columnas ya sean suficientes para bloquear acceso cruzado.**
+   Causa: `notification_preferences` se creó con `organization_id` pero la policy solo comprobaba `profile_id = auth.uid()` — sin exposición real (un `profile_id` ya pertenece a un solo org), pero viola la letra de la regla de AGENTS.md y deja una columna que un cliente arbitrario podría poblar con cualquier UUID.
+   Do instead: `using (profile_id = (select auth.uid()) and organization_id = private.auth_org_id())`, igual en `with check` — mismo patrón que cualquier otra tabla org-scoped, sin excepción "porque total ya está protegida por otro lado".
+
+7. **Gotcha ya documentado (Fase 3), reapareció igual: objeto con clave computada rompe el excess-property check de `.upsert()` tipado.**
+   Do instead: `const channelUpdate: Partial<Record<"in_app" | "email", boolean>> = { [canal]: enabled }`, spread aparte — ver `preferences-actions.ts`. Sigue siendo la trampa más recurrente del proyecto con Supabase tipado.
+
+8. **`mencion_nota` y `respuesta_reporte_error` existen en el enum `notification_type` pero no se disparan todavía.**
+   Do instead: no armar un selector de preferencias para un tipo que nunca ocurre — `PREFERENCE_TYPES` los excluye a propósito. `mencion_nota` depende de un selector de @mención en `NoteForm` (no construido en Fase 5); `respuesta_reporte_error` es de Fase 7.
+
+9. **Pendiente para Fase 8 (hardening), no bloqueante ahora: `getSiteUrl()` cae al header `Host` del request si falta `NEXT_PUBLIC_SITE_URL`, y Fase 6 empezó a usarlo desde `/api/postular` (ruta pública, sin sesión) para armar el link de "Ver la postulación" en el correo que le llega a RH.**
+   Riesgo: si en producción se olvida configurar `NEXT_PUBLIC_SITE_URL`, un solicitante malicioso podría mandar un `Host` falso y que el correo interno de "nueva postulación" incluya un link de phishing. `getSiteUrl()` documenta que su único uso sensible conocido era `signInWithGoogle()` (protegido por la lista de Redirect URLs de Supabase) — ya no es cierto, revisar ese comentario al tocar Fase 8.
+   Do instead en Fase 8: verificar que `NEXT_PUBLIC_SITE_URL` esté seteado en Vercel antes de desplegar, y considerar que `getSiteUrl()` rechace el fallback a `Host` para cualquier link que salga en un correo (no solo para el OAuth redirect).
 
 ---
 

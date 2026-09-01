@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { markAsRead } from "@/lib/notifications/mark-read-actions";
+import { ActionButton } from "@/components/ui/action-button";
 import type { NotificationItem as NotificationItemType } from "@/lib/notifications/get-notifications";
 
 export function NotificationItem({
@@ -14,7 +15,7 @@ export function NotificationItem({
   item: NotificationItemType;
   onRead?: () => void;
 }) {
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const isUnread = !item.readAt;
 
   function handleClick() {
@@ -39,6 +40,10 @@ export function NotificationItem({
     </div>
   );
 
+  // Con url, esto navega — el clic dispara la navegación de inmediato
+  // (Link no espera nada), así que un estado "pending" de ActionButton no
+  // alcanza a mostrarse antes de que el usuario ya esté en otra página.
+  // markAsRead() queda como best-effort detrás del onClick.
   if (item.url) {
     return (
       <Link href={item.url} onClick={handleClick} className="block hover:bg-background">
@@ -48,8 +53,14 @@ export function NotificationItem({
   }
 
   return (
-    <button type="button" onClick={handleClick} className="block w-full text-left hover:bg-background">
+    <ActionButton
+      type="button"
+      variant="ghost"
+      pending={isPending}
+      onClick={handleClick}
+      className="block h-auto w-full items-start justify-start rounded-none border-0 p-0 text-left font-normal disabled:opacity-100"
+    >
       {content}
-    </button>
+    </ActionButton>
   );
 }

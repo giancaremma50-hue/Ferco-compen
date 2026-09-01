@@ -24,7 +24,10 @@ export async function updatePreference(
   const channelUpdate: Partial<Record<"in_app" | "email", boolean>> = { [parsedChannel.data]: enabled };
   const { error } = await supabase
     .from("notification_preferences")
-    .upsert({ profile_id: profile.id, type, ...channelUpdate }, { onConflict: "profile_id,type" });
+    .upsert(
+      { profile_id: profile.id, organization_id: profile.organization_id, type, ...channelUpdate },
+      { onConflict: "profile_id,type" },
+    );
 
   if (error) return { error: "No se pudo guardar la preferencia." };
   revalidatePath("/mi-cuenta");

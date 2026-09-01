@@ -4,9 +4,91 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { CambioEtapaEmail } from "@/emails/cambio-etapa";
+import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
 import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string };
+
+/**
+ * Se invoca siempre envuelta en notifyBestEffort() — corre con after(),
+ * después de responder. Cliente admin porque la notificación es para OTRA
+ * persona (dueño de la vacante o quien refirió al candidato), no depende
+ * de lo que el actor que movió la tarjeta pueda ver por RLS.
+ */
+async function notifyStageChange(
+  applicationId: string,
+  jobId: string,
+  candidateId: string,
+  toStageId: string,
+  moverId: string,
+  organizationId: string,
+): Promise<void> {
+  const admin = createAdminClient();
+  const [{ data: job }, { data: candidate }, { data: stage }] = await Promise.all([
+    admin.from("jobs").select("title, owner_id, requested_by").eq("id", jobId).single(),
+    admin.from("candidates").select("full_name, referred_by").eq("id", candidateId).single(),
+    admin.from("job_stages").select("name").eq("id", toStageId).single(),
+  ]);
+  if (!job || !candidate || !stage) return;
+
+  const ownerId = job.owner_id ?? job.requested_by;
+  const referrerId =
+    candidate.referred_by && candidate.referred_by !== ownerId ? candidate.referred_by : null;
+  if ((!ownerId || ownerId === moverId) && (!referrerId || referrerId === moverId)) return;
+
+  const { platformName, siteUrl } = await getEmailContext();
+  const applicationUrl = `${siteUrl}/postulaciones/${applicationId}`;
+
+  await Promise.all([
+    ownerId && ownerId !== moverId
+      ? notify({
+          organizationId,
+          recipientId: ownerId,
+          type: "cambio_etapa",
+          title: "Cambio de etapa",
+          body: `${candidate.full_name} (${job.title}) pasó a la etapa "${stage.name}".`,
+          url: `/postulaciones/${applicationId}`,
+          entityType: "application",
+          entityId: applicationId,
+          email: {
+            subject: "Cambio de etapa",
+            react: CambioEtapaEmail({
+              platformName,
+              candidateName: candidate.full_name,
+              jobTitle: job.title,
+              stageName: stage.name,
+              applicationUrl,
+            }),
+          },
+        })
+      : Promise.resolve(),
+    referrerId && referrerId !== moverId
+      ? notify({
+          organizationId,
+          recipientId: referrerId,
+          type: "movimiento_referido",
+          title: "Tu referido avanzó",
+          body: `${candidate.full_name}, a quien referiste para "${job.title}", ahora está en la etapa "${stage.name}".`,
+          url: `/postulaciones/${applicationId}`,
+          entityType: "application",
+          entityId: applicationId,
+          email: {
+            subject: "Tu referido avanzó",
+            react: MovimientoReferidoEmail({
+              platformName,
+              candidateName: candidate.full_name,
+              jobTitle: job.title,
+              stageName: stage.name,
+              applicationUrl,
+            }),
+          },
+        })
+      : Promise.resolve(),
+  ]);
+}
 
 export async function moveApplicationStage(
   applicationId: string,
@@ -26,7 +108,7 @@ export async function moveApplicationStage(
   // misma vacante que esta postulación antes de tocar la fila.
   const { data: application } = await supabase
     .from("applications")
-    .select("job_id")
+    .select("job_id, candidate_id")
     .eq("id", applicationId)
     .single();
   if (!application) return { error: "No se encontró la postulación." };
@@ -67,6 +149,10 @@ export async function moveApplicationStage(
     actor_id: profile.id,
     payload: { from: fromStageId, to: toStageId },
   });
+
+  notifyBestEffort(() =>
+    notifyStageChange(applicationId, application.job_id, application.candidate_id, toStageId, profile.id, data.organization_id),
+  );
 
   revalidatePath(`/postulaciones/${applicationId}`);
   return { success: "Etapa actualizada" };

@@ -1,6 +1,9 @@
 import "server-only";
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send-email";
+import { getOrganization } from "@/lib/organizations/get-organization";
+import { getSiteUrl } from "@/lib/site-url";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ReactElement } from "react";
 
@@ -39,17 +42,23 @@ export async function notify(input: NotifyInput): Promise<void> {
   const inAppEnabled = preference?.in_app ?? true;
   const emailEnabled = preference?.email ?? true;
 
+  let notificationId: string | null = null;
   if (inAppEnabled) {
-    await admin.from("notifications").insert({
-      organization_id: input.organizationId,
-      recipient_id: input.recipientId,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      url: input.url ?? null,
-      entity_type: input.entityType ?? null,
-      entity_id: input.entityId ?? null,
-    });
+    const { data: row } = await admin
+      .from("notifications")
+      .insert({
+        organization_id: input.organizationId,
+        recipient_id: input.recipientId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        url: input.url ?? null,
+        entity_type: input.entityType ?? null,
+        entity_id: input.entityId ?? null,
+      })
+      .select("id")
+      .single();
+    notificationId = row?.id ?? null;
   }
 
   if (emailEnabled && input.email) {
@@ -59,7 +68,49 @@ export async function notify(input: NotifyInput): Promise<void> {
       .eq("id", input.recipientId)
       .single();
     if (recipient) {
-      await sendEmail({ to: recipient.email, subject: input.email.subject, react: input.email.react });
+      const { error } = await sendEmail({
+        to: recipient.email,
+        subject: input.email.subject,
+        react: input.email.react,
+      });
+      // Solo se marca email_sent_at cuando Resend de verdad confirmó el
+      // envío — así "Centro de errores" (Fase 7) puede distinguir una
+      // notificación cuyo correo nunca salió de una que sí.
+      if (!error && notificationId) {
+        await admin.from("notifications").update({ email_sent_at: new Date().toISOString() }).eq("id", notificationId);
+      }
     }
   }
+}
+
+/**
+ * Repetido en cada sitio que arma un correo (Fase 6): nombre de la
+ * plataforma + URL del sitio, ninguno depende del otro — van en paralelo.
+ */
+export async function getEmailContext(): Promise<{ platformName: string; siteUrl: string }> {
+  const [organization, siteUrl] = await Promise.all([getOrganization(), getSiteUrl()]);
+  return { platformName: organization?.platform_name ?? "Reclutamiento", siteUrl };
+}
+
+/**
+ * Envuelve una notificación best-effort para que corra con `after()` —
+ * después de que la respuesta ya se envió, sin bloquearla ni arriesgarla —
+ * y nunca deje escapar una excepción hacia la mutación que la disparó. Sin
+ * esto, un fallo de red al insertar en `notifications` o al renderizar un
+ * correo convertiría una Server Action ya exitosa (el job/postulación/
+ * referido ya quedó guardado) en un error de cara al usuario.
+ *
+ * El catch sí registra el error (console.error): Vercel lo captura en los
+ * logs de la función. No es "Centro de errores" (Fase 7, con bandeja y
+ * aviso al super admin) — mientras tanto, es la única traza de que un
+ * correo o una notificación in-app se perdió.
+ */
+export function notifyBestEffort(work: () => Promise<void>): void {
+  after(async () => {
+    try {
+      await work();
+    } catch (error) {
+      console.error("notifyBestEffort: fallo al notificar", error);
+    }
+  });
 }

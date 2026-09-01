@@ -55,6 +55,30 @@ export function NotificationBell({
           setUnreadCount((count) => count + 1);
         },
       )
+      .on(
+        // markAsRead/markAllAsRead solo tocan filas con read_at aún null
+        // (ver mark-read-actions.ts), así que cada UPDATE que llega aquí es
+        // siempre una transición real de no-leída a leída — sin esto, el
+        // badge se queda desactualizado en cuanto el usuario marca como
+        // leído desde /notificaciones, ya que ese layout no se remonta al
+        // navegar del lado del cliente.
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `recipient_id=eq.${profileId}` },
+        (payload) => {
+          const row = payload.new as NotificationRow;
+          if (!row.read_at) return;
+          setItems((current) => {
+            const existing = current.find((i) => i.id === row.id);
+            // Si ya estaba marcada como leída en este mismo cliente (clic
+            // local que ya descontó el badge de forma optimista), el eco de
+            // Realtime no debe volver a descontar.
+            if (!existing || !existing.readAt) {
+              setUnreadCount((count) => Math.max(0, count - 1));
+            }
+            return existing ? current.map((i) => (i.id === row.id ? { ...i, readAt: row.read_at } : i)) : current;
+          });
+        },
+      )
       .subscribe();
 
     return () => {
