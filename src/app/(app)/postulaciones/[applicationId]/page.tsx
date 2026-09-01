@@ -12,6 +12,9 @@ import { CompetencyRow } from "@/components/postulaciones/competency-row";
 import { getApplicationEvaluations } from "@/lib/competencies/get-competencies";
 import { MessageForm } from "@/components/postulaciones/message-form";
 import { getMessageTemplates } from "@/lib/message-templates/get-message-templates";
+import { InterviewForm } from "@/components/postulaciones/interview-form";
+import { InterviewList } from "@/components/postulaciones/interview-list";
+import { getApplicationInterviews } from "@/lib/interviews/get-interviews";
 import { RatingStars } from "@/components/postulaciones/rating-stars";
 import { RejectDialog } from "@/components/postulaciones/reject-dialog";
 import { HireButton } from "@/components/postulaciones/hire-button";
@@ -35,11 +38,12 @@ export default async function ApplicationDetailPage({
   // para colaborador — sin este atajo, cada carga de esta página para el
   // rol más común de la plataforma dispara una consulta cuyo resultado
   // siempre se descarta.
-  const [{ data: reasons }, assignable, evaluations, templates] = await Promise.all([
+  const [{ data: reasons }, assignable, evaluations, templates, interviews] = await Promise.all([
     supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
     getAssignableProfiles(application.jobId, profile.organization_id).catch(() => []),
     getApplicationEvaluations(application.id, application.jobId, profile.id).catch(() => []),
     profile.role === "colaborador" ? Promise.resolve([]) : getMessageTemplates(profile.organization_id).catch(() => []),
+    getApplicationInterviews(application.id).catch(() => []),
   ]);
 
   return (
@@ -79,6 +83,20 @@ export default async function ApplicationDetailPage({
             </div>
             <div className="mt-4">
               <TaskList tasks={application.tasks} applicationId={application.id} />
+            </div>
+          </section>
+        )}
+
+        {(profile.role !== "colaborador" || interviews.length > 0) && (
+          <section className="mt-10">
+            <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Entrevistas</h2>
+            {profile.role !== "colaborador" && (
+              <div className="mt-3">
+                <InterviewForm applicationId={application.id} assignable={assignable} />
+              </div>
+            )}
+            <div className="mt-4">
+              <InterviewList interviews={interviews} applicationId={application.id} jobTitle={application.jobTitle ?? ""} />
             </div>
           </section>
         )}

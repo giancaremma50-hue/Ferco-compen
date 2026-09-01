@@ -711,6 +711,80 @@ export type Database = {
           },
         ]
       }
+      interviews: {
+        Row: {
+          application_id: string
+          created_at: string
+          created_by: string
+          duration_minutes: number
+          id: string
+          interviewer_id: string
+          location: string | null
+          notes: string | null
+          organization_id: string
+          scheduled_at: string
+          status: Database["public"]["Enums"]["interview_status"]
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          created_by: string
+          duration_minutes?: number
+          id?: string
+          interviewer_id: string
+          location?: string | null
+          notes?: string | null
+          organization_id: string
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          created_by?: string
+          duration_minutes?: number
+          id?: string
+          interviewer_id?: string
+          location?: string | null
+          notes?: string | null
+          organization_id?: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_interviewer_id_fkey"
+            columns: ["interviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_collaborators: {
         Row: {
           created_at: string
@@ -1406,6 +1480,7 @@ export type Database = {
         | "esperando_usuario"
         | "resuelto"
         | "descartado"
+      interview_status: "programada" | "completada" | "cancelada"
       job_collaborator_permission:
         | "viewer"
         | "interviewer"

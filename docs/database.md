@@ -122,6 +122,14 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 `sendCandidateMessage()` (`src/lib/applications/actions.ts`) reusa `canDecideApplication` para autorizar el envío — mismo permiso que Contratar/Rechazar, no uno nuevo. El destinatario (`candidates.email`) se resuelve siempre server-side desde `applicationId`, nunca desde un campo del formulario. El envío usa `sendEmail()` (Resend) directo, no `notify()` — el candidato no es un `profile`, no tiene preferencias de notificación. El evento `correo_enviado` (existía en el enum desde Fase 6, sin productor hasta ahora) se registra en `application_events` con el asunto en el payload.
 
+## Entrevistas y Google Calendar (Fase 13)
+
+**`interviews`** (postulación, entrevistador, fecha/hora, duración, lugar, notas, `status` programada/completada/cancelada). RLS gemela de `candidate_tasks`: `SELECT`/`INSERT` exigen `can_access_job(job_id)` o admin+; `UPDATE` agrega `interviewer_id = auth.uid()` como auto-servicio (igual que `assigned_to` en tareas); `DELETE` solo `created_by` o admin+.
+
+La capa de aplicación es más estricta que Tareas a propósito: `scheduleInterview()`/`deleteInterview()` exigen `canDecideApplication` (no solo acceso RLS a la vacante) porque agendar dispara un correo al candidato a nombre de la plataforma — mismo nivel que `sendCandidateMessage`. `updateInterviewStatus()` deja pasar además a quien es `interviewer_id` de esa fila específica, para que pueda marcar su propia entrevista sin ser approver/owner. Compare-and-swap contra `status = 'programada'` en el `UPDATE` — mismo patrón que las transiciones de `applications`.
+
+Sin integración real con la API de Google Calendar (requeriría OAuth con scope `calendar.events`, guardado de refresh token y configuración manual en Google Cloud Console). En su lugar, `src/lib/interviews/calendar-link.ts` arma un enlace `calendar.google.com/calendar/render` — cada quien agrega el evento a su propio calendario con un clic, sin credenciales nuevas. El correo al candidato muestra la hora en UTC explícito (el servidor no conoce la zona horaria de la organización ni la del candidato) y remite al enlace, que sí ajusta la hora a la zona de quien lo abre.
+
 ## Storage
 
 | Bucket | Público | Contenido |

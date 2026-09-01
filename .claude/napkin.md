@@ -1,5 +1,24 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 12)_
+_Última actualización: 2026-09-01 (Fase 13)_
+
+## Entrevistas + Google Calendar (Fase 13) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Decisión: integración con Google Calendar sin OAuth ni API — solo enlaces "TEMPLATE" (`calendar.google.com/calendar/render?...`).**
+   Requiere pedir el scope `calendar.events` en el login de Google (hoy solo se pide perfil/email), guardar refresh token, y renovar credenciales — todo eso es configuración manual en Google Cloud Console (mismo tipo de paso que el hook de custom access token o el proveedor de Google en Supabase, ningún agente puede hacerlo por API). Se optó por el enlace "agregar a mi calendario" de un clic: cero credenciales nuevas, funciona igual de bien para una demo, y cada quien agrega el evento a SU PROPIO calendario. Si se necesita sincronización real (auto-invitar, detectar cambios, cancelar desde Calendar), ahí sí hace falta OAuth completo — anotado como alcance futuro, no implementado.
+
+2. **[2026-09-01] BUG REAL: la hora del correo al candidato se formateaba con la zona horaria del SERVIDOR, no la de la organización ni la del candidato — podía contradecir el enlace de Google Calendar del mismo correo.**
+   `toLocaleString()` sin `timeZone` explícito, evaluado en un React Email renderizado server-side (dentro de `after()`), usa la zona del proceso Node (típicamente UTC en producción), no la del navegador de quien lo lee. El enlace "TEMPLATE" de Google Calendar sí es correcto siempre (manda el instante en UTC, Google lo convierte en el navegador de quien lo abre) — el texto y el enlace del mismo correo podían decir horas distintas. No existe una columna de zona horaria en `organizations`, así que la corrección no fue "adivinar la zona correcta" sino ser honesto: mostrar la hora en UTC explícito y remitir al enlace para la hora local real. Do instead: cualquier fecha/hora renderizada en un correo (server-side, sin `after()` corriendo en el navegador de nadie) necesita `timeZone` explícito en `toLocaleString`/`Intl.DateTimeFormat` — nunca asumir que el servidor y el destinatario comparten zona horaria.
+
+3. **[2026-09-01] Decisión de nivel de permiso: agendar/cancelar/eliminar una entrevista exige `canDecideApplication` (mismo nivel que rechazar/contratar/mandar mensaje), NO el nivel más permisivo de Tareas — con una excepción de auto-servicio.**
+   El primer diseño copió el nivel de autorización de `candidate_tasks` (cualquier colaborador con acceso a la vacante) porque la tabla es RLS-gemela de `candidate_tasks`. Un review encontró el error: agendar dispara un correo al candidato a nombre de la plataforma — mismo tipo de efecto hacia afuera que `sendCandidateMessage`, no el efecto puramente interno de una tarea. Se corrigió para exigir `canDecideApplication` en `scheduleInterview`/`deleteInterview`, con una excepción: `updateInterviewStatus` deja que la persona asignada como `interviewer_id` marque su propia entrevista sin ser approver/owner (mismo auto-servicio que ya permite la política RLS `interviews_update` vía `interviewer_id = auth.uid()`). Do instead: la forma de la tabla (mismo shape RLS que otra tabla) NO determina el nivel de permiso de la Server Action — eso lo decide si la acción tiene un efecto visible hacia el candidato o hacia afuera de la organización, sin importar qué tan parecida sea la tabla a una ya construida.
+
+4. **[2026-09-01] El JWT de prueba en simulación de rol necesita `app_metadata.app_role`, no `app_metadata.role` — error de sintaxis repetido al armar el primer test de esta fase, ya cometido antes en Fase 8-11 pero no anotado hasta ahora.**
+   `private.auth_role()` lee `auth.jwt() -> 'app_metadata' ->> 'app_role'` (ver `private.is_admin_or_above()`); un test con `app_metadata: { role: 'admin' }` (sin el prefijo `app_`) falla la política silenciosamente — el INSERT de prueba se rechaza y parece un bug de RLS cuando en realidad es un JWT de prueba mal armado. Do instead: antes de escribir un test de simulación de rol nuevo, confirmar el nombre exacto de la claim corriendo `select pg_get_functiondef(oid) from pg_proc where proname = 'auth_role'` — no asumir el nombre por analogía con `organization_id`.
+
+5. **[2026-09-01] Tercera vez que el mismo preprocesador zod ("cadena vacía → undefined") se copia a mano en un archivo nuevo — recién extraído a `src/lib/zod-helpers.ts` en esta fase.**
+   Ya estaba duplicado en `departments/schema.ts` y `api/postular/route.ts` desde antes; esta fase iba a agregar una cuarta copia. Mismo patrón que `ConfigListSkeleton` en Fase 12: la señal real de extraer no es "esto se parece a algo", es "esto YA se duplicó una vez antes de que yo llegara".
+
+---
 
 ## Plantillas de mensaje + correo directo al candidato (Fase 12) — MÁXIMA PRIORIDAD
 

@@ -60,7 +60,8 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 10 — Tareas del candidato | ✅ |
 | 11 — Evaluación por competencias | ✅ |
 | 12 — Plantillas de mensaje y correo directo al candidato | ✅ |
-| 13+ | Pendientes |
+| 13 — Entrevistas y enlaces de Google Calendar | ✅ |
+| 14+ | Pendientes |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).

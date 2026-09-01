@@ -11,16 +11,14 @@ import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/n
 import { sendEmail } from "@/lib/email/send-email";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import { PostulacionRecibidaEmail } from "@/emails/postulacion-recibida";
+import { optionalText } from "@/lib/zod-helpers";
 
 const ApplySchema = z.object({
   job_id: z.uuid({ error: "Vacante inválida." }),
   full_name: z.string().trim().min(3, { error: "Escribe tu nombre completo." }).max(120),
   email: z.email({ error: "Correo inválido." }),
   phone: z.string().trim().min(6, { error: "Escribe un teléfono válido." }).max(30),
-  current_title: z.preprocess(
-    (v) => (v === "" || v == null ? undefined : v),
-    z.string().trim().max(120).optional(),
-  ),
+  current_title: optionalText(120),
   years_experience: z.preprocess(
     (v) => (v === "" || v == null ? undefined : Number(v)),
     z
