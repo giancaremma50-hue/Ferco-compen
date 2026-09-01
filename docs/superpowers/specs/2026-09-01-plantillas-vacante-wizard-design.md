@@ -42,8 +42,11 @@ está); el link generado apunta a la página pública existente, sin cambios de 
 | `candidacy_fields` | `jsonb` | `{ full_name, email, phone, address, resume, cover_letter, additional_files }`, cada uno `'hidden'\|'optional'\|'required'`. `email` siempre `'required'`, la UI no permite cambiarlo. |
 | `country` | ya existe | se mantiene como valor por defecto editable en la vacante. |
 
-`created_by` ya debería existir o se agrega (`uuid references profiles`, `not null`,
-default `auth.uid()`) — necesario para la regla de confidencialidad.
+`created_by` no existe todavía en `job_templates` — se agrega
+(`uuid references profiles`, `not null`, default `auth.uid()`), necesario para la
+regla de confidencialidad. `is_public` (ya existe en `jobs`, no en `job_templates`)
+se agrega también aquí — deja de ser editable al crear la vacante, la decide la
+plantilla y se copia tal cual.
 
 ### Tablas nuevas — plantilla
 
@@ -77,11 +80,18 @@ en el bolsón de nadie salvo su creador y super_admin.
 
 ### `jobs` — columnas nuevas
 
+`salary_min`, `salary_max`, `headcount`, `is_public` **ya existen** desde el
+esquema fundacional (Fase 2) — no se tocan, `is_public` simplemente deja de
+pedirse en el formulario de creación (se copia de la plantilla).
+
+`jobs.employment_type` **ya existe** y ya significa otra cosa — tipo de
+**contrato** (`indefinido`/`temporal`/`por_obra`/`pasantía`). El "Tipo de vacante"
+del wizard (Nueva posición/Reemplazo/Crecimiento) es un concepto distinto y
+necesita su propio nombre para no chocar:
+
 | Columna | Notas |
 |---|---|
-| `salary_min`, `salary_max` | `numeric`, nullable. |
-| `headcount` | `integer default 1`. |
-| `employment_type` | check `('nueva_posicion','reemplazo','crecimiento')`. |
+| `vacancy_type` | check `('nueva_posicion','reemplazo','crecimiento')`, nullable. |
 | `employment_reason_id` | FK a `employment_reasons`, nullable. |
 | `job_template_id` | FK a `job_templates`, `on delete set null` — solo trazabilidad, no se vuelve a leer después de crear. |
 | `candidacy_fields` | copia de la plantilla al momento de crear. |
@@ -155,6 +165,22 @@ borrador desde el paso 1); "Atrás" no pierde nada porque ya quedó guardado.
   (LinkedIn, Computrabajo, etc.) con los métodos que la organización ya usa hoy.
 
 ## Portal público `/postular`
+
+Hoy `ApplySchema` solo pide `full_name`, `email`, `phone`, `current_title`
+(opcional), `years_experience` (opcional) y el archivo `cv` — no existen todavía
+`Dirección`, `Carta de motivación` ni `Archivos adicionales`. Estos tres se agregan
+como columnas/uso nuevo, no como algo que ya estaba oculto:
+
+- `candidates.address` — `text` nullable (dato de identidad, igual que `phone`).
+- `applications.cover_letter` — `text` nullable (contextual a esa postulación, no
+  a la persona).
+- "Archivos adicionales" no necesita columna nueva — `attachments.kind` ya es
+  `text` libre (sin `CHECK`); se sube con `kind = 'adicional'`, uno o más por
+  postulación.
+
+`current_title`/`years_experience` quedan exactamente como están hoy — no forman
+parte del tri-estado de Candidatura, el usuario no los mencionó al listar los 7
+campos configurables.
 
 Deja de tener un `ApplySchema` fijo. Por cada vacante:
 
