@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireSuperAdmin } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { contrastRatio } from "@/lib/color-contrast";
+import { optionalText } from "@/lib/zod-helpers";
 
 // El fondo claro de la app (--background en globals.css). El foco de
 // teclado se dibuja con este mismo acento (--ring: var(--accent)) — un
@@ -21,6 +22,8 @@ const BrandingSchema = z.object({
     .refine((hex) => contrastRatio(hex, APP_BACKGROUND) >= MIN_FOCUS_CONTRAST, {
       error: "Este color es muy parecido al fondo: el foco de teclado no se vería. Prueba uno más oscuro o más saturado.",
     }),
+  careers_headline: optionalText(120),
+  careers_intro: optionalText(500),
 });
 
 export type BrandingActionState = { error?: string; success?: string } | undefined;
@@ -34,6 +37,8 @@ export async function updateBranding(
   const parsed = BrandingSchema.safeParse({
     platform_name: formData.get("platform_name"),
     accent_color: formData.get("accent_color"),
+    careers_headline: formData.get("careers_headline"),
+    careers_intro: formData.get("careers_intro"),
   });
 
   if (!parsed.success) {
@@ -43,7 +48,18 @@ export async function updateBranding(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .update(parsed.data)
+    .update({
+      ...parsed.data,
+      // undefined en un .update() de Supabase omite la columna en vez de
+      // limpiarla — si el campo se dejó vacío a propósito, hay que mandar
+      // null explícito para que sí se borre (mismo gotcha de Fase 9 con
+      // normalizeDepartmentFields). `||` y no `??`: optionalText solo
+      // convierte "" a undefined ANTES de recortar espacios — un valor de
+      // puros espacios sobrevive el preprocess y llega aquí ya recortado
+      // a "" (no undefined), que `??` no habría capturado.
+      careers_headline: parsed.data.careers_headline || null,
+      careers_intro: parsed.data.careers_intro || null,
+    })
     .eq("id", profile.organization_id)
     .select("id");
 

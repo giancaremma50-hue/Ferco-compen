@@ -1,5 +1,18 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 15)_
+_Última actualización: 2026-09-01 (Fase 16)_
+
+## Configurador de bolsa pública (Fase 16) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Alcance recortado a propósito: 2 columnas nuevas en `organizations` (`careers_headline`, `careers_intro`) reusando el formulario de Marca ya existente, no una página ni tabla nueva.**
+   El ítem del roadmap decía "configurador de bolsa pública (editor de contenido multi-página)" — sonaba a mucho más de lo que en realidad hace falta para una demo. Lo real: el portal público (`/empleos`) solo necesitaba un título y un texto de bienvenida configurables; no hace falta una tabla nueva, RLS nueva, ni una página de configuración nueva — son 2 campos más en la fila de `organizations` que ya existe, guardados por la misma acción que ya guarda logo/color/nombre. Do instead: antes de diseñar una tabla/página nueva para un ítem de roadmap que "suena grande", preguntar qué tan grande es el contenido real — a veces son 2 columnas en una tabla que ya existe.
+
+2. **[2026-09-01] Decisión de permiso: el contenido de la bolsa pública quedó gateado a `super_admin` (mismo nivel que logo/color), no a `admin` como el resto de la configuración de reclutamiento — decisión deliberada, no un descuido.**
+   `admin` (RH) sería el dueño natural de este copy, pero la política RLS de `UPDATE` en `organizations` (`organizations_update_super_admin`) es a nivel de FILA, no de columna — Postgres RLS no puede decir "admin puede tocar `careers_headline` pero no `accent_color`" sobre la misma fila sin un trigger o una tabla aparte. Bajar el gate a `admin+` en la acción compartida (`updateBranding`) le daría a cualquier `admin` la capacidad de cambiar también el logo, el color de acento y el nombre de la plataforma — una escalación de permiso real. Se dejó en `super_admin` (más estricto, consistente con Marca) en vez de resolver esto ahora. Si se necesita de verdad que `admin` edite el copy de la bolsa sin tocar la identidad visual, la solución correcta es sacar `careers_headline`/`careers_intro` a una tabla aparte con su propia política — no relajar la política de `organizations`.
+
+3. **[2026-09-01] BUG REAL: `?? null` no captura un valor de solo espacios porque `optionalText()` solo convierte a `undefined` el valor CRUDO antes de recortar, no el resultado ya recortado.**
+   `optionalText("   ").safeParse(...)` → el preprocess ve `"   "` (no es `""` ni `null`), lo deja pasar; luego el `.trim()` interno del schema lo reduce a `""` — el resultado final en `parsed.data` es `""`, no `undefined`. `"" ?? null` da `""`, no `null`. Corregido con `|| null` en vez de `?? null` (trata `""` igual que `null`/`undefined`). Do instead: cuando se necesite "vacío o solo espacios → null" después de un `optionalText()`, usar `|| null`, no `?? null` — el operador `??` solo mira nullish, no falsy, y un string recortado a `""` no es nullish.
+
+---
 
 ## Motor de plantillas de vacante (Fase 15) — MÁXIMA PRIORIDAD
 

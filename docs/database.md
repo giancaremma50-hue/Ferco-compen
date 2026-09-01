@@ -146,6 +146,12 @@ Sin acciones masivas ni paginación real todavía — `.limit(100)` con un aviso
 
 `/vacantes/nueva` gana un selector de plantilla (`TemplatePicker`, navega a `?template=id`) que prellena `JobForm` — este último es un formulario no controlado (`defaultValue`), así que tanto `JobForm` como el `<select>` del picker llevan una `key` atada al id de la plantilla elegida para forzar un remount real al cambiar de plantilla (`defaultValue` no se actualiza solo si el componente sigue siendo la misma instancia). El mismo problema, en su variante "editar", apareció en `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo — se corrigió con `key={template.updated_at}`.
 
+## Configurador de bolsa pública (Fase 16)
+
+**`organizations.careers_headline`/`careers_intro`** (`text`, nullable) — dos columnas más en la fila de `organizations` que ya existía, no una tabla nueva. RLS de fila cubre las columnas nuevas automáticamente (Postgres no tiene RLS por columna); la política de `UPDATE` sigue siendo `super_admin`-only, deliberado — bajarla a `admin+` en la acción compartida (`updateBranding`) le daría a cualquier admin la capacidad de tocar también logo/color/nombre de la plataforma, la misma fila. Si se necesita que `admin` edite solo el copy de la bolsa, la solución es sacar estas dos columnas a una tabla aparte con su propia política, no relajar `organizations_update_super_admin`.
+
+Reusa por completo el flujo de Marca (Fase 3): mismo formulario (`BrandingForm`), misma acción (`updateBranding`), misma página (`/configuracion/marca`) — sin página ni componente nuevo. `/empleos` (portal público) los lee vía `getOrganization()` (ya cacheada con `cache()`, ya reusada por `empleos/layout.tsx`) con fallback a "Vacantes abiertas" si no están configurados.
+
 ## Storage
 
 | Bucket | Público | Contenido |
