@@ -7,6 +7,7 @@ const TABS = [
   { href: "/configuracion/marca", label: "Marca", roles: ["super_admin"] },
   { href: "/configuracion/usuarios", label: "Usuarios y roles", roles: ["admin", "super_admin"] },
   { href: "/configuracion/errores", label: "Centro de errores", roles: ["super_admin"] },
+  { href: "/configuracion/bitacora", label: "Bitácora", roles: ["super_admin"] },
 ];
 
 export function ConfigTabs({ role }: { role: string }) {

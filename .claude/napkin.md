@@ -1,5 +1,27 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 7 + desmarcado a demo genérica)_
+_Última actualización: 2026-09-01 (Fase 8)_
+
+## Colaboradores por vacante + Bitácora (Fase 8) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Todo el mecanismo RLS de `job_collaborators` ya existía completo desde Fase 2 — `can_access_job()` ya lo usa en `jobs`/`job_stages`/`applications`. Fase 8 fue 100% UI + capa de app, cero migración.**
+   `private.can_access_job(job_id)` = admin+ OR owner/requested_by OR fila en `job_collaborators`. Ya estaba wireado en `jobs_select_internal`, `job_stages_select`, `applications_select/insert/update`. Lo único que faltaba: pantalla para agregar/quitar colaboradores (gateada a admin+ por `job_collaborators_write_admin`).
+
+2. **[2026-09-01] BUG REAL encontrado en `/code-review`: un atajo "sin cambios" antes del chequeo de permiso deja pasar sin autorizar.**
+   `moveApplicationStage` tenía `if (fromStageId === toStageId) return {success}` ANTES de validar `canDecideApplication`. No mutaba nada, pero el invariante "toda la función valida permiso" se rompía por ese único camino.
+   Do instead: el chequeo de permiso/autorización va SIEMPRE antes de cualquier atajo de "no-op", nunca después — un atajo de conveniencia es fácil de escribir arriba del todo sin pensar que también hay que autorizarlo.
+
+3. **[2026-09-01] BUG REAL (IDOR), encontrado en `/code-review`: agregar un colaborador no validaba que la persona elegida fuera de la misma organización.**
+   El `<select>` del panel ya solo lista gente de la org, pero la Server Action confiaba en el `profile_id` que llegara en el FormData sin comparar organización — el cliente nunca es fuente de verdad, ni siquiera cuando la UI ya filtra.
+   Do instead: antes de cualquier INSERT con un id que el cliente eligió de un `<select>`, revalidar server-side que esa fila (aquí, el perfil) pertenece a la misma organización que el actor — el mismo patrón que "un id hijo no prueba pertenencia al padre" de Fase 5.
+
+4. **[2026-09-01] PENDIENTE, real, no corregido: los niveles de `job_collaborators.permission` (viewer/interviewer/approver/owner) solo se validan en la Server Action, RLS deja pasar a cualquier colaborador por igual.**
+   `applications_update` usa `can_access_job()`, que no distingue nivel de permiso. Un `colaborador` con permiso `viewer` que llame Supabase directo desde el navegador (su propia sesión, sin pasar por `moveApplicationStage`/`rejectApplication`/etc.) puede mutar `applications` igual que un `approver`.
+   Do instead (pendiente de migración aprobada): una función `private.can_decide_application(job_id)` que sí valide `permission in ('approver','owner')`, usada en la política de `applications` para las columnas que deciden (`status`), no solo `can_access_job`. Requiere `apply_migration` — el clasificador de auto-modo ya bloqueó un cambio DDL trivial esta sesión, así que esto necesita pedirse explícito.
+
+5. **[2026-09-01] `audit_log` tiene el mismo hueco de organización que `error_reports` (Fase 7) — mismo mitigante.**
+   `audit_log_select_super_admin` es solo `is_super_admin()`, sin `organization_id`. `getAuditLog()` filtra en la app. Ver el ítem de Fase 7/Supabase-RLS arriba — es el mismo patrón repetido, no una fuga nueva.
+
+---
 
 ## Demo genérica — sin marca real (2026-09-01)
 

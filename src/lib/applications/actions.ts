@@ -8,9 +8,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
+import { canDecideApplication, canRateApplication } from "./permissions";
 import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string };
+
+/** Repetido en setRating/rejectApplication/hireApplication/reopenApplication — un solo lugar para no desincronizar el shape de la query. */
+async function requireApplicationJobId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  applicationId: string,
+): Promise<string | null> {
+  const { data } = await supabase.from("applications").select("job_id").eq("id", applicationId).single();
+  return data?.job_id ?? null;
+}
 
 /**
  * Se invoca siempre envuelta en notifyBestEffort() — corre con after(),
@@ -96,8 +106,6 @@ export async function moveApplicationStage(
   toStageId: string,
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede mover postulaciones." };
-  if (fromStageId === toStageId) return { success: "Sin cambios" };
 
   const supabase = await createClient();
 
@@ -112,6 +120,16 @@ export async function moveApplicationStage(
     .eq("id", applicationId)
     .single();
   if (!application) return { error: "No se encontró la postulación." };
+
+  // Acceso fino por job_collaborators (AGENTS.md) — un `colaborador` solo
+  // mueve etapa si es approver/owner de ESTA vacante, no por rol global.
+  // ANTES del atajo "misma etapa": si no, un actor sin permiso alguno
+  // recibe "Sin cambios" sin que este chequeo llegue a correr nunca.
+  if (!(await canDecideApplication(profile.role, profile.id, application.job_id))) {
+    return { error: "Tu perfil no puede mover postulaciones en esta vacante." };
+  }
+
+  if (fromStageId === toStageId) return { success: "Sin cambios" };
 
   const { data: validStages } = await supabase
     .from("job_stages")
@@ -200,6 +218,13 @@ export async function setRating(applicationId: string, rating: number): Promise<
   if (!parsed.success) return { error: "Calificación inválida." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canRateApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede calificar en esta vacante." };
+  }
+
   const value = parsed.data === 0 ? null : parsed.data;
   const { data, error } = await supabase
     .from("applications")
@@ -228,12 +253,18 @@ export async function rejectApplication(
   formData: FormData,
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede rechazar postulaciones." };
 
   const parsed = RejectSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Elige un motivo." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede rechazar postulaciones en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "rechazada", rejection_reason_id: parsed.data.rejection_reason_id })
@@ -258,9 +289,15 @@ export async function rejectApplication(
 
 export async function hireApplication(applicationId: string): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede contratar." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede contratar en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "contratada" })
@@ -277,9 +314,15 @@ export async function hireApplication(applicationId: string): Promise<Applicatio
 
 export async function reopenApplication(applicationId: string): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede reabrir postulaciones." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede reabrir postulaciones en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "activa", rejection_reason_id: null })

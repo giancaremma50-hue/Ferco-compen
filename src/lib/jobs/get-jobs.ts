@@ -30,6 +30,7 @@ export type JobDetail = JobListItem & {
   department_id: string | null;
   requested_by: string | null;
   owner_id: string | null;
+  organization_id: string;
 };
 
 /** RLS ya decide qué filas ve este viewer — este archivo solo pide columnas. */
@@ -47,7 +48,7 @@ export async function getJobById(id: string): Promise<JobDetail | null> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, is_public, department_id, requested_by, owner_id",
+      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, is_public, department_id, requested_by, owner_id, organization_id",
     )
     .eq("id", id)
     .maybeSingle();
