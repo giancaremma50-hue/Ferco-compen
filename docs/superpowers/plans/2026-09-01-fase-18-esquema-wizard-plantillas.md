@@ -33,7 +33,7 @@ de compilar o de pasar RLS.
 **Herramienta:** MCP de Supabase, `apply_migration`, `project_id:
 "cgudnnlcwcotovcslgzu"`.
 
-- [ ] **Step 1: Aplicar la migración**
+- [x] **Step 1: Aplicar la migración**
 
 ```sql
 alter table public.job_templates
@@ -95,11 +95,39 @@ create policy job_templates_select on public.job_templates
   for select
   to authenticated
   using (private.can_view_job_template(id));
+
+-- job_templates_write_admin (Fase 15) es FOR ALL, y en Postgres eso también
+-- cubre SELECT — se combina en OR con la política de arriba y deja ver una
+-- plantilla confidencial a cualquier admin+ igual, sin pasar por
+-- can_view_job_template. Se reemplaza por tres políticas separadas, ninguna
+-- cubre SELECT (bug real encontrado con la simulación de rol del Step 3, ver
+-- la sección "Ejecutado" al final de este documento y docs/database.md).
+drop policy if exists job_templates_write_admin on public.job_templates;
+
+create policy job_templates_insert_admin on public.job_templates
+  for insert to authenticated
+  with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_templates_update_admin on public.job_templates
+  for update to authenticated
+  using (organization_id = private.auth_org_id() and private.is_admin_or_above())
+  with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_templates_delete_admin on public.job_templates
+  for delete to authenticated
+  using (organization_id = private.auth_org_id() and private.is_admin_or_above());
 ```
 
-Nombre de la migración: `job_templates_confidentiality_and_status`.
+Nombre de la migración: `job_templates_confidentiality_and_status` — el bloque
+`job_templates_write_admin`/`insert_admin`/`update_admin`/`delete_admin` de
+arriba se aplicó como una segunda migración de seguimiento en la misma
+sesión, `fix_job_templates_write_admin_for_all_select_leak`, después de que el
+Step 3 de abajo mostrara la plantilla confidencial visible para un admin
+cualquiera. Se deja fusionado en un solo bloque acá porque es la forma
+correcta de correr esta tarea desde cero — no tiene sentido reproducir a
+propósito el paso intermedio con el bug.
 
-- [ ] **Step 2: Verificar con `execute_sql`**
+- [x] **Step 2: Verificar con `execute_sql`**
 
 ```sql
 select column_name, is_nullable, column_default
@@ -113,7 +141,7 @@ Esperado: 5 filas, `created_by` con `is_nullable = 'NO'` y sin `column_default`
 (la volatilidad de `auth.uid()` en un `default` de columna no sirve — por eso el
 backfill de arriba corre antes de fijar `not null`), el resto con su default.
 
-- [ ] **Step 3: Simular RLS con un JWT de prueba**
+- [x] **Step 3: Simular RLS con un JWT de prueba**
 
 ```sql
 begin;
@@ -137,14 +165,14 @@ Expected: el segundo `select count(*)` devuelve `0` — el `admin` de prueba no 
 la plantilla confidencial de otro creador. `rollback` deshace todo, nada queda
 escrito.
 
-- [ ] **Step 4: Commit** — no aplica todavía (sin cambios de archivos en el
+- [x] **Step 4: Commit** — no aplica todavía (sin cambios de archivos en el
   repo); se documenta y commitea junto con el resto en el Task 10.
 
 ---
 
 ### Task 2: `job_template_questions` + `job_template_question_options`
 
-- [ ] **Step 1: Aplicar la migración** (`job_template_questions_and_options`)
+- [x] **Step 1: Aplicar la migración** (`job_template_questions_and_options`)
 
 ```sql
 create table public.job_template_questions (
@@ -163,10 +191,20 @@ create policy job_template_questions_select on public.job_template_questions
   for select to authenticated
   using (private.can_view_job_template(job_template_id));
 
-create policy job_template_questions_write_admin on public.job_template_questions
-  for all to authenticated
+-- FOR INSERT/UPDATE/DELETE por separado, nunca FOR ALL: mismo bug que
+-- job_templates_write_admin (Task 1) — FOR ALL también cubre SELECT.
+create policy job_template_questions_insert_admin on public.job_template_questions
+  for insert to authenticated
+  with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_questions_update_admin on public.job_template_questions
+  for update to authenticated
   using (organization_id = private.auth_org_id() and private.is_admin_or_above())
   with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_questions_delete_admin on public.job_template_questions
+  for delete to authenticated
+  using (organization_id = private.auth_org_id() and private.is_admin_or_above());
 
 create table public.job_template_question_options (
   id uuid primary key default gen_random_uuid(),
@@ -190,13 +228,21 @@ create policy job_template_question_options_select on public.job_template_questi
   for select to authenticated
   using (private.can_view_job_template(job_template_id));
 
-create policy job_template_question_options_write_admin on public.job_template_question_options
-  for all to authenticated
+create policy job_template_question_options_insert_admin on public.job_template_question_options
+  for insert to authenticated
+  with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_question_options_update_admin on public.job_template_question_options
+  for update to authenticated
   using (organization_id = private.auth_org_id() and private.is_admin_or_above())
   with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_question_options_delete_admin on public.job_template_question_options
+  for delete to authenticated
+  using (organization_id = private.auth_org_id() and private.is_admin_or_above());
 ```
 
-- [ ] **Step 2: Verificar** — `execute_sql`:
+- [x] **Step 2: Verificar** — `execute_sql`:
 
 ```sql
 select relname, relrowsecurity from pg_class
@@ -209,7 +255,7 @@ Expected: ambas filas con `relrowsecurity = true`.
 
 ### Task 3: `job_template_stages`
 
-- [ ] **Step 1: Aplicar la migración** (`job_template_stages`)
+- [x] **Step 1: Aplicar la migración** (`job_template_stages`)
 
 ```sql
 create table public.job_template_stages (
@@ -228,13 +274,21 @@ create policy job_template_stages_select on public.job_template_stages
   for select to authenticated
   using (private.can_view_job_template(job_template_id));
 
-create policy job_template_stages_write_admin on public.job_template_stages
-  for all to authenticated
+create policy job_template_stages_insert_admin on public.job_template_stages
+  for insert to authenticated
+  with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_stages_update_admin on public.job_template_stages
+  for update to authenticated
   using (organization_id = private.auth_org_id() and private.is_admin_or_above())
   with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
+
+create policy job_template_stages_delete_admin on public.job_template_stages
+  for delete to authenticated
+  using (organization_id = private.auth_org_id() and private.is_admin_or_above());
 ```
 
-- [ ] **Step 2: Verificar** — mismo patrón que Task 2, Step 2, con
+- [x] **Step 2: Verificar** — mismo patrón que Task 2, Step 2, con
   `'job_template_stages'`.
 
 ---
@@ -245,7 +299,7 @@ create policy job_template_stages_write_admin on public.job_template_stages
 vacante (todo rol salvo `colaborador`) puede agregar un motivo nuevo inline, no
 solo admin+ — es una lista operativa, no una política de rechazo.
 
-- [ ] **Step 1: Aplicar la migración** (`employment_reasons`)
+- [x] **Step 1: Aplicar la migración** (`employment_reasons`)
 
 ```sql
 create table public.employment_reasons (
@@ -270,7 +324,7 @@ create policy employment_reasons_delete_admin on public.employment_reasons
   using (organization_id = private.auth_org_id() and private.is_admin_or_above());
 ```
 
-- [ ] **Step 2: Verificar** — `execute_sql`:
+- [x] **Step 2: Verificar** — `execute_sql`:
 
 ```sql
 select polname, cmd from pg_policies where tablename = 'employment_reasons' order by polname;
@@ -287,7 +341,7 @@ Expected: 3 filas (`employment_reasons_select` SELECT,
 se tocan. `employment_type` ya existe con otro significado (tipo de contrato) —
 el "Tipo de vacante" del wizard usa un nombre distinto, `vacancy_type`.
 
-- [ ] **Step 1: Aplicar la migración** (`jobs_vacancy_type_and_template_link`)
+- [x] **Step 1: Aplicar la migración** (`jobs_vacancy_type_and_template_link`)
 
 ```sql
 alter table public.jobs
@@ -305,7 +359,7 @@ alter table public.jobs
   }'::jsonb;
 ```
 
-- [ ] **Step 2: Verificar** — `execute_sql`:
+- [x] **Step 2: Verificar** — `execute_sql`:
 
 ```sql
 select column_name from information_schema.columns
@@ -326,7 +380,7 @@ en vez de `can_view_job_template`. El escritor real es `createAdminClient()` al
 copiar desde la plantilla (mismo patrón que `job_competencies` en `createJob`,
 Fase 17) — la política de escritura de abajo es respaldo, no el camino real.
 
-- [ ] **Step 1: Aplicar la migración** (`job_questions_and_options`)
+- [x] **Step 1: Aplicar la migración** (`job_questions_and_options`)
 
 ```sql
 create table public.job_questions (
@@ -373,7 +427,7 @@ create policy job_question_options_write_admin on public.job_question_options
   with check (organization_id = private.auth_org_id() and private.is_admin_or_above());
 ```
 
-- [ ] **Step 2: Verificar** — mismo patrón que Task 2, Step 2.
+- [x] **Step 2: Verificar** — mismo patrón que Task 2, Step 2.
 
 ---
 
@@ -384,7 +438,7 @@ propósito — mismo patrón deliberado que `notifications` (Fase 6): el único
 camino de escritura es `createAdminClient()` desde `/api/postular`, nunca la
 sesión de un usuario ni el rol `anon` directo.
 
-- [ ] **Step 1: Aplicar la migración** (`application_answers`)
+- [x] **Step 1: Aplicar la migración** (`application_answers`)
 
 ```sql
 alter table public.applications add column prequalified boolean;
@@ -407,7 +461,7 @@ create policy application_answers_select on public.application_answers
   using (private.can_access_job(job_id));
 ```
 
-- [ ] **Step 2: Verificar** — `execute_sql`:
+- [x] **Step 2: Verificar** — `execute_sql`:
 
 ```sql
 select polname, cmd from pg_policies where tablename = 'application_answers';
@@ -423,14 +477,14 @@ ninguna política de escritura para roles de sesión.
 Campos nuevos que hoy no existen en ningún lado — no es ampliar algo oculto, es
 capacidad nueva del formulario público (ver spec, sección "Portal público").
 
-- [ ] **Step 1: Aplicar la migración** (`candidates_address_and_cover_letter`)
+- [x] **Step 1: Aplicar la migración** (`candidates_address_and_cover_letter`)
 
 ```sql
 alter table public.candidates add column address text;
 alter table public.applications add column cover_letter text;
 ```
 
-- [ ] **Step 2: Verificar** — `execute_sql`:
+- [x] **Step 2: Verificar** — `execute_sql`:
 
 ```sql
 select table_name, column_name from information_schema.columns
@@ -451,7 +505,7 @@ acceso a esa vacante ve sus eventos) y de paso cierra el hueco de organización
 en la rama de `super_admin` — sin ampliar a quién ve el resto de la bitácora
 más allá de lo pedido.
 
-- [ ] **Step 1: Aplicar la migración** (`audit_log_job_scoped_select`)
+- [x] **Step 1: Aplicar la migración** (`audit_log_job_scoped_select`)
 
 ```sql
 drop policy if exists audit_log_select_super_admin on public.audit_log;
@@ -464,7 +518,7 @@ create policy audit_log_select on public.audit_log
   );
 ```
 
-- [ ] **Step 2: Simular con JWT de prueba** — confirmar que un `gestor`
+- [x] **Step 2: Simular con JWT de prueba** — confirmar que un `gestor`
   colaborador de una vacante ve sus eventos y NO ve eventos de otras entidades:
 
 ```sql
@@ -492,23 +546,23 @@ permanentes fuera de una transacción con `rollback`.)
 
 ### Task 10: Regenerar tipos, documentar y commitear
 
-- [ ] **Step 1: Auditoría de seguridad** — MCP de Supabase, `get_advisors`,
+- [x] **Step 1: Auditoría de seguridad** — MCP de Supabase, `get_advisors`,
   `type: "security"`. Revisar que no aparezca ninguna tabla nueva sin RLS ni
   ninguna política nueva marcada como riesgo. Si aparece algo, corregirlo con
   una migración adicional antes de seguir.
 
-- [ ] **Step 2: Regenerar tipos** — MCP de Supabase,
+- [x] **Step 2: Regenerar tipos** — MCP de Supabase,
   `generate_typescript_types`; guardar el resultado completo en
   `src/lib/supabase/database.types.ts` (reemplaza el archivo entero).
 
-- [ ] **Step 3: Typecheck** —
+- [x] **Step 3: Typecheck** —
 
 Run: `npm run typecheck`
 Expected: sin errores (esta fase no toca ningún `.ts`/`.tsx` que consuma las
 tablas nuevas todavía, así que el build no debería moverse; si algo rompe, es
 una señal de que `database.types.ts` quedó mal generado).
 
-- [ ] **Step 4: Documentar en `docs/database.md`** — agregar, después de la
+- [x] **Step 4: Documentar en `docs/database.md`** — agregar, después de la
   sección "Fusión de plantilla de vacante + pipeline/competencias (Fase 17)",
   una nueva sección:
 
@@ -560,7 +614,7 @@ el diseño completo. Solo esquema y RLS en esta entrega — sin UI todavía.
   ampliar a quién ve el resto de la bitácora.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/supabase/database.types.ts docs/database.md
@@ -579,6 +633,31 @@ EOF
 ```
 
 ---
+
+## Ejecutado — desviaciones reales encontradas
+
+Todas las tareas se ejecutaron y verificaron contra el proyecto real
+(`cgudnnlcwcotovcslgzu`). Dos cosas no salieron exactamente como estaba escrito
+arriba — documentadas en detalle en `docs/database.md` (sección de esta fase)
+y en `.claude/napkin.md`:
+
+1. `job_templates_write_admin` (Fase 15, `FOR ALL`) dejaba ver una plantilla
+   confidencial a cualquier admin+ igual, porque `FOR ALL` también cubre
+   `SELECT` y las políticas permisivas se combinan con `OR`. Se partió en
+   `INSERT`/`UPDATE`/`DELETE` — mismo fix aplicado de entrada a las 3 tablas
+   hijas de plantilla (Tasks 2 y 3), no solo a `job_templates`.
+2. `created_by` necesitó un `ALTER COLUMN ... SET DEFAULT auth.uid()`
+   adicional después del backfill (no estaba en el SQL original del Task 1) —
+   sin eso, `createJobTemplate()` rompía. Se detectó con `npm run typecheck`,
+   no con la simulación de rol.
+3. Un toque de código, mínimo y mecánico: `get-job-templates.ts` amplió su
+   lista de columnas del `SELECT` para incluir las 5 nuevas — sin esto el
+   tipo devuelto no cumplía `JobTemplate` y el build no compilaba. Ningún
+   comportamiento visible cambia (nada en la UI lee todavía esos campos).
+
+`npm run typecheck` y `npm run lint` limpios. `get_advisors(security)` sin
+advertencias nuevas (las 2 preexistentes — `pg_net` en `public`, protección de
+contraseña filtrada — ya estaban aceptadas desde antes, ver `docs/database.md`).
 
 ## Self-Review
 

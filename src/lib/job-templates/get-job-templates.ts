@@ -12,7 +12,7 @@ export type JobTemplate = Omit<Tables<"job_templates">, "organization_id" | "cre
 // frescos después de guardar (defaultValue de un input no controlado solo
 // aplica al montar, no se actualiza solo si el componente sigue vivo).
 const COLUMNS =
-  "id, name, title, country, location, work_mode, employment_type, description, requirements, pipeline_template_id, competencies, updated_at";
+  "id, name, title, country, location, work_mode, employment_type, description, requirements, pipeline_template_id, competencies, updated_at, created_by, is_public, status, is_confidential, candidacy_fields";
 
 /** Cualquier miembro de la organización puede leerlas (RLS: job_templates_select) — se usan al solicitar una vacante, no solo al administrarlas. */
 export async function getJobTemplates(organizationId: string): Promise<JobTemplate[]> {

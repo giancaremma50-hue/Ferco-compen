@@ -164,6 +164,97 @@ El pipeline se materializa igual que siempre (`materializeJobStages`, Fase 5) pe
 
 `NuevaVacanteForm` fusiona los campos visibles de la plantilla elegida SOLO si están vacíos (`fillIfEmpty`, manipula el DOM directo vía `form.elements.namedItem`) — a diferencia del mecanismo de Fase 15 (remount con `key`, que reemplazaba todo el formulario), esto preserva lo que el usuario ya haya escrito a mano. `JobForm` expone su `<form>` con `forwardRef` para esto, y acepta `children` (el único hidden input `template_id`) en vez de cargar ese campo también en el flujo de editar, que no lo usa.
 
+## Esquema del wizard de plantillas de vacante (Fase 18, 1/7)
+
+Ver `docs/superpowers/specs/2026-09-01-plantillas-vacante-wizard-design.md` para
+el diseño completo. Esta entrega es solo esquema y RLS — sin UI todavía (las
+fases 2-7 la construyen encima, cada una con su propio plan).
+
+- `job_templates` gana `created_by`, `is_public`, `status`
+  (`draft`/`published`), `is_confidential`, `candidacy_fields` (jsonb,
+  tri-estado por campo). `private.can_view_job_template(id)` — función
+  `SECURITY DEFINER`, mismo motivo que `candidate_has_accessible_application`
+  (Fase 2): sin eso, la política de `job_templates_select` llamándose a sí
+  misma vía la tabla produce recursión infinita.
+- `job_template_questions`/`job_template_question_options`/`job_template_stages`
+  — hijas de `job_templates`, mismo patrón de lectura
+  (`can_view_job_template`), escritura admin+. Las opciones llevan
+  `job_template_id` duplicado (no solo `question_id`) a propósito: sin eso, la
+  confidencialidad de la plantilla no cubriría sus propias opciones sin un
+  segundo join o una segunda función.
+- `employment_reasons` — a diferencia de `rejection_reasons`, el `INSERT` es
+  para cualquier rol que pueda crear una vacante (no solo admin+): es una
+  lista operativa con alta inline desde el selector, no una política de
+  rechazo.
+- `jobs` gana `vacancy_type` (Nueva posición/Reemplazo/Crecimiento) —
+  deliberadamente NO se llama `employment_type`, esa columna ya existe y
+  significa tipo de *contrato* (indefinido/temporal/por obra/pasantía),
+  agregada desde Fase 2. `employment_reason_id`, `job_template_id` (solo
+  trazabilidad, no se vuelve a leer tras crear la vacante — mismo principio
+  de seguridad que Fase 17 con `pipeline_template_id`/`competencies`),
+  `candidacy_fields` (copia de la plantilla al crear).
+- `job_questions`/`job_question_options` — mismo shape que sus pares de
+  plantilla, colgando de `jobs`, `can_access_job(job_id)` en vez de
+  `can_view_job_template`. Sus políticas de escritura sí quedaron `FOR ALL`
+  (a diferencia de las de plantilla, ver abajo) porque `can_access_job()`
+  empieza con `is_admin_or_above() OR ...` — un admin+ ya tiene acceso
+  incondicional a toda vacante de su organización, así que `FOR ALL` no le
+  regala ningún `SELECT` que no tuviera igual.
+- `application_answers` — sin política de escritura para ningún rol de
+  sesión, mismo patrón deliberado que `notifications` (Fase 6): el único
+  camino de escritura es `createAdminClient()` desde `/api/postular`.
+  `applications` gana `prequalified` (nullable — `null` si la vacante no
+  tiene preguntas de opción múltiple).
+- `candidates.address`, `applications.cover_letter` — campos que hoy no
+  existen en ningún lado, no una ampliación de algo oculto. "Archivos
+  adicionales" no necesita columna nueva: `attachments.kind` ya es `text`
+  libre sin `CHECK`, se sube con `kind = 'adicional'`.
+- **Bitácora dentro de la vacante**: `audit_log_select_super_admin` se
+  reemplaza por `audit_log_select`, que agrega la rama
+  `entity_type = 'job' and can_access_job(entity_id)` — cualquier
+  colaborador de esa vacante ve sus propios eventos, no toda la bitácora. De
+  paso cierra el hueco de organización documentado en Fase 8 (la rama de
+  `super_admin` ahora exige `organization_id = auth_org_id()` también) — sin
+  ampliar a quién ve el resto de la bitácora. Verificado con simulación de
+  rol real: un `gestor` colaborador de una vacante ve el evento de esa
+  vacante y no ve un evento de otra entidad (`department`).
+
+### Bug real encontrado y corregido: `FOR ALL` incluye `SELECT`
+
+`job_templates_write_admin` (Fase 15, ya existía) estaba declarada `FOR ALL`.
+En Postgres una política `FOR ALL` también gobierna `SELECT`, y las políticas
+permisivas se combinan con `OR` — así que aunque `job_templates_select` (esta
+fase) negara correctamente ver una plantilla confidencial, la política de
+escritura por sí sola igual dejaba verla a cualquier `admin+` de la
+organización, sin pasar por `can_view_job_template`. Se detectó simulando el
+rol real (no leyendo la política) e insertando una plantilla confidencial de
+otro creador — sin la corrección, `select count(*)` la devolvía visible.
+
+**Corrección**: `job_templates_write_admin` y las tres políticas de escritura
+de sus hijas (`job_template_questions`/`job_template_question_options`/
+`job_template_stages`) se partieron en `INSERT`/`UPDATE`/`DELETE` por
+separado, ninguna cubre `SELECT`. Re-verificado tras el cambio: un `admin` no
+creador ya no ve la plantilla confidencial; el creador y `super_admin` sí.
+
+**Lección para toda política futura**: si una tabla tiene una política de
+lectura con una condición más estricta que "cualquiera del rol X" (acá,
+confidencialidad), ninguna otra política sobre esa tabla puede declararse
+`FOR ALL` — hay que partirla, o esa condición estricta queda de adorno.
+
+### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
+
+`auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración
+(no hay contexto de request, evalúa `null` para las filas ya existentes) — por
+eso el backfill de `created_by` corrió como un `UPDATE` aparte antes de fijar
+`NOT NULL`. Pero sin un `DEFAULT` real, `createJobTemplate()` (Fase 15, nunca
+mandó `created_by`) hubiera roto en producción con cualquier plantilla nueva.
+Se agregó `ALTER COLUMN created_by SET DEFAULT auth.uid()` **después** del
+backfill — de acá en adelante sí hay contexto de request real en cada
+`INSERT`, así que el default resuelve al actor correcto sin tocar la Server
+Action. `getJobTemplates()` también amplió su lista de columnas para incluir
+las 5 nuevas (antes solo pedía las de Fase 15/17) — sin eso, el tipo que
+devuelve no cumplía `JobTemplate` y el build no compilaba.
+
 ## Storage
 
 | Bucket | Público | Contenido |

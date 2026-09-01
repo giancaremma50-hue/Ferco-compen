@@ -1,5 +1,25 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 17)_
+_Última actualización: 2026-09-01 (Fase 18, 1/7)_
+
+## Esquema del wizard de plantillas de vacante (Fase 18, 1/7) — MÁXIMA PRIORIDAD
+
+Origen: rediseño grande pedido por el usuario (wizard de plantillas de vacante paso a paso, candidatura dinámica, preguntas con precalificación, confidencialidad). Esta entrega es solo esquema y RLS — las fases 2-7 construyen la UI encima, cada una con su propio plan.
+
+1. **[2026-09-01] BUG DE SEGURIDAD REAL: una política `FOR ALL` también gobierna `SELECT`, y se combina en OR con la política de lectura — puede dejar ver una fila que la política de SELECT explícitamente esconde.**
+   `job_templates_write_admin` (Fase 15, ya existía) es `FOR ALL`. Al agregar `is_confidential` y una `job_templates_select` más estricta (`can_view_job_template`, esconde una plantilla confidencial de quien no es su creador), la plantilla confidencial SEGUÍA siendo visible para cualquier admin+ de la organización — la política de escritura, al cubrir también SELECT, la dejaba pasar sin pasar por la función nueva. Se detectó simulando el rol real (insertar una confidencial de otro creador, `select count(*)` como un admin distinto) — leer el SQL de la política no lo hubiera mostrado, hacía falta correrlo. Corregido partiendo `job_templates_write_admin` (y las 3 políticas de escritura de sus hijas nuevas) en `INSERT`/`UPDATE`/`DELETE` por separado, ninguna declarada `FOR ALL`.
+   Do instead: en cuanto una tabla tenga una política de SELECT con una condición más estricta que "cualquiera del rol X" (confidencialidad, visibilidad parcial), auditar TODAS las demás políticas de esa tabla — si alguna es `FOR ALL`, hay que partirla o la condición estricta queda de adorno. No alcanza con revisar la política que se acaba de escribir.
+
+2. **[2026-09-01] `auth.uid()` como `DEFAULT` de columna no sirve en el momento de una migración (sin contexto de request, evalúa `null`), pero SÍ sirve para cada INSERT real de la app de ahí en adelante.**
+   `job_templates.created_by` se agregó `NOT NULL` sin default, con un backfill (`UPDATE ... SET created_by = <super_admin de la org>`) para las filas ya existentes, y RECIÉN DESPUÉS `ALTER COLUMN created_by SET DEFAULT auth.uid()`. Sin ese paso separado, `createJobTemplate()` (Fase 15, nunca mandó `created_by`) hubiera roto en el primer POST real después de esta migración — confirmado porque `typecheck` lo señaló de inmediato (el tipo `Insert` generado exige la columna cuando no ve un default en `information_schema`).
+   Do instead: cuando una columna `NOT NULL` nueva necesita quedar poblada por el actor real (no un valor fijo), backfill con un `UPDATE` explícito primero, `SET NOT NULL` después, y recién ahí agregar `DEFAULT auth.uid()` — hacerlo en un solo paso (columna con default volátil desde el `ADD COLUMN`) rompe el backfill de las filas existentes.
+
+3. **[2026-09-01] Decisión: `job_questions`/`job_question_options` (copia por vacante) sí quedaron con política de escritura `FOR ALL`, a diferencia de sus pares de plantilla — verificado que es seguro, no un descuido.**
+   `private.can_access_job()` empieza con `is_admin_or_above() OR ...` — un admin+ ya tiene acceso incondicional a toda vacante de su organización, así que una política `FOR ALL` no le regala ningún `SELECT` que `can_access_job` no le diera igual (a diferencia de `job_templates`, que sí tiene una condición de confidencialidad que un admin+ no cumple automáticamente). Confirmado leyendo `prosrc` de `can_access_job` antes de decidir, no asumido por analogía.
+
+4. **[2026-09-01] El JWT de prueba en simulación de rol necesita `app_metadata.app_role`, no `app_metadata.role` — mismo error de sintaxis ya anotado en Fase 13, repetido de nuevo antes de recordarlo.**
+   Costó dos intentos fallidos (parecían RLS negando de más) antes de volver a `select prosrc from pg_proc where proname = 'auth_role'` y confirmar el nombre exacto. Do instead: la próxima vez, empezar por ahí, no por adivinar.
+
+---
 
 ## Fusión de plantilla de vacante + conexión a pipeline/competencias (Fase 17) — MÁXIMA PRIORIDAD
 
