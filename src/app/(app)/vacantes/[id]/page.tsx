@@ -13,6 +13,8 @@ import { CompetenciesPanel } from "@/components/vacantes/competencies-panel";
 import { getJobCompetencies } from "@/lib/competencies/get-competencies";
 import { NotifyOnMount } from "@/components/ui/notify-on-mount";
 import { CopyJobLink } from "@/components/vacantes/copy-job-link";
+import { JobAuditLog } from "@/components/vacantes/job-audit-log";
+import { getJobAuditLog } from "@/lib/audit/get-job-audit-log";
 import { getEmailContext } from "@/lib/notifications/notify";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
@@ -40,13 +42,15 @@ export default async function VacanteDetailPage({
   const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
   const canEdit = canEditJob(profile.role, profile.id, job);
   const canManageCollaborators = ADMIN_ROLES.has(profile.role);
-  const [collaborators, addable, competencies] = canManageCollaborators
-    ? await Promise.all([
-        getJobCollaborators(job.id),
-        getAddableProfiles(job.id, job.organization_id),
-        getJobCompetencies(job.id),
-      ])
-    : [[], [], []];
+  const [collaborators, addable, competencies, auditEntries] = await Promise.all([
+    canManageCollaborators ? getJobCollaborators(job.id) : Promise.resolve([]),
+    canManageCollaborators ? getAddableProfiles(job.id, job.organization_id) : Promise.resolve([]),
+    canManageCollaborators ? getJobCompetencies(job.id) : Promise.resolve([]),
+    // RLS (audit_log_select) ya filtra a quien tenga acceso real a esta
+    // vacante — un colaborador sin ese acceso recibe [] directo de la
+    // base, no hace falta acotar por rol acá también.
+    getJobAuditLog(job.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -121,6 +125,8 @@ export default async function VacanteDetailPage({
           <CompetenciesPanel jobId={job.id} competencies={competencies} />
         </>
       )}
+
+      <JobAuditLog entries={auditEntries} />
     </div>
   );
 }

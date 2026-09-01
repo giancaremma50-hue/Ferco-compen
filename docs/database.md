@@ -411,6 +411,24 @@ Descartado fijas" que usa el wizard.
    organización" cruzaron el umbral de 3-4 copias documentado en
    napkin.md (Fase 9) — extraídas a `src/lib/assert-belongs-to-org.ts`.
 
+## Bitácora dentro de la vacante — UI (Fase 18)
+
+`/vacantes/[id]` gana una sección "Bitácora" (`getJobAuditLog` +
+`JobAuditLog`) — la política de lectura (`audit_log_select`) ya se agregó
+en la 1/7, esta entrega es solo la pantalla. Se descubrió que
+`audit_log` para `entity_type = 'job'` ya se llena solo, vía un trigger
+existente (`audit_job_status` → `private.audit_job_status_change()`, no
+tocado en esta fase) que registra `{antes, despues}` en cada cambio de
+`jobs.status` — no hizo falta ninguna migración nueva ni ningún productor
+de eventos nuevo, solo leer lo que ya se estaba guardando sin mostrarse en
+ningún lado.
+
+Renderizado especial para `job_status_changed` (dos `<JobStatusBadge>` con
+una flecha), con fallback genérico para cualquier otra acción futura. Sin
+gate de rol en el componente — `audit_log_select` ya filtra a quien tenga
+acceso real a esa vacante, un colaborador sin acceso recibe `[]` directo de
+la base.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración
