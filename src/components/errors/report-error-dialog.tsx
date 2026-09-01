@@ -2,10 +2,10 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
 import { createErrorReport } from "@/lib/errors/actions";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
+import { DialogShell, type DialogShellHandle } from "@/components/ui/dialog-shell";
 
 /**
  * Única puerta de entrada a "Contarle al soporte" — una sola pregunta,
@@ -15,7 +15,7 @@ import { ActionButton } from "@/components/ui/action-button";
  * de error de negocio (permiso denegado, dominio no permitido, etc.).
  */
 export function ReportErrorDialog({ motivo, titulo, technicalDetail }: { motivo: string; titulo: string; technicalDetail?: string }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<DialogShellHandle>(null);
   const pathname = usePathname();
   const context = {
     motivo,
@@ -37,29 +37,12 @@ export function ReportErrorDialog({ motivo, titulo, technicalDetail }: { motivo:
 
   return (
     <>
-      <ActionButton type="button" variant="secondary" onClick={() => dialogRef.current?.showModal()}>
+      <ActionButton type="button" variant="secondary" onClick={() => dialogRef.current?.open()}>
         Contarle al soporte
       </ActionButton>
-      <dialog
-        ref={dialogRef}
-        onClick={(e) => {
-          if (e.target === dialogRef.current) dialogRef.current?.close();
-        }}
-        className="w-full max-w-[440px] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-foreground/25"
-      >
-        <form action={formAction} className="p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-serif text-[22px]">¿Qué estabas intentando hacer?</h2>
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              aria-label="Cerrar"
-              className="rounded-md p-1 text-muted-foreground hover:bg-muted"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
+      <DialogShell ref={dialogRef} title="¿Qué estabas intentando hacer?">
+        <form action={formAction}>
+          <p className="text-sm text-muted-foreground">
             Cuéntanos en tus palabras. Adjuntamos el resto (página, navegador) automáticamente.
           </p>
           <textarea
@@ -80,7 +63,7 @@ export function ReportErrorDialog({ motivo, titulo, technicalDetail }: { motivo:
             </ActionButton>
           </div>
         </form>
-      </dialog>
+      </DialogShell>
     </>
   );
 }

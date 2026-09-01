@@ -1,5 +1,27 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 8)_
+_Última actualización: 2026-09-01 (Fase 9)_
+
+## Configurador simple: Departamentos, Pipelines, Motivos de rechazo (Fase 9)
+
+1. **[2026-09-01] `email_templates` quedó fuera de Fase 9 a propósito — no se construyó su CRUD.**
+   Motivo: nada en el código lee esa tabla todavía (los correos siguen hardcodeados en React Email desde Fase 6). Un CRUD para una tabla que nadie consume es peor que no construirlo — miente sobre tener efecto. Do instead: cuando se aborde, hacerlo junto con wirear `notify()`/`sendEmail()` para leer de ahí, no antes.
+
+2. **[2026-09-01] El patrón "diálogo repetido" cruzó el umbral de 3 a 4 copias — esta vez sí se extrajo `<DialogShell>` (`src/components/ui/dialog-shell.tsx`).**
+   Antes: `report-error-dialog.tsx` (Fase 7) y `reject-dialog.tsx` (Fase 5) ya lo tenían flagueado en reviews previos como "no urgente, 2-3 copias". Al aparecer una 4ª (`department-dialog.tsx`), el propio agente de reuso lo marcó como punto de quiebre. Do instead: 2-3 copias del mismo chrome se documentan y se dejan; a la 4ª, extraer — no hay una regla numérica mágica, pero repetirlo un review tras otro sin actuar es la señal real.
+
+3. **[2026-09-01] BUG REAL (mismo patrón de Fase 8): `head_profile_id` de un departamento no se validaba contra la organización del actor antes de escribir.**
+   El `<select>` del formulario ya solo lista gente de la org, pero la Server Action confiaba en el valor del cliente. Ver `assertProfileInOrg()` en `src/lib/departments/actions.ts` — mismo helper conceptual que Fase 8 para `job_collaborators`. Do instead: cualquier id que el cliente eligió de un `<select>` filtrado por organización se revalida server-side igual, sin excepción — ya es la segunda vez que aparece este mismo hueco en fases consecutivas.
+
+4. **[2026-09-01] Aceptado, no corregido: `updatePipelineTemplate`/`createPipelineTemplate` borran+reinsertan las etapas sin transacción — ventana real de "plantilla con 0 etapas" si el insert falla justo después del delete.**
+   Mismo patrón ya usado en el proyecto para listas anidadas (preguntas/etapas de vacante) — se acepta el mismo trade-off aquí. Corregirlo de verdad requiere una función RPC en Postgres que envuelva ambas operaciones en una transacción real (el cliente de Supabase JS no hace transacciones multi-statement). No se atacó esta sesión — bajo tráfico de escritura en esta pantalla, y cualquier fallo deja un estado detectable (plantilla con 0 etapas, mensaje de error visible), no uno silencioso.
+
+5. **[2026-09-01] Aceptado, no corregido: `setDefaultPipelineTemplate` hace 2 UPDATEs secuenciales (quitar default viejo, poner default nuevo) sin transacción — ventana de "cero plantillas default" si el proceso se interrumpe entre los dos.**
+   Mismo motivo que el punto anterior (necesita RPC/transacción real). Si `materializeJobStages()` corre justo en esa ventana, el `.single()` no encuentra fila y el gestor ve "No hay una plantilla de pipeline configurada" — mensaje amigable ya existente, no un crash. Riesgo real bajísimo: un solo admin activo hoy, acción rara.
+
+6. **[2026-09-01] `deletePipelineTemplate` sí se corrigió con compare-and-swap: el chequeo `is_default=false` va en el propio `.eq()` del DELETE, no en un SELECT previo.**
+   Mismo patrón que las transiciones de estado de vacantes/postulaciones — evita la carrera "SELECT ve false, otro admin lo marca default, DELETE de todos modos" sin necesitar ninguna migración nueva.
+
+---
 
 ## Colaboradores por vacante + Bitácora (Fase 8) — MÁXIMA PRIORIDAD
 

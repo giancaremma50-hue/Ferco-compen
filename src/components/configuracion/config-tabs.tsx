@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/configuracion/marca", label: "Marca", roles: ["super_admin"] },
   { href: "/configuracion/usuarios", label: "Usuarios y roles", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/departamentos", label: "Departamentos", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/pipelines", label: "Pipelines", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/motivos-rechazo", label: "Motivos de rechazo", roles: ["admin", "super_admin"] },
   { href: "/configuracion/errores", label: "Centro de errores", roles: ["super_admin"] },
   { href: "/configuracion/bitacora", label: "Bitácora", roles: ["super_admin"] },
 ];
