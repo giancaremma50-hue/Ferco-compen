@@ -1,5 +1,39 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 7)_
+_Última actualización: 2026-09-01 (Fase 7 + desmarcado a demo genérica)_
+
+## Demo genérica — sin marca real (2026-09-01)
+
+Por indicación del usuario, el repo y los datos de demo NO deben identificar a
+ninguna empresa real.
+
+- **Nombre de producto**: `organizations.platform_name = 'Atrio'` (ya usado en
+  los mockups de `design/*.dc.html` — solo faltaba escribirlo en la fila real).
+  `organizations.name = 'Mi Empresa'` (genérico, sin cambios). `accent_color`
+  y `allowed_email_domain` ya eran genéricos/`null`.
+- **Logo**: no se sube ningún archivo. El fallback ya existente (cuadro con
+  borde + primera letra de `platform_name`, en `login/page.tsx`,
+  `app-header.tsx`) hace de "logo genérico" con cero assets nuevos — no
+  inventar un logo de imagen, ese fallback YA es el logo.
+- Se borraron `public/logo-blanca.png`/`logo-negro.png` — eran el logo real de
+  un cliente (Ferco Cerámica), commiteados sin uso en el código (`grep` no
+  encontró ningún import). **Siguen en el historial de git** de commits
+  anteriores a esta limpieza — borrar eso de verdad requiere reescribir
+  historia (`git filter-repo`/BFG + force-push), una operación destructiva que
+  no se hizo sin pedirla explícita.
+- Se cambió `es-GT`/"Guatemala"/"Centroamérica" por `es`/genérico en 4 sitios
+  de formateo de fecha y 2 comentarios (`today-label.tsx`, `greeting.tsx`,
+  `application-timeline.tsx`, `note-list.tsx`, `configuracion/errores/page.tsx`)
+  — no había ninguna dependencia real de esa configuración regional, solo texto
+  de ejemplo/locale hardcodeado.
+- `docs/database.md`/napkin mencionan `V1-motoslam` como nombre del proyecto de
+  Supabase — es un codename interno de OTRO proyecto reutilizado, no tiene
+  relación con ninguna empresa real; no hace falta cambiarlo.
+- Pendiente de decisión del usuario, no tocado sin permiso explícito: el
+  nombre del repositorio de GitHub (`Ferco-compen`) y el archivo
+  `context-ats-reclutamiento.md` (fuera de este repo, en el directorio padre,
+  describe un sistema legado distinto — no se editó ni se borró).
+
+---
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.

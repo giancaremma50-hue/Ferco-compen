@@ -18,7 +18,7 @@ export function ApplicationTimeline({ events }: { events: ApplicationEvent[] }) 
         <li key={e.id} className="border-l-2 border-border pl-3 text-sm">
           <p>{EVENT_LABEL[e.type](e)}</p>
           <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-            {e.actorName ?? "Sistema"} · {new Date(e.createdAt).toLocaleString("es-GT")}
+            {e.actorName ?? "Sistema"} · {new Date(e.createdAt).toLocaleString("es")}
           </p>
         </li>
       ))}

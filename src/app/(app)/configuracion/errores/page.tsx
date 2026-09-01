@@ -140,7 +140,7 @@ export default async function CentroErroresPage({
                 <h3 className="font-serif text-[24px] leading-tight">{selected.title}</h3>
                 <p className="mt-2 text-[13px] text-muted-foreground">
                   Reportado por <strong className="font-medium text-foreground">{selected.reporter?.display_name ?? "Anónimo"}</strong> ·{" "}
-                  {new Date(selected.created_at).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" })}
+                  {new Date(selected.created_at).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}
                 </p>
               </div>
 
