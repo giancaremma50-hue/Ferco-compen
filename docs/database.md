@@ -531,12 +531,14 @@ devuelve no cumplía `JobTemplate` y el build no compilaba.
 
 ## Storage
 
-| Bucket | Público | Contenido |
-|---|---|---|
-| `marca-publico` | sí | Logos y la imagen de login, editables por el super admin |
-| `cvs-privado` | no | CVs y adjuntos, servidos siempre por URL firmada de 60 s. Ruta: `candidates/{candidate_id}/{archivo}` |
+| Bucket | Público | Tipos permitidos | Límite | Contenido |
+|---|---|---|---|---|
+| `marca-publico` | sí | PNG, JPG, WebP, SVG (bucket) — la app solo sube PNG/JPG/WebP, nunca SVG (ver `EXTENSION_BY_MIME` en `src/lib/organizations/actions.ts`) | 5 MB | Logos y la imagen de login, editables por el super admin. Ruta: `{organization_id}/{campo}.{ext}` |
+| `cvs-privado` | no | PDF, DOC, DOCX, JPG, PNG | 10 MB | CVs y adjuntos de postulación, servidos siempre por URL firmada de 60 s. Ruta: `{organization_id}/{candidate_id}/{archivo}` (el segundo segmento tiene que ser el `candidate_id` — lo exige la política RLS de `storage.objects`, no es solo convención) |
 
-`V1-motoslam` tenía un bucket `archivos` del sistema anterior con 1 objeto huérfano. Los objetos y buckets de Storage no se pueden borrar por SQL directo (`Direct deletion from storage tables is not allowed`); requiere la API de Storage con la service role key, que no se expone por MCP. **Queda pendiente que el usuario lo borre manualmente** desde el Dashboard si quiere el proyecto completamente limpio — no interfiere con el ATS porque usa nombres de bucket distintos.
+Auditoría post-Fase 18 (detalle completo en `.claude/napkin.md`): se encontraron y corrigieron 2 bugs reales — `next.config.ts` no overrideaba el límite de 1 MB por defecto de las Server Actions (bloqueaba imágenes de marca > 1 MB antes de que corriera cualquier validación propia), y `cvs-privado.allowed_mime_types` solo incluía tipos de CV, por lo que los archivos adicionales JPG/PNG de la postulación (agregados en Fase 18) se perdían en silencio.
+
+`V1-motoslam` tenía un bucket `archivos` del sistema anterior con 1 objeto huérfano (además `archivos_planes` y `firmas`, con política de solo-lectura para `authenticated`). Los objetos y buckets de Storage no se pueden borrar por SQL directo (`Direct deletion from storage tables is not allowed`); requiere la API de Storage con la service role key, que no se expone por MCP. **Queda pendiente que el usuario los borre manualmente** desde el Dashboard si quiere el proyecto completamente limpio — no interfieren con el ATS porque usa nombres de bucket distintos.
 
 ## Seed
 

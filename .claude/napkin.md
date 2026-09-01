@@ -1,5 +1,23 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18 — pestaña Pipelines eliminada, cierre real)_
+_Última actualización: 2026-09-01 (auditoría de buckets de Storage, post-Fase 18)_
+
+## Auditoría de buckets de Storage (post-Fase 18) — MÁXIMA PRIORIDAD
+
+Disparada por un reporte real del usuario: falló subir la "imagen del inicio
+de sesión" desde `/configuracion/marca`. Se verificó `storage.buckets` y las
+políticas de `storage.objects` en vivo (`execute_sql` contra el proyecto,
+simulación de rol con `request.jwt.claims`) — RLS de `marca-publico`/`cvs-privado`
+está bien, los 2 bugs reales estaban en otro lado.
+
+1. **[2026-09-01] BUG REAL: Next.js limita a 1 MB el body de toda Server Action por defecto — `next.config.ts` nunca lo overrideaba, aunque el configurador de marca admite imágenes de hasta 5 MB.**
+   `uploadBrandImage` (`src/lib/organizations/actions.ts`) valida tamaño/tipo con Zod después de recibir el `FormData`, pero Next.js corta la solicitud ANTES de que ese código corra si el body pasa de 1 MB — la "imagen del inicio de sesión" (recomendada 1200x1600 vertical) fácilmente pesa más que eso. El candidato ve un error crudo de Next, no el mensaje en español del catálogo. Do instead: `experimental.serverActions.bodySizeLimit` en `next.config.ts` SIEMPRE tiene que ser ≥ el límite más grande que valide cualquier Server Action del código (+ margen por overhead de `multipart/form-data`, la doc de Next recomienda 10-20 KB) — un límite de archivo en Zod que nunca se compara contra este config es una validación que puede no alcanzar a ejecutarse nunca.
+
+2. **[2026-09-01] BUG REAL, silencioso: el bucket `cvs-privado` tenía `allowed_mime_types` configurado solo para CVs (PDF/DOC/DOCX) — nunca se actualizó cuando Fase 18 agregó "archivos adicionales" (PDF/JPG/PNG) a `/api/postular`.**
+   El código de la app sí permite JPG/PNG (`ALLOWED_ADDITIONAL_TYPES` en `src/app/api/postular/route.ts`), pero Supabase Storage rechaza la subida a nivel de bucket antes de que la RLS o el código importen — y ese error se trata como "best-effort" (`continue`, sin avisar al candidato). Resultado: TODO archivo adicional que fuera imagen se perdía en silencio, en cada postulación, desde el primer commit de Fase 18 — la postulación seguía viéndose exitosa. Corregido con `update storage.buckets set allowed_mime_types = array[...] where id='cvs-privado'` agregando `image/jpeg`/`image/png`. Do instead: **el tipo MIME permitido vive en 2 lugares que tienen que coincidir** — el `Set` de la app y `storage.buckets.allowed_mime_types` — cambiar solo uno dos dejarlo pasar en un lado y morir en silencio en el otro. Verificar ambos con `select allowed_mime_types from storage.buckets` cada vez que se agregue un tipo de archivo nuevo a cualquier flujo de subida.
+
+3. **[2026-09-01] Aviso, no bug: el proyecto Supabase de este ATS tiene 2 buckets que el código de este repo nunca referencia — `archivos` (público, sin límite de tipo/tamaño) y `archivos_planes`/`firmas` (política de solo-lectura para `authenticated`).** Ninguno aparece en `docs/database.md` ni en ningún `storage.from(...)` de `src/`. Probablemente resto de otro proyecto compartiendo el mismo proyecto Supabase — no se tocaron, solo se deja constancia por si el usuario no esperaba que estuvieran ahí.
+
+---
 
 ## Pestaña Pipelines eliminada + "guardar como set reutilizable" (Fase 18)
 
