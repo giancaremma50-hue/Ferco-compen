@@ -4,9 +4,8 @@ import { CompetencyDraftSchema } from "@/lib/job-templates/schema";
 import { CANDIDACY_STATE_SCHEMA, CANDIDACY_FIELD_LABEL } from "@/lib/job-templates/candidacy-fields";
 import type { CandidacyFieldKey } from "@/lib/job-templates/candidacy-fields";
 
-// Paso 1 del wizard ("Detalles de la vacante"). A diferencia de
-// JobTemplateSchema (Fase 15, la plantilla plana), este NO incluye
-// pipeline_template_id — el pipeline de la plantilla ahora se arma en el
+// Paso 1 del wizard ("Detalles de la vacante"). No incluye
+// pipeline_template_id — el pipeline de la plantilla se arma en el
 // paso "Etapas" (Fase 18, 4/7), no se elige de un catálogo aparte.
 export const WizardStep1Schema = JobBaseSchema.pick({
   title: true,
@@ -21,8 +20,7 @@ export const WizardStep1Schema = JobBaseSchema.pick({
   // "Puesto" en el wizard — mismo campo que ya existía como "Nombre de la
   // plantilla" (Fase 15), solo cambia la etiqueta visible.
   name: z.string().trim().min(2, { error: "El nombre debe tener al menos 2 caracteres." }).max(80, { error: "Máximo 80 caracteres." }),
-  // Llega como JSON serializado desde CompetencyListEditor — mismo patrón
-  // que JobTemplateSchema.
+  // Llega como JSON serializado desde CompetencyListEditor (input oculto).
   competencies: z.preprocess(
     (v) => (v === "" || v == null ? "[]" : v),
     z.string().transform((value, ctx) => {

@@ -1,5 +1,22 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (auditoría de buckets de Storage, post-Fase 18)_
+_Última actualización: 2026-09-01 (lista de plantillas conectada al wizard, post-Fase 18)_
+
+## Lista de plantillas nunca se conectó al wizard nuevo (post-Fase 18) — MÁXIMA PRIORIDAD
+
+Reporte real del usuario: "el configurador de plantillas no quedó como lo pedí". Causa
+real: `/configuracion/plantillas-vacante` (el listado) seguía usando el modal plano de
+Fase 15 (`JobTemplateDialog`) para "Nueva plantilla" y "Editar" — el wizard de 6 pasos
+de Fase 18 solo era alcanzable desde "Continuar" (solo plantillas en borrador) o desde
+"Crear vacante" cuando no había ninguna plantilla todavía. El spec
+(`docs/superpowers/specs/2026-09-01-plantillas-vacante-wizard-design.md:3`) decía
+literal "Reemplaza el flujo actual" — nunca se hizo, el modal viejo quedó viviendo en
+paralelo sin que nadie lo notara porque seguía "funcionando".
+
+1. **[2026-09-01] Lección de proceso, no bug de código: un spec que dice "reemplaza X" no confirma solo con que lo nuevo compile y funcione — hay que verificar que lo viejo de verdad se desconectó de la UI.** El modal de Fase 15 se mantuvo deliberadamente actualizado durante Fase 18 (`createJobTemplate` ya insertaba con `status: 'published'`, tenía su propio helper `syncTemplateStagesFromPipeline` para no dejar `job_template_stages` vacío) — alguien SÍ pensó en mantenerlo compatible con el nuevo esquema, pero nadie volvió a la pantalla que lo dispara para apagarlo. Do instead: al cerrar cualquier fase que dice "reemplaza" un flujo viejo, grep del componente/acción vieja para confirmar 0 referencias reales en `src/app` — no alcanza con que el flujo nuevo exista y pase build.
+2. **[2026-09-01] Borrado, no bug: `JobTemplateDialog`, `createJobTemplate`/`updateJobTemplate`, `JobTemplateSchema` y `sync-stages-from-pipeline.ts` completos.** `job-template-row.tsx` ahora manda "Continuar" (borrador, a `paso-{wizard_step}`) o "Editar" (publicada, a `paso-1`) al wizard; `plantillas-vacante/page.tsx` manda "Nueva plantilla" a `/nueva`. Verificado con 2 revisores en paralelo: el paso 6 (`publishTemplate`) bloquea publicar sin etapas (mismo gate que tenía el helper borrado), ningún `update*Step` toca `status` salvo `publishTemplate` (reabrir una plantilla publicada no la revierte a borrador), pasos 3/4 son borra-e-inserta (reabrir no duplica preguntas/etapas), y `createJob` copia las filas de la plantilla a tablas propias de la vacante al crearla — nada queda con referencia viva a lo que se edite después en la plantilla.
+3. **[2026-09-01] Cascada de código muerto: borrar el punto de entrada de un flujo puede dejar huérfano lo que solo ÉL consumía, no solo lo que consume directamente.** `getPipelineTemplateOptions`/`PipelineTemplateOption` (`pipeline-templates/get-pipeline-templates.ts`) solo existían para alimentar el selector de pipeline del modal viejo — al borrar el modal, quedaron sin ningún llamador. Encontrado por el review (angle "removed-behavior"), no por grep manual inicial. Do instead: tras borrar un componente/acción, grep también los HELPERS que ese componente importaba — no solo confirmar que el componente en sí ya no se usa.
+
+---
 
 ## Auditoría de buckets de Storage (post-Fase 18) — MÁXIMA PRIORIDAD
 

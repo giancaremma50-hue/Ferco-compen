@@ -146,7 +146,7 @@ Sin acciones masivas ni paginación real todavía — `.limit(100)` con un aviso
 
 `/vacantes/nueva` gana un selector de plantilla que prellena `JobForm`. El mecanismo original (`TemplatePicker`, navegaba a `?template=id`, remontaba el formulario entero con una `key`) se reemplazó por completo en Fase 17 — ver esa sección.
 
-En `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo (formulario no controlado, `defaultValue` no se actualiza solo) — corregido con `key={template.updated_at}` en el uso del diálogo, esto sigue vigente.
+En `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla mostraba el valor viejo (formulario no controlado, `defaultValue` no se actualiza solo) — corregido con `key={template.updated_at}` en el uso del diálogo. **Superado post-Fase 18**: `JobTemplateDialog` (junto con `createJobTemplate`/`updateJobTemplate`/`JobTemplateSchema`) se borró por completo — el listado de `/configuracion/plantillas-vacante` nunca se había conectado al wizard de 6 pasos, quedaba usando este modal plano en paralelo. "Nueva plantilla"/"Editar" navegan ahora al wizard (detalle en `.claude/napkin.md`).
 
 ## Configurador de bolsa pública (Fase 16)
 
