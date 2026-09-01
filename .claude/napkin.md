@@ -28,10 +28,10 @@ ninguna empresa real.
 - `docs/database.md`/napkin mencionan `V1-motoslam` como nombre del proyecto de
   Supabase — es un codename interno de OTRO proyecto reutilizado, no tiene
   relación con ninguna empresa real; no hace falta cambiarlo.
-- Pendiente de decisión del usuario, no tocado sin permiso explícito: el
-  nombre del repositorio de GitHub (`Ferco-compen`) y el archivo
-  `context-ats-reclutamiento.md` (fuera de este repo, en el directorio padre,
-  describe un sistema legado distinto — no se editó ni se borró).
+- El repositorio de GitHub ya se renombró a `demo-ats` (antes `Ferco-compen`) —
+  hecho fuera de esta sesión, confirmado al hacer push.
+- No tocado sin permiso explícito: `context-ats-reclutamiento.md` (fuera de
+  este repo, en el directorio padre, describe un sistema legado distinto).
 
 ---
 
