@@ -15,7 +15,14 @@ export function JobTemplateRow({
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/60 px-1 py-3 text-sm">
       <div className="min-w-0">
-        <p className="truncate font-medium">{template.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium">{template.name}</p>
+          {template.status === "draft" && (
+            <span className="flex-none rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+              Borrador
+            </span>
+          )}
+        </div>
         <p className="truncate text-xs text-muted-foreground">{template.title}</p>
       </div>
       <div className="flex flex-none items-center gap-2">

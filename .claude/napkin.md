@@ -1,5 +1,16 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 1/7)_
+_Última actualización: 2026-09-01 (Fase 18, 2/7)_
+
+## Wizard de plantillas — paso 1 "Detalles" (Fase 18, 2/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL DE REGRESIÓN: agregar una columna `status` con `DEFAULT 'draft'` a una tabla que ya tenía un flujo de creación existente puede volver invisibles filas que antes eran normales, sin tocar ese flujo para nada.**
+   `job_templates.status` se agregó en la 1/7 pensando en el wizard nuevo (progresivo). `createJobTemplate()` (Fase 15, diálogo de un solo paso, nunca supo de `status`) seguía insertando bien — pero cada plantilla nueva nacía en `'draft'` por el default, y el nuevo `getPublishedJobTemplates()` (filtra `published`) las excluía todas del selector de "Solicitar vacante". Se encontró en `/code-review` antes de commitear, no en producción.
+   Do instead: cuando una migración agrega una columna con estado (`status`, `draft/published`, `activo/inactivo`) a una tabla con un flujo de creación YA EXISTENTE, revisar ese flujo explícitamente — ¿debería seguir produciendo el equivalente de "listo para usar" de siempre, o heredar el nuevo estado por defecto? No asumir que un default de columna es inocuo solo porque no rompe el `INSERT` en sí.
+
+2. **[2026-09-01] Entorno: un archivo que Bash puede leer bajo `~/.claude/projects/.../tool-results/` puede ser invisible para el tool de PowerShell en la misma sesión (`Test-Path` da `False`), sin patrón claro de cuándo pasa.**
+   Encontrado al intentar extraer el resultado de `generate_typescript_types` (guardado como archivo grande fuera del contexto) — Bash lo leía sin problema (`head -c` funcionaba), PowerShell no lo encontraba ni con la ruta exacta copiada de `Get-ChildItem`. Do instead: si PowerShell no encuentra un archivo bajo `tool-results` que Bash sí ve, copiarlo primero al working directory del proyecto con Bash (`cp`) y operar sobre la copia — no perder tiempo reintentando la ruta original.
+
+---
 
 ## Esquema del wizard de plantillas de vacante (Fase 18, 1/7) — MÁXIMA PRIORIDAD
 

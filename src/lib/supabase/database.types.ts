@@ -1325,6 +1325,7 @@ export type Database = {
           country: string
           created_at: string
           created_by: string
+          department_id: string | null
           description: string
           employment_type: string
           id: string
@@ -1346,6 +1347,7 @@ export type Database = {
           country: string
           created_at?: string
           created_by?: string
+          department_id?: string | null
           description: string
           employment_type: string
           id?: string
@@ -1367,6 +1369,7 @@ export type Database = {
           country?: string
           created_at?: string
           created_by?: string
+          department_id?: string | null
           description?: string
           employment_type?: string
           id?: string
@@ -1388,6 +1391,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {

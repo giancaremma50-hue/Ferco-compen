@@ -45,6 +45,12 @@ export async function createJobTemplate(
 
   const { error } = await supabase.from("job_templates").insert({
     organization_id: profile.organization_id,
+    // `status` default es 'draft' (Fase 18, pensado para el wizard paso a
+    // paso) — este diálogo sigue siendo de un solo paso, todo el contenido
+    // ya llegó completo en este mismo submit, así que nace publicada
+    // directo. Sin esto, toda plantilla creada desde este diálogo quedaría
+    // invisible para "Solicitar vacante" (getPublishedJobTemplates).
+    status: "published",
     ...parsed.data,
   });
   if (error) return { error: "No se pudo crear la plantilla." };

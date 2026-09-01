@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/dal";
 import { getDepartmentsForOrg } from "@/lib/jobs/get-departments";
-import { getJobTemplates } from "@/lib/job-templates/get-job-templates";
+import { getPublishedJobTemplates } from "@/lib/job-templates/get-job-templates";
 import { NuevaVacanteForm } from "@/components/vacantes/nueva-vacante-form";
 
 export default async function NuevaVacantePage() {
@@ -10,7 +10,7 @@ export default async function NuevaVacantePage() {
 
   const [departments, jobTemplates] = await Promise.all([
     getDepartmentsForOrg(),
-    getJobTemplates(profile.organization_id).catch(() => []),
+    getPublishedJobTemplates(profile.organization_id).catch(() => []),
   ]);
 
   // Solo los campos que la fusión en el cliente necesita — pipeline_template_id

@@ -241,6 +241,38 @@ lectura con una condición más estricta que "cualquiera del rol X" (acá,
 confidencialidad), ninguna otra política sobre esa tabla puede declararse
 `FOR ALL` — hay que partirla, o esa condición estricta queda de adorno.
 
+## Wizard de plantillas de vacante — Paso 1 "Detalles" (Fase 18, 2/7)
+
+Primera entrega de UI sobre el esquema de la 1/7. Solo el paso 1 —
+`/configuracion/plantillas-vacante/nueva` crea la plantilla en `status =
+'draft'` (default de la columna) y vuelve al listado con confirmación; los
+pasos 2-6 son entregas siguientes, cada una con su propio plan.
+
+- **`job_templates.department_id`** (FK a `departments`, nullable) — hueco
+  real en la 1/7: el wizard pide Departamento en el paso 1, pero la tabla
+  nunca tuvo esa columna (a diferencia de `jobs`, que sí la tiene desde Fase
+  2). Se agregó al construir el paso que la necesita, no antes.
+- **Bug real de regresión, encontrado y corregido antes de commitear:**
+  `job_templates.status` (agregada en 1/7, default `'draft'`) hizo que
+  `createJobTemplate()` (el diálogo plano de Fase 15, que sigue existiendo
+  para creación de un solo paso) empezara a crear plantillas invisibles para
+  "Solicitar vacante" — `getPublishedJobTemplates()` (nueva, filtra
+  `status = 'published'`) las hubiera excluido a todas. Corregido
+  insertando `status: 'published'` explícito en esa acción: el diálogo
+  viejo sigue siendo "todo en un paso, queda listo de inmediato"; solo el
+  wizard nuevo (progresivo) deja la plantilla en borrador hasta su paso de
+  cierre (2026, aún sin construir). `updateJobTemplate` no necesitó el mismo
+  fix — nunca toca `status` en su `.update()`, así que no revierte una
+  plantilla ya publicada.
+- **Puesto/Título del anuncio**: el wizard reusa las columnas existentes
+  `name`/`title` con etiquetas nuevas ("Puesto"/"Título del anuncio de la
+  vacante") — no se agregó ninguna columna para esto, es un cambio de
+  rótulo en la UI, no de esquema.
+- **Rúbrica de evaluación**: el paso 1 sigue mostrando
+  `CompetencyListEditor` (Fase 11/17) tal cual — la lista de pasos del
+  wizard que pidió el usuario no menciona la rúbrica por separado, y
+  "Detalles" es la lectura más razonable de dónde vive esa info general.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración

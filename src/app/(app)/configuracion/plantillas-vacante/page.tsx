@@ -4,9 +4,15 @@ import { getPipelineTemplateOptions } from "@/lib/pipeline-templates/get-pipelin
 import { JobTemplateRow } from "@/components/configuracion/job-template-row";
 import { JobTemplateDialog } from "@/components/configuracion/job-template-dialog";
 import { ActionButton } from "@/components/ui/action-button";
+import { NotifyOnMount } from "@/components/ui/notify-on-mount";
 
-export default async function PlantillasVacantePage() {
+export default async function PlantillasVacantePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ guardado?: string }>;
+}) {
   const profile = await requireAdminOrAbove();
+  const { guardado } = await searchParams;
   const [templates, pipelineOptions] = await Promise.all([
     getJobTemplates(profile.organization_id),
     getPipelineTemplateOptions(profile.organization_id),
@@ -14,6 +20,7 @@ export default async function PlantillasVacantePage() {
 
   return (
     <section className="border border-border bg-card p-5">
+      {guardado && <NotifyOnMount message="Detalles guardados" />}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-serif text-2xl">Plantillas de vacante</h2>
