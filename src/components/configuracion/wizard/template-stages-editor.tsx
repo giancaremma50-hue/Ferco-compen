@@ -34,6 +34,7 @@ export function TemplateStagesEditor({
   const [stages, setStages] = useState<StageRow[]>(() =>
     initialStages.map((s, i) => ({ ...s, key: `stage-${i}` })),
   );
+  const [saveAsReusable, setSaveAsReusable] = useState(false);
 
   function updateStage(index: number, patch: Partial<TemplateStageDraft>) {
     setStages((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
@@ -169,6 +170,32 @@ export function TemplateStagesEditor({
         <FixedStagePill label="Contratado" />
         <FixedStagePill label="Descartado" />
       </div>
+
+      {stages.length > 0 && (
+        <label className="flex flex-col gap-1 border-t border-border pt-4">
+          <span className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={saveAsReusable}
+              onChange={(e) => setSaveAsReusable(e.target.checked)}
+              className="size-4"
+            />
+            Guardar estas etapas intermedias como un set reutilizable
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Queda disponible para &ldquo;Empezar desde un set guardado&rdquo; en otras plantillas — esta plantilla no se toca.
+          </span>
+          {saveAsReusable && (
+            <input
+              name="reusable_set_name"
+              required
+              maxLength={120}
+              placeholder="Nombre del set (ej. Ventas con dos entrevistas)"
+              className="mt-2 h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-foreground"
+            />
+          )}
+        </label>
+      )}
     </div>
   );
 }

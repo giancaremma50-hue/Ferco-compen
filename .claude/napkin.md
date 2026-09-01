@@ -1,5 +1,26 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18 — portal público dinámico, cierra la fase)_
+_Última actualización: 2026-09-01 (Fase 18 — pestaña Pipelines eliminada, cierre real)_
+
+## Pestaña Pipelines eliminada + "guardar como set reutilizable" (Fase 18)
+
+Cierra la pieza que quedó pendiente tras portal público: con el wizard ya
+pudiendo crear `pipeline_templates` nuevos desde su propio paso "Etapas"
+(checkbox "Guardar estas etapas intermedias como un set reutilizable"),
+se cumple la condición para quitar `/configuracion/pipelines` — pantalla,
+componentes (`pipeline-stages-editor.tsx`, `pipeline-template-form.tsx`,
+`pipeline-template-row.tsx`) y `pipeline-templates/actions.ts` completo,
+borrados.
+
+1. **[2026-09-01] BUG REAL: `createPipelineTemplate` (Fase 15, ya borrado) manejaba `error.code === "23505"` para un nombre repetido — pero nunca existió un índice único que hiciera posible ese código de error. Confirmado consultando `pg_indexes` directo: solo estaba el índice único parcial de `is_default`, ninguno sobre `name`.**
+   El pre-check de la nueva función (`.ilike` antes de insertar) tenía la misma falsa sensación de seguridad — sin restricción real, dos guardados casi simultáneos con el mismo nombre nuevo pasaban los dos. Agregado `pipeline_templates_org_name_key` (índice único en `(organization_id, lower(name))`), mismo patrón que `employment_reasons_org_label_key` (Fase 18, 1/7). Do instead: un `catch` de `error.code === "23505"` en código viejo NO es evidencia de que la restricción real existe — confirmarlo consultando `pg_indexes`/`pg_constraint` directo antes de asumir que "ya está cubierto en otro lado".
+
+2. **[2026-09-01] BUG REAL: crear una fila padre y luego una fila hija dependiente en dos pasos separados, sin revertir la primera si la segunda falla, deja un registro fantasma (nombre sin contenido) que la UI sigue ofreciendo como opción válida.**
+   Si `pipeline_templates` se insertaba bien pero `pipeline_template_stages` fallaba, quedaba un set con nombre y 0 etapas — "Empezar desde un set guardado" lo seguía listando, y elegirlo vaciaba la plantilla de quien lo intentara, sin ningún beneficio. Corregido: si el segundo insert falla, se borra la fila padre recién creada. Do instead: cualquier "crear padre, luego hijo" en dos pasos sin transacción real necesita el rollback manual del padre si el hijo falla — no dejarlo mudo esperando a que alguien lo note en la lista.
+
+3. **[2026-09-01] Decisión, aceptada y no corregida: ya no hay forma de RE-designar qué `pipeline_templates` es la "predeterminada" de la organización — `setDefaultPipelineTemplate` se borró junto con la pantalla, y nada la reemplaza.**
+   Solo importa para el diálogo plano viejo (Fase 15) cuando no se elige ningún pipeline al crear una plantilla — cada vez más un camino secundario ahora que el wizard es el principal. Construir una UI nueva solo para esto era alcance no pedido; se documenta como límite conocido, no se inventó una pantalla nueva para un caso que hoy casi no se usa.
+
+---
 
 ## Portal público dinámico (Fase 18) — MÁXIMA PRIORIDAD
 
@@ -50,8 +71,8 @@ _Última actualización: 2026-09-01 (Fase 18 — portal público dinámico, cier
    Se diseñó pensando solo en la UX del wizard (qué posiciones quedan fijas), sin considerar que esta tabla eventualmente se materializa en `job_stages` — que sí necesita el tipo semántico real (`postulado`/`preseleccion`/`entrevista`/`oferta`/`contratado`/`descartado`) para que el resto de la app (filtros de candidatos, kanban) la entienda. Corregido a tiempo porque la tabla seguía vacía (nadie había usado el paso 4 todavía) — sin backfill necesario.
    Do instead: antes de diseñar el esquema de una tabla nueva "solo para la UI de este paso", preguntar si esos datos eventualmente alimentan o se materializan en OTRA tabla que ya tiene su propio tipo/enum establecido — si sí, reusar ese enum desde el principio en vez de inventar uno paralelo que después hay que reconciliar.
 
-2. **[2026-09-01] Decisión: "Guardar este set como reutilizable" (crear una `pipeline_templates` nueva desde el wizard) se recorta de este paso — la pestaña Pipelines sigue existiendo por ahora, así que no hace falta todavía.**
-   La idea original (Checkpoint 1 del diseño) era que la pestaña Pipelines desapareciera y los sets nuevos nacieran desde el wizard. Pero esa pestaña se decidió NO quitar todavía (ver napkin de la 1/7, "no eliminar sin reemplazo listo") — así que sigue siendo el camino real para crear sets nuevos, y la función de guardar-como-reutilizable en el wizard puede esperar a cuando de verdad haga falta (cuando se quite Pipelines). Se documenta acá para no perderla, no se construyó.
+2. **[RESUELTO, ver la sección de arriba] Decisión original: "Guardar este set como reutilizable" se recortó de este paso mientras la pestaña Pipelines siguiera existiendo.**
+   Ya no aplica — el checkbox se construyó y la pestaña Pipelines se quitó en la misma entrega que cierra esta fase. Se deja el ítem para el historial, no como pendiente real.
 
 ---
 

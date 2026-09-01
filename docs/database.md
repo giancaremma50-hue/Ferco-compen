@@ -467,6 +467,37 @@ el portal público sin autenticar. Se agregó `parseCandidacyFields()`
 `CANDIDACY_STATE_SCHEMA` y cae a `"required"` (el default más seguro) ante
 cualquier valor ausente o inválido.
 
+## Pestaña Pipelines eliminada (Fase 18, cierre real)
+
+El paso "Etapas" del wizard gana un checkbox — "Guardar estas etapas
+intermedias como un set reutilizable" — que crea un `pipeline_templates`
+nuevo (+ `pipeline_template_stages` para las etapas del medio, nunca las
+3 fijas) directo desde el wizard. Con esto, `/configuracion/pipelines`
+(pantalla, `pipeline-stages-editor.tsx`, `pipeline-template-form.tsx`,
+`pipeline-template-row.tsx`, `pipeline-templates/actions.ts` completo) se
+elimina — ya no hace falta como único camino para crear sets nuevos.
+
+**Dos hallazgos reales en `/code-review`:**
+1. Nunca existió una restricción de unicidad real en `pipeline_templates.name`
+   — el manejo de `error.code === "23505"` del diálogo viejo (Fase 15, ya
+   borrado) no podía dispararse nunca, confirmado consultando
+   `pg_indexes`/`pg_constraint` directo. Se agregó
+   `pipeline_templates_org_name_key` (único en `(organization_id,
+   lower(name))`), cerrando una ventana de carrera real en el pre-check
+   nuevo (dos guardados casi simultáneos con el mismo nombre nuevo).
+2. Si el `INSERT` en `pipeline_templates` tenía éxito pero el de
+   `pipeline_template_stages` fallaba, quedaba un set con nombre y 0
+   etapas — visible en "Empezar desde un set guardado", vaciando la
+   plantilla de quien lo eligiera sin ningún beneficio. Corregido con
+   rollback manual del padre si el hijo falla.
+
+**Aceptado, no corregido**: ya no hay forma de re-designar qué
+`pipeline_templates` es la predeterminada de la organización
+(`setDefaultPipelineTemplate` se borró con la pantalla). Solo importa
+para el diálogo plano viejo cuando no se elige ningún pipeline al crear
+una plantilla — alcance no pedido, no se construyó una pantalla nueva
+para un camino cada vez menos usado.
+
 ## Cierre de la Fase 18: pestaña Bitácora global eliminada
 
 Con la bitácora dentro de la vacante ya construida, se cumple la
@@ -479,9 +510,10 @@ solo pierde su única pantalla. `AGENTS.md` se actualiza (la tabla de
 Roles ya no lista "bitácora de auditoría" como capacidad de
 `super_admin`).
 
-La pestaña **Pipelines** NO se quita todavía — su reemplazo ("guardar
-como set reutilizable" desde el wizard) sigue sin construirse, sigue
-siendo el único camino real para crear `pipeline_templates` nuevas.
+La pestaña **Pipelines** también se quitó, en una entrega posterior —
+ver la sección "Pestaña Pipelines eliminada" más abajo, que documenta el
+reemplazo real ("guardar como set reutilizable" desde el wizard) y dos
+bugs reales encontrados al construirlo.
 
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 

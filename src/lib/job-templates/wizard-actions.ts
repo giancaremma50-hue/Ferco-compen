@@ -228,6 +228,14 @@ export async function updateTemplateStep3(
  * mismo texto y tipo, nunca las que mande el formulario (no hay ningún
  * campo para ellas en WizardStep4Schema, así que no hay nada que "confiar"
  * ahí ni por accidente). Mismo patrón "reemplaza todo" que el paso 3.
+ *
+ * "Guardar como set reutilizable" (`reusable_set_name`) es cómo nace un
+ * `pipeline_templates` nuevo ahora que no existe una pestaña Pipelines
+ * dedicada — solo las etapas intermedias (nunca los 3 tipos reservados),
+ * mismo criterio que "empezar desde un set guardado" en sentido inverso. Se
+ * valida el nombre ANTES de tocar job_template_stages: si el nombre ya
+ * existe, la plantilla de este wizard no debe quedar a medio guardar por
+ * un problema que en realidad es del set nuevo, no de esta plantilla.
  */
 export async function updateTemplateStep4(
   templateId: string,
@@ -248,6 +256,25 @@ export async function updateTemplateStep4(
     .maybeSingle();
   if (!template) return { error: "La plantilla ya no existe." };
 
+  // El mismo chequeo de más abajo decide si de verdad se crea el set
+  // (nombre Y al menos una etapa) — este pre-check tiene que exigir
+  // exactamente lo mismo, o podría bloquear el guardado completo de esta
+  // plantilla por un nombre repetido de un set que ni se iba a crear.
+  if (parsed.data.reusable_set_name && parsed.data.stages.length > 0) {
+    const { data: existingSet } = await supabase
+      .from("pipeline_templates")
+      .select("id")
+      .eq("organization_id", profile.organization_id)
+      .ilike("name", parsed.data.reusable_set_name)
+      .maybeSingle();
+    // Solo evita la vuelta redonda más común (escribir todo, guardar, y
+    // recién ahí enterarse) — la garantía real es el índice único
+    // (organization_id, lower(name)) en la base; una carrera entre dos
+    // guardados casi simultáneos con el mismo nombre nuevo la cierra esa
+    // restricción, no este pre-check.
+    if (existingSet) return { error: "Ya existe un set guardado con ese nombre." };
+  }
+
   const { error: deleteError } = await supabase.from("job_template_stages").delete().eq("job_template_id", templateId);
   if (deleteError) return { error: "No se pudieron guardar las etapas." };
 
@@ -266,6 +293,38 @@ export async function updateTemplateStep4(
 
   const { error: insertError } = await supabase.from("job_template_stages").insert(rows);
   if (insertError) return { error: "No se pudieron guardar las etapas." };
+
+  if (parsed.data.reusable_set_name && parsed.data.stages.length > 0) {
+    const { data: newSet, error: setError } = await supabase
+      .from("pipeline_templates")
+      .insert({ organization_id: profile.organization_id, name: parsed.data.reusable_set_name })
+      .select("id")
+      .single();
+    if (setError || !newSet) {
+      // Puede fallar por una carrera real contra el índice único
+      // (organization_id, lower(name)) si otro admin guardó el mismo
+      // nombre nuevo casi al mismo instante — no bloquea el guardado de
+      // ESTA plantilla, que ya quedó bien (job_template_stages arriba).
+      console.error("updateTemplateStep4: no se pudo crear el set reutilizable", setError);
+    } else {
+      const { error: setStagesError } = await supabase.from("pipeline_template_stages").insert(
+        parsed.data.stages.map((s, i) => ({
+          organization_id: profile.organization_id,
+          pipeline_template_id: newSet.id,
+          name: s.title,
+          type: s.type,
+          position: i,
+        })),
+      );
+      if (setStagesError) {
+        console.error("updateTemplateStep4: no se pudieron guardar las etapas del set reutilizable", setStagesError);
+        // Sin esto quedaría un pipeline_templates con nombre pero 0 etapas
+        // — "Empezar desde un set guardado" lo ofrecería igual y vaciaría
+        // la plantilla de quien lo elija, sin ningún beneficio real.
+        await supabase.from("pipeline_templates").delete().eq("id", newSet.id);
+      }
+    }
+  }
 
   const { error: stepError } = await supabase
     .from("job_templates")

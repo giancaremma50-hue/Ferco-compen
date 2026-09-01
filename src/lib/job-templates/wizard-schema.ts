@@ -108,6 +108,13 @@ export const WizardStep4Schema = z.object({
       }
     }),
   ).pipe(z.array(TemplateStageDraftSchema).max(15, { error: "Máximo 15 etapas intermedias." })),
+  // "Guardar este set como reutilizable" — nace desde el propio wizard, ya
+  // que se quitó la pestaña Pipelines dedicada (ver napkin.md). Vacío/ausente
+  // = no guardar nada nuevo, solo las etapas de esta plantilla.
+  reusable_set_name: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().trim().min(2, { error: "El nombre del set debe tener al menos 2 caracteres." }).max(120, { error: "Máximo 120 caracteres." }).optional(),
+  ),
 });
 export type WizardStep4Values = z.infer<typeof WizardStep4Schema>;
 
