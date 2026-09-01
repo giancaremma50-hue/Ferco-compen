@@ -9,6 +9,8 @@ import { JobStatusBadge } from "@/components/vacantes/job-status-badge";
 import { ApprovalActions } from "@/components/vacantes/approval-actions";
 import { ReferCandidateDialog } from "@/components/vacantes/refer-candidate-dialog";
 import { CollaboratorsPanel } from "@/components/vacantes/collaborators-panel";
+import { CompetenciesPanel } from "@/components/vacantes/competencies-panel";
+import { getJobCompetencies } from "@/lib/competencies/get-competencies";
 import { NotifyOnMount } from "@/components/ui/notify-on-mount";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
@@ -31,9 +33,13 @@ export default async function VacanteDetailPage({
   const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
   const canEdit = canEditJob(profile.role, profile.id, job);
   const canManageCollaborators = ADMIN_ROLES.has(profile.role);
-  const [collaborators, addable] = canManageCollaborators
-    ? await Promise.all([getJobCollaborators(job.id), getAddableProfiles(job.id, job.organization_id)])
-    : [[], []];
+  const [collaborators, addable, competencies] = canManageCollaborators
+    ? await Promise.all([
+        getJobCollaborators(job.id),
+        getAddableProfiles(job.id, job.organization_id),
+        getJobCompetencies(job.id),
+      ])
+    : [[], [], []];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -92,7 +98,12 @@ export default async function VacanteDetailPage({
         )}
       </div>
 
-      {canManageCollaborators && <CollaboratorsPanel jobId={job.id} collaborators={collaborators} addable={addable} />}
+      {canManageCollaborators && (
+        <>
+          <CollaboratorsPanel jobId={job.id} collaborators={collaborators} addable={addable} />
+          <CompetenciesPanel jobId={job.id} competencies={competencies} />
+        </>
+      )}
     </div>
   );
 }

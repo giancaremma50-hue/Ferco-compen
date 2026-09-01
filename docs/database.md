@@ -108,6 +108,14 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 `assigned_to` se valida server-side contra `isProfileAssignable()` (`src/lib/applications/get-applications.ts`) antes de insertar — el `<select>` del formulario ya solo ofrece gente con acceso real a la vacante, pero eso es solo la UI (mismo patrón de validación ya aplicado a `job_collaborators` en Fase 8 y a `head_profile_id` de departamentos en Fase 9).
 
+## Evaluación por competencias (Fase 11)
+
+**`job_competencies`** (rúbrica por vacante: nombre + peso 0-100) y **`application_competency_scores`** (calificación 1-5 + comentario, `unique(application_id, competency_id, evaluator_id)`). Mismo patrón de RLS que `candidate_tasks`, con un ajuste real: las políticas de `UPDATE`/`DELETE` sobre la propia fila (`evaluator_id = auth.uid()`) también revalidan `can_access_job` — no alcanza con "es mi fila", porque el acceso a la vacante pudo revocarse después de crearla (ver napkin.md).
+
+`submitScore()` (`src/lib/competencies/actions.ts`) valida que `competencyId` y `applicationId` compartan el mismo `job_id` antes de guardar — no hay FK que lo fuerce (son columnas de tablas distintas), así que la Server Action lo comprueba a mano.
+
+`weight` se captura pero todavía no alimenta un puntaje global ponderado — cada competencia solo muestra su promedio simple entre evaluadores.
+
 ## Storage
 
 | Bucket | Público | Contenido |

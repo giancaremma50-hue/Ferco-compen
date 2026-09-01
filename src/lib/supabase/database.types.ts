@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_competency_scores: {
+        Row: {
+          application_id: string
+          comment: string | null
+          competency_id: string
+          created_at: string
+          evaluator_id: string
+          id: string
+          organization_id: string
+          score: number
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          comment?: string | null
+          competency_id: string
+          created_at?: string
+          evaluator_id: string
+          id?: string
+          organization_id: string
+          score: number
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          comment?: string | null
+          competency_id?: string
+          created_at?: string
+          evaluator_id?: string
+          id?: string
+          organization_id?: string
+          score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_competency_scores_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "job_competencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_events: {
         Row: {
           actor_id: string | null
@@ -691,6 +756,51 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_competencies: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          name: string
+          organization_id: string
+          position: number
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          name: string
+          organization_id: string
+          position?: number
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          name?: string
+          organization_id?: string
+          position?: number
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_competencies_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_competencies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

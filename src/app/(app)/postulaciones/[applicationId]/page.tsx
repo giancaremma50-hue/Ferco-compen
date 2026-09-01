@@ -8,6 +8,8 @@ import { NoteForm } from "@/components/postulaciones/note-form";
 import { NoteList } from "@/components/postulaciones/note-list";
 import { TaskForm } from "@/components/postulaciones/task-form";
 import { TaskList } from "@/components/postulaciones/task-list";
+import { CompetencyRow } from "@/components/postulaciones/competency-row";
+import { getApplicationEvaluations } from "@/lib/competencies/get-competencies";
 import { RatingStars } from "@/components/postulaciones/rating-stars";
 import { RejectDialog } from "@/components/postulaciones/reject-dialog";
 import { HireButton } from "@/components/postulaciones/hire-button";
@@ -24,12 +26,13 @@ export default async function ApplicationDetailPage({
   if (!application) notFound();
 
   const supabase = await createClient();
-  const [{ data: reasons }, assignable] = await Promise.all([
+  // .catch() en las dos consultas nuevas a propósito: si cualquiera falla,
+  // que se pierda solo esa sección (asignar tarea / evaluación), no toda
+  // la página — CV, notas, calificación, etc. no dependen de esto.
+  const [{ data: reasons }, assignable, evaluations] = await Promise.all([
     supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
-    // .catch() a propósito: si esta consulta nueva falla, que se pierda
-    // solo la lista de "asignar a" (el formulario ofrece "Sin asignar"),
-    // no toda la página — CV, notas, calificación, etc. no dependen de esto.
     getAssignableProfiles(application.jobId, profile.organization_id).catch(() => []),
+    getApplicationEvaluations(application.id, application.jobId, profile.id).catch(() => []),
   ]);
 
   return (
@@ -69,6 +72,22 @@ export default async function ApplicationDetailPage({
             </div>
             <div className="mt-4">
               <TaskList tasks={application.tasks} applicationId={application.id} />
+            </div>
+          </section>
+        )}
+
+        {evaluations.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Evaluación</h2>
+            <div className="mt-3 flex flex-col gap-3">
+              {evaluations.map((e) => (
+                // Prefijo con application.id: dos candidatos de la misma
+                // vacante comparten competencyId (pertenece al job, no a
+                // la postulación) — sin esto, navegar entre candidatos
+                // puede reciclar el estado del componente (calificación
+                // de un candidato "pegada" al siguiente).
+                <CompetencyRow key={`${application.id}:${e.competencyId}`} applicationId={application.id} evaluation={e} />
+              ))}
             </div>
           </section>
         )}

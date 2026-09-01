@@ -1,5 +1,26 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 10)_
+_Última actualización: 2026-09-01 (Fase 11)_
+
+## Evaluación por competencias (Fase 11) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado por un agente con acceso directo a Supabase (no solo lectura de código): `UPDATE`/`DELETE` de `application_competency_scores` no revalidaban acceso a la vacante, solo `evaluator_id = auth.uid()`.**
+   A diferencia de `SELECT`/`INSERT` (que sí exigen `can_access_job`), un evaluador al que se le quita el acceso (deja de ser `job_collaborator`) podía seguir tocando su calificación vieja. Corregido con una migración que agrega el mismo `EXISTS(...can_access_job...)` a ambas políticas. Verificado con simulación de rol real: se quita el `job_collaborator`, se intenta `UPDATE`, 0 filas afectadas.
+   Do instead: cuando una tabla nueva tiene SELECT/INSERT con un chequeo (ej. `can_access_job`) y UPDATE/DELETE con otro más simple (ej. solo "soy el dueño de la fila"), preguntarse explícitamente si ese chequeo más simple debería incluir también el primero — no asumir que "ya es mi fila" es suficiente si el permiso subyacente (acceso a la vacante) pudo cambiar después de crearla.
+
+2. **[2026-09-01] BUG REAL (4ª vez esta sesión, variante nueva): `submitScore` nunca validaba que `competencyId` perteneciera a la MISMA vacante que `applicationId`.**
+   A diferencia de las 3 veces anteriores (un id de OTRA fila del mismo tipo, ej. otro perfil), acá son dos ids de tablas DISTINTAS que deben coincidir en un campo compartido (`job_id`) sin que ninguna FK lo obligue — ninguna restricción de base de datos liga `application_competency_scores.application_id` con `.competency_id` a través de un `job_id` común. Do instead: cuando dos columnas de una misma fila referencian tablas distintas que a su vez comparten un campo "padre" (aquí, `job_id`), y no hay una FK compuesta que lo fuerce, la Server Action tiene que leer y comparar ese campo compartido a mano antes de escribir — mismo principio que "un id hijo no prueba pertenencia al padre correcto" (Fase 5), pero entre dos hijos del mismo padre, no un hijo y su padre.
+
+3. **[2026-09-01] BUG REAL, encontrado por línea-por-línea: una `key` de React compartida entre postulaciones distintas puede filtrar estado de un candidato a otro.**
+   `CompetencyRow` se keyeaba solo por `competencyId` (pertenece a la VACANTE, no a la postulación) — dos candidatos de la misma vacante comparten esa key. Al navegar de un candidato a otro (misma vacante), React podía reciclar la instancia del componente y su estado local (la calificación en progreso), dejando que se guardara la nota de un candidato sobre otro.
+   Do instead: cuando un componente de cliente muestra datos de una entidad (aquí, competencia) que en realidad pertenece a un padre compartido (la vacante) pero se renderiza en el contexto de un hijo específico (la postulación/candidato), la `key` de React tiene que incluir el id del hijo, no solo el de la entidad compartida — aunque la entidad compartida ya tenga su propio id único.
+
+4. **[2026-09-01] Decisión: `position` de `job_competencies` se simplificó a un valor fijo (0), ordenando por `created_at`.**
+   El primer intento calculaba `position` con un `COUNT` antes de cada insert — sin constraint de unicidad, esto colisiona de forma determinística después de un borrar+agregar (no hace falta concurrencia para reproducirlo). Como no existe todavía un reordenamiento manual de competencias, no hay ninguna razón para mantener un valor calculado que nadie lee de forma ordenada — se resuelve solo con orden de creación. Si se agrega reordenamiento después, ahí sí vale la pena un `position` real mantenido (con el mismo patrón "reemplazar todo" que `pipeline_templates`).
+
+5. **[2026-09-01] Pendiente, documentado a propósito: el peso (`weight`) de cada competencia se captura y se muestra, pero no se usa todavía para calcular un puntaje global ponderado de la postulación.**
+   Hoy cada competencia solo muestra su propio promedio simple entre evaluadores; no existe un "puntaje total" que combine las competencias usando su peso. Es una limitación conocida, no un bug — construirlo bien necesita decidir dónde mostrarlo y qué hacer cuando faltan calificaciones en algunas competencias, y no se improvisó en esta fase.
+
+---
 
 ## Tareas del candidato (Fase 10) — MÁXIMA PRIORIDAD
 
