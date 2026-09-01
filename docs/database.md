@@ -116,6 +116,12 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 `weight` se captura pero todavía no alimenta un puntaje global ponderado — cada competencia solo muestra su promedio simple entre evaluadores.
 
+## Plantillas de mensaje y correo directo al candidato (Fase 12)
+
+**`message_templates`** (organización, nombre, asunto, cuerpo) — mensajes reutilizables para escribirle a un candidato. RLS distinto al resto del configurador (`pipeline_templates`/`email_templates`, admin-only en todo): aquí `SELECT` es para cualquier miembro de la organización (igual que `rejection_reasons`) porque cualquiera que pueda enviar un mensaje necesita poder elegir una plantilla, y solo `INSERT`/`UPDATE`/`DELETE` exigen `is_admin_or_above()`. Mutaciones sin filtro `organization_id` adicional en el `WHERE` — confían solo en RLS vía `.eq("id", id)`, mismo patrón que `departments`/`rejection_reasons`.
+
+`sendCandidateMessage()` (`src/lib/applications/actions.ts`) reusa `canDecideApplication` para autorizar el envío — mismo permiso que Contratar/Rechazar, no uno nuevo. El destinatario (`candidates.email`) se resuelve siempre server-side desde `applicationId`, nunca desde un campo del formulario. El envío usa `sendEmail()` (Resend) directo, no `notify()` — el candidato no es un `profile`, no tiene preferencias de notificación. El evento `correo_enviado` (existía en el enum desde Fase 6, sin productor hasta ahora) se registra en `application_events` con el asunto en el payload.
+
 ## Storage
 
 | Bucket | Público | Contenido |

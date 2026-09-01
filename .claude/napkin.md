@@ -1,5 +1,24 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 11)_
+_Última actualización: 2026-09-01 (Fase 12)_
+
+## Plantillas de mensaje + correo directo al candidato (Fase 12) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] `application_event_type` ya tenía el valor `correo_enviado` desde el diseño original del esquema, sin ningún código que lo insertara — confirmado por grep antes de escribir la Server Action.**
+   El schema fue diseñado anticipando esta feature (Fase 6 dejó el enum listo) pero nunca se cableó hasta ahora. Do instead: antes de decidir que un enum "no se usa" o está muerto, comprobar con grep si de verdad no hay ningún productor — puede ser una feature futura ya prevista, no basura.
+
+2. **[2026-09-01] El destinatario del correo sale SIEMPRE de la fila (`applications.candidates.email`), nunca de un campo del formulario — variante nueva del patrón IDOR de esta sesión.**
+   A diferencia de los 5 casos anteriores (un id de OTRA fila que no se revalida), acá el riesgo es distinto: si el "to" viniera del cliente, cualquiera con acceso de escritura a la acción podría mandar un correo con remitente de esta plataforma a una dirección arbitraria (vector de phishing), no solo leer/escribir datos ajenos. Do instead: en cualquier acción que envía correo a un tercero (no un perfil interno), el destinatario se resuelve siempre server-side desde la fila que la acción ya tiene permiso de leer — jamás se acepta como parámetro, ni siquiera oculto en un campo hidden.
+
+3. **[2026-09-01] Un `<textarea>` manda saltos de línea como `\r\n` en el FormData — `body.split("\n")` sin normalizar deja un `\r` colgando en cada línea salvo la última.**
+   Encontrado por revisión línea-por-línea antes de llegar a producción. Do instead: cualquier código que haga `split("\n")` sobre texto que vino de un `<textarea>` (o cualquier input HTML multilínea) debe normalizar con `.replace(/\r\n/g, "\n")` primero — no asumir que el navegador manda `\n` puro.
+
+4. **[2026-09-01] Precedente confirmado (no bug): reusar un permiso "de decisión" (`canDecideApplication`) para una acción nueva (enviar mensaje) puede dar a un `colaborador` con tier `approver`/`owner` una capacidad que la UI no expone a su rol — pero esto ya era así para Contratar/Rechazar/Tareas, no es una regresión nueva.**
+   El gate de UI (`profile.role !== "colaborador"`) y el permiso real de servidor (`canDecideApplication`, que sí deja pasar a un colaborador con tier alto en `job_collaborators`) llevan divergiendo desde Fase 5 — es el modelo de acceso fino documentado en AGENTS.md ("el acceso fino se resuelve con `job_collaborators`, no subiendo el rol global"), no un hueco. Do instead: antes de "corregir" una discrepancia UI-vs-servidor en este proyecto, comprobar si YA es el patrón aceptado en pantallas hermanas (Contratar/Rechazar) antes de tratarla como bug nuevo.
+
+5. **[2026-09-01] Tres páginas de configuración con lista simple (`motivos-rechazo`, `pipelines`, ahora `plantillas-mensaje`) habían llegado a tener el mismo `loading.tsx` copiado a mano — extraído a `<ConfigListSkeleton />` recién en la 3ª repetición.**
+   Do instead: la regla "tres líneas similares > abstracción prematura" aplica a *código nuevo* que se parece a algo existente — pero si el código NUEVO sería la 3ª copia casi idéntica de algo que YA se duplicó una vez antes, esa es la señal real de extraer, no de aceptar una 3ª duplicación.
+
+---
 
 ## Evaluación por competencias (Fase 11) — MÁXIMA PRIORIDAD
 

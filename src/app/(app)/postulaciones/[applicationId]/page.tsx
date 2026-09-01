@@ -10,6 +10,8 @@ import { TaskForm } from "@/components/postulaciones/task-form";
 import { TaskList } from "@/components/postulaciones/task-list";
 import { CompetencyRow } from "@/components/postulaciones/competency-row";
 import { getApplicationEvaluations } from "@/lib/competencies/get-competencies";
+import { MessageForm } from "@/components/postulaciones/message-form";
+import { getMessageTemplates } from "@/lib/message-templates/get-message-templates";
 import { RatingStars } from "@/components/postulaciones/rating-stars";
 import { RejectDialog } from "@/components/postulaciones/reject-dialog";
 import { HireButton } from "@/components/postulaciones/hire-button";
@@ -29,10 +31,15 @@ export default async function ApplicationDetailPage({
   // .catch() en las dos consultas nuevas a propósito: si cualquiera falla,
   // que se pierda solo esa sección (asignar tarea / evaluación), no toda
   // la página — CV, notas, calificación, etc. no dependen de esto.
-  const [{ data: reasons }, assignable, evaluations] = await Promise.all([
+  // La sección que usa `templates` (Mensaje al candidato) ya está oculta
+  // para colaborador — sin este atajo, cada carga de esta página para el
+  // rol más común de la plataforma dispara una consulta cuyo resultado
+  // siempre se descarta.
+  const [{ data: reasons }, assignable, evaluations, templates] = await Promise.all([
     supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
     getAssignableProfiles(application.jobId, profile.organization_id).catch(() => []),
     getApplicationEvaluations(application.id, application.jobId, profile.id).catch(() => []),
+    profile.role === "colaborador" ? Promise.resolve([]) : getMessageTemplates(profile.organization_id).catch(() => []),
   ]);
 
   return (
@@ -88,6 +95,15 @@ export default async function ApplicationDetailPage({
                 // de un candidato "pegada" al siguiente).
                 <CompetencyRow key={`${application.id}:${e.competencyId}`} applicationId={application.id} evaluation={e} />
               ))}
+            </div>
+          </section>
+        )}
+
+        {profile.role !== "colaborador" && (
+          <section className="mt-10">
+            <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Mensaje al candidato</h2>
+            <div className="mt-3">
+              <MessageForm applicationId={application.id} templates={templates} />
             </div>
           </section>
         )}

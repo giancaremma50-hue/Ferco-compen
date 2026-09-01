@@ -26,3 +26,16 @@ export const TaskSchema = z.object({
     .max(300, { error: "Máximo 300 caracteres." }),
   assigned_to: optionalAssignee,
 });
+
+export const SendMessageSchema = z.object({
+  subject: z
+    .string()
+    .trim()
+    .min(2, { error: "El asunto debe tener al menos 2 caracteres." })
+    .max(160, { error: "Máximo 160 caracteres." }),
+  body: z
+    .string()
+    .trim()
+    .min(2, { error: "Escribe el mensaje." })
+    .max(4000, { error: "Máximo 4000 caracteres." }),
+});
