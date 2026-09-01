@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { WizardStep1Schema, WizardStep2Schema } from "./wizard-schema";
+import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema } from "./wizard-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -146,8 +146,82 @@ export async function updateTemplateStep2(
 
   revalidatePath("/configuracion/plantillas-vacante");
   revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-2`);
-  // El paso 3 ("Preguntas") todavía no existe — mismo motivo que el paso 1
-  // volvía al listado antes de que este paso existiera. Se vuelve al
-  // listado con confirmación en vez de redirigir a una ruta rota.
+  redirect(`/configuracion/plantillas-vacante/${templateId}/paso-3?guardado=1`);
+}
+
+/**
+ * Paso 3 ("Preguntas"). Reemplaza la lista completa (borra + reinserta),
+ * mismo patrón que pipeline_template_stages/job_competencies — sin
+ * transacción real (el cliente de Supabase JS no las soporta), aceptado ya
+ * en Fase 9 para listas anidadas de bajo tráfico de escritura.
+ *
+ * Los ids de las preguntas se generan ACÁ (no se leen del RETURNING del
+ * INSERT) porque Postgres no garantiza que el orden de las filas devueltas
+ * por un INSERT en lote coincida con el orden de los valores insertados —
+ * confiar en `insertedRows[i].id` para emparejar la pregunta i con sus
+ * opciones habría podido mezclar preguntas y opciones de plantillas
+ * distintas en el peor caso, o de la pregunta equivocada en el mejor.
+ */
+export async function updateTemplateStep3(
+  templateId: string,
+  _prevState: WizardActionResult | undefined,
+  formData: FormData,
+): Promise<WizardActionResult> {
+  const profile = await requireAdminOrAbove();
+  const parsed = WizardStep3Schema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa las preguntas." };
+
+  const supabase = await createClient();
+
+  const { data: template } = await supabase
+    .from("job_templates")
+    .select("id")
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (!template) return { error: "La plantilla ya no existe." };
+
+  const { error: deleteError } = await supabase.from("job_template_questions").delete().eq("job_template_id", templateId);
+  if (deleteError) return { error: "No se pudieron guardar las preguntas." };
+
+  if (parsed.data.questions.length > 0) {
+    const questionRows = parsed.data.questions.map((q, i) => ({
+      id: crypto.randomUUID(),
+      organization_id: profile.organization_id,
+      job_template_id: templateId,
+      prompt: q.prompt,
+      type: q.type,
+      position: i,
+    }));
+
+    const { error: questionsError } = await supabase.from("job_template_questions").insert(questionRows);
+    if (questionsError) return { error: "No se pudieron guardar las preguntas." };
+
+    // Solo las de opción múltiple — una pregunta "abierta" con opciones
+    // colgadas (ej. el cliente las mandó igual tras cambiar el tipo sin
+    // limpiarlas) no debe dejar filas huérfanas en job_template_question_options.
+    // El cliente ya las limpia al cambiar el tipo (QuestionListEditor), pero
+    // el cliente nunca es la barrera real.
+    const optionRows = parsed.data.questions.flatMap((q, i) =>
+      q.type === "multiple_choice"
+        ? q.options.map((o, j) => ({
+            organization_id: profile.organization_id,
+            job_template_id: templateId,
+            question_id: questionRows[i].id,
+            label: o.label,
+            is_expected: o.is_expected,
+            position: j,
+          }))
+        : [],
+    );
+
+    if (optionRows.length > 0) {
+      const { error: optionsError } = await supabase.from("job_template_question_options").insert(optionRows);
+      if (optionsError) return { error: "No se pudieron guardar las opciones." };
+    }
+  }
+
+  revalidatePath("/configuracion/plantillas-vacante");
+  revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-3`);
   redirect(`/configuracion/plantillas-vacante?guardado=1`);
 }

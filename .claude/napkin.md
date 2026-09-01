@@ -1,5 +1,16 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 3/7)_
+_Última actualización: 2026-09-01 (Fase 18, 4/7)_
+
+## Wizard de plantillas — paso 3 "Preguntas" (Fase 18, 4/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado por 2 agentes de `/code-review` independientes con el mismo hallazgo: cambiar el `<select>` de tipo de una pregunta sin limpiar su lista de opciones asociada deja filas huérfanas permanentes.**
+   Al pasar una pregunta de "Opción múltiple" a "Abierta" en `QuestionListEditor`, el `onChange` solo parcheaba `type`, no `options` — el bloque de opciones deja de RENDERIZARSE (gateado a `type === "multiple_choice"`) pero sigue vivo en el estado de React, y el input oculto las sigue serializando en cada submit. El servidor las insertaba igual (sin filtro por tipo) — el usuario nunca puede volver a verlas ni borrarlas desde la UI una vez ocurre.
+   Do instead: en cualquier editor de lista anidada donde un campo "tipo" decide si un sub-campo aplica o no (acá: `type` decide si `options` tiene sentido), el `onChange` de ese campo tipo tiene que limpiar el sub-campo explícitamente, Y la Server Action tiene que filtrar por ese mismo tipo antes de escribir — las dos capas, no solo una (el cliente puede tener el mismo bug de nuevo mañana).
+
+2. **[2026-09-01] Decisión de arquitectura: los `id` de un INSERT en lote que necesita después un segundo INSERT dependiente (preguntas → opciones) se generan en el cliente/servidor de la app con `crypto.randomUUID()` antes de insertar, nunca se leen del `RETURNING`.**
+   Postgres no garantiza que las filas de un `RETURNING` de un `INSERT` multi-fila vuelvan en el mismo orden que los valores insertados — emparejar `insertedRows[i].id` con el índice `i` del array original es una apuesta, no una garantía. Generar los `id` de antemano (`crypto.randomUUID()`, disponible como global en el runtime de Node de este proyecto sin import) elimina el problema por completo. Do instead: cualquier INSERT en lote cuyo resultado alimenta un segundo INSERT relacionado (padre-hijo) genera los ids de antemano, no confía en el orden de vuelta del primero.
+
+---
 
 ## Wizard de plantillas — pasos 1-2 (Fase 18, 2/7 y 3/7) — MÁXIMA PRIORIDAD
 

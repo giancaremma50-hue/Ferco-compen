@@ -287,6 +287,30 @@ para que "Atrás" desde el paso 2 tenga a dónde ir) y un botón "Continuar" en
 el listado para plantillas en borrador — apunta directo a `paso-2`, que es
 la frontera resumible mientras solo existan los pasos 1 y 2.
 
+## Wizard de plantillas de vacante — Paso 3 "Preguntas" (Fase 18, 4/7)
+
+`/configuracion/plantillas-vacante/[id]/paso-3` — primer editor de dos
+niveles del proyecto (`job_template_questions` tiene muchas
+`job_template_question_options`). `updateTemplateStep3` reemplaza la lista
+completa (borra + reinserta, mismo trade-off sin transacción ya aceptado en
+Fase 9 para `pipeline_template_stages`), con un detalle nuevo: los `id` de
+las preguntas se generan en el servidor con `crypto.randomUUID()` **antes**
+de insertar, en vez de leerlos del `RETURNING` del `INSERT` — Postgres no
+garantiza que el orden de las filas devueltas por un `INSERT` en lote
+coincida con el de los valores insertados, así que emparejar
+`insertedRows[i].id` con la pregunta `i` habría podido mezclar preguntas y
+opciones distintas de forma silenciosa.
+
+**Bug real encontrado en `/code-review` antes de commitear**: cambiar el
+tipo de una pregunta de "Opción múltiple" a "Abierta" en el editor no
+limpiaba sus opciones — quedaban en el estado local (invisibles, el bloque
+de opciones solo se muestra para `multiple_choice`) y se reinsertaban en
+cada guardado como filas huérfanas en `job_template_question_options`.
+Corregido en dos capas: el cliente limpia `options` al cambiar el tipo
+(higiene), y `updateTemplateStep3` además filtra `q.type ===
+"multiple_choice"` antes de construir las filas de opciones — el cliente
+nunca es la barrera real.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración
