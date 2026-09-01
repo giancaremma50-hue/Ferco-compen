@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { deleteJobTemplate } from "@/lib/job-templates/actions";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { JobTemplateDialog } from "./job-template-dialog";
@@ -26,6 +27,14 @@ export function JobTemplateRow({
         <p className="truncate text-xs text-muted-foreground">{template.title}</p>
       </div>
       <div className="flex flex-none items-center gap-2">
+        {template.status === "draft" && (
+          <Link
+            href={`/configuracion/plantillas-vacante/${template.id}/paso-2`}
+            className="flex h-8 items-center rounded-md border border-border px-3 text-xs"
+          >
+            Continuar
+          </Link>
+        )}
         <JobTemplateDialog
           // key por updated_at: fuerza a remontar el diálogo cuando la
           // fila cambió (ej. tras una edición ya guardada) — sin esto, el

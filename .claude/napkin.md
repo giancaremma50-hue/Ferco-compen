@@ -1,5 +1,10 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 2/7)_
+_Última actualización: 2026-09-01 (Fase 18, 3/7)_
+
+## Wizard de plantillas — pasos 1-2 (Fase 18, 2/7 y 3/7) — MÁXIMA PRIORIDAD
+
+3. **[2026-09-01] Toda Server Action nueva que muta y redirige necesita `revalidatePath` del listado y de cualquier página propia a la que se pueda volver — se me olvidó en las 3 acciones del wizard, encontrado en `/code-review` antes de commitear.**
+   `createTemplateDraftStep1`/`updateTemplateStep1`/`updateTemplateStep2` redirigían sin revalidar nada, rompiendo la convención que sigue cada Server Action de este proyecto (`job-templates/actions.ts`, `departments/actions.ts`, `jobs/actions.ts`, todas la llaman). Do instead: al escribir una Server Action nueva que hace `redirect()` tras mutar, copiar el bloque `revalidatePath(...)` de la acción hermana más parecida ANTES de considerarla terminada — no es opcional solo porque el destino "parece" dinámico.
 
 ## Wizard de plantillas — paso 1 "Detalles" (Fase 18, 2/7) — MÁXIMA PRIORIDAD
 

@@ -35,3 +35,16 @@ export async function getPublishedJobTemplates(organizationId: string): Promise<
   const templates = await getJobTemplates(organizationId);
   return templates.filter((t) => t.status === "published");
 }
+
+/** Para las páginas de paso del wizard — una sola plantilla, ya confirmada de la organización del actor. */
+export async function getJobTemplateForWizard(id: string, organizationId: string): Promise<JobTemplate | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_templates")
+    .select(COLUMNS)
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!data) return null;
+  return { ...data, competencies: (data.competencies as CompetencyDraft[]) ?? [] };
+}

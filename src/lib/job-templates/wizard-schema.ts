@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { JobBaseSchema } from "@/lib/jobs/schema";
 import { CompetencyDraftSchema } from "@/lib/job-templates/schema";
+import { CANDIDACY_STATE_SCHEMA, CANDIDACY_FIELD_LABEL } from "@/lib/job-templates/candidacy-fields";
+import type { CandidacyFieldKey } from "@/lib/job-templates/candidacy-fields";
 
 // Paso 1 del wizard ("Detalles de la vacante"). A diferencia de
 // JobTemplateSchema (Fase 15, la plantilla plana), este NO incluye
@@ -34,3 +36,14 @@ export const WizardStep1Schema = JobBaseSchema.pick({
   ).pipe(z.array(CompetencyDraftSchema).max(20, { error: "Máximo 20 competencias." })),
 });
 export type WizardStep1Values = z.infer<typeof WizardStep1Schema>;
+
+// Paso 2 ("Candidatura"). `email` no es un campo de este schema a propósito
+// — es fijo "Obligatorio" y el servidor lo fuerza, nunca lee un valor de
+// email que mande el cliente (mismo principio "el cliente no es fuente de
+// verdad" de siempre en este proyecto).
+const candidacyFieldsShape = Object.fromEntries(
+  (Object.keys(CANDIDACY_FIELD_LABEL) as CandidacyFieldKey[]).map((key) => [key, CANDIDACY_STATE_SCHEMA]),
+) as Record<CandidacyFieldKey, typeof CANDIDACY_STATE_SCHEMA>;
+
+export const WizardStep2Schema = z.object(candidacyFieldsShape);
+export type WizardStep2Values = z.infer<typeof WizardStep2Schema>;

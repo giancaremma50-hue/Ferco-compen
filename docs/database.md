@@ -273,6 +273,20 @@ pasos 2-6 son entregas siguientes, cada una con su propio plan.
   wizard que pidió el usuario no menciona la rúbrica por separado, y
   "Detalles" es la lectura más razonable de dónde vive esa info general.
 
+## Wizard de plantillas de vacante — Paso 2 "Candidatura" (Fase 18, 3/7)
+
+`/configuracion/plantillas-vacante/[id]/paso-2` — tri-estado
+(`hidden`/`optional`/`required`) sobre `job_templates.candidacy_fields`
+(columna ya agregada en la 1/7). `email` no es un campo del formulario ni del
+`WizardStep2Schema` — el servidor lo fuerza a `required` siempre
+(`{ ...parsed.data, email: "required" }`), nunca confía en un valor que
+mande el cliente para ese campo en particular.
+
+Se agregó `/[id]/paso-1` (reeditar el paso 1 de una plantilla ya creada,
+para que "Atrás" desde el paso 2 tenga a dónde ir) y un botón "Continuar" en
+el listado para plantillas en borrador — apunta directo a `paso-2`, que es
+la frontera resumible mientras solo existan los pasos 1 y 2.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración
