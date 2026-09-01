@@ -83,3 +83,30 @@ export const WizardStep3Schema = z.object({
   ).pipe(z.array(QuestionDraftSchema).max(20, { error: "Máximo 20 preguntas." })),
 });
 export type WizardStep3Values = z.infer<typeof WizardStep3Schema>;
+
+// Paso 4 ("Etapas"). Solo las etapas del MEDIO — "Bandeja de entrada"
+// (postulado) y "Contratado"/"Descartado" son fijas, el servidor las arma
+// siempre igual (nunca confía en que el cliente mande esos 3 textos/tipos).
+// Los tres tipos reservados para esas etapas fijas no son opciones válidas
+// acá — una etapa intermedia con type "contratado" sería confusa (¿es la
+// fija, o una copia?).
+const TemplateStageDraftSchema = z.object({
+  title: z.string().trim().min(2, { error: "El nombre de la etapa debe tener al menos 2 caracteres." }).max(80, { error: "Máximo 80 caracteres." }),
+  type: z.enum(["preseleccion", "entrevista", "oferta"], { error: "Elige un tipo de etapa." }),
+});
+export type TemplateStageDraft = z.infer<typeof TemplateStageDraftSchema>;
+
+export const WizardStep4Schema = z.object({
+  stages: z.preprocess(
+    (v) => (v === "" || v == null ? "[]" : v),
+    z.string().transform((value, ctx) => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Etapas inválidas." });
+        return z.NEVER;
+      }
+    }),
+  ).pipe(z.array(TemplateStageDraftSchema).max(15, { error: "Máximo 15 etapas intermedias." })),
+});
+export type WizardStep4Values = z.infer<typeof WizardStep4Schema>;

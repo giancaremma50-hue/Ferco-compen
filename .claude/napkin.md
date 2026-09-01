@@ -1,5 +1,16 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 18, 4/7)_
+_Última actualización: 2026-09-01 (Fase 18, 5/7)_
+
+## Wizard de plantillas — paso 4 "Etapas" (Fase 18, 5/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] `job_template_stages` nació en la 1/7 con un enum propio (`kind`) que resultó redundante en cuanto se llegó a construir el paso que la usa — reemplazado por el `job_stage_type` que ya usan `pipeline_template_stages`/`job_stages` antes de que nadie hubiera guardado una fila.**
+   Se diseñó pensando solo en la UX del wizard (qué posiciones quedan fijas), sin considerar que esta tabla eventualmente se materializa en `job_stages` — que sí necesita el tipo semántico real (`postulado`/`preseleccion`/`entrevista`/`oferta`/`contratado`/`descartado`) para que el resto de la app (filtros de candidatos, kanban) la entienda. Corregido a tiempo porque la tabla seguía vacía (nadie había usado el paso 4 todavía) — sin backfill necesario.
+   Do instead: antes de diseñar el esquema de una tabla nueva "solo para la UI de este paso", preguntar si esos datos eventualmente alimentan o se materializan en OTRA tabla que ya tiene su propio tipo/enum establecido — si sí, reusar ese enum desde el principio en vez de inventar uno paralelo que después hay que reconciliar.
+
+2. **[2026-09-01] Decisión: "Guardar este set como reutilizable" (crear una `pipeline_templates` nueva desde el wizard) se recorta de este paso — la pestaña Pipelines sigue existiendo por ahora, así que no hace falta todavía.**
+   La idea original (Checkpoint 1 del diseño) era que la pestaña Pipelines desapareciera y los sets nuevos nacieran desde el wizard. Pero esa pestaña se decidió NO quitar todavía (ver napkin de la 1/7, "no eliminar sin reemplazo listo") — así que sigue siendo el camino real para crear sets nuevos, y la función de guardar-como-reutilizable en el wizard puede esperar a cuando de verdad haga falta (cuando se quite Pipelines). Se documenta acá para no perderla, no se construyó.
+
+---
 
 ## Wizard de plantillas — paso 3 "Preguntas" (Fase 18, 4/7) — MÁXIMA PRIORIDAD
 

@@ -1278,28 +1278,28 @@ export type Database = {
           created_at: string
           id: string
           job_template_id: string
-          kind: string
           organization_id: string
           position: number
           title: string
+          type: Database["public"]["Enums"]["job_stage_type"]
         }
         Insert: {
           created_at?: string
           id?: string
           job_template_id: string
-          kind?: string
           organization_id: string
           position?: number
           title: string
+          type: Database["public"]["Enums"]["job_stage_type"]
         }
         Update: {
           created_at?: string
           id?: string
           job_template_id?: string
-          kind?: string
           organization_id?: string
           position?: number
           title?: string
+          type?: Database["public"]["Enums"]["job_stage_type"]
         }
         Relationships: [
           {

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema } from "./wizard-schema";
+import { WizardStep1Schema, WizardStep2Schema, WizardStep3Schema, WizardStep4Schema } from "./wizard-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -223,5 +223,55 @@ export async function updateTemplateStep3(
 
   revalidatePath("/configuracion/plantillas-vacante");
   revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-3`);
+  redirect(`/configuracion/plantillas-vacante/${templateId}/paso-4?guardado=1`);
+}
+
+/**
+ * Paso 4 ("Etapas"). El cliente solo manda las etapas del MEDIO — "Bandeja
+ * de entrada"/"Contratado"/"Descartado" las arma el servidor siempre con el
+ * mismo texto y tipo, nunca las que mande el formulario (no hay ningún
+ * campo para ellas en WizardStep4Schema, así que no hay nada que "confiar"
+ * ahí ni por accidente). Mismo patrón "reemplaza todo" que el paso 3.
+ */
+export async function updateTemplateStep4(
+  templateId: string,
+  _prevState: WizardActionResult | undefined,
+  formData: FormData,
+): Promise<WizardActionResult> {
+  const profile = await requireAdminOrAbove();
+  const parsed = WizardStep4Schema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa las etapas." };
+
+  const supabase = await createClient();
+
+  const { data: template } = await supabase
+    .from("job_templates")
+    .select("id")
+    .eq("id", templateId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (!template) return { error: "La plantilla ya no existe." };
+
+  const { error: deleteError } = await supabase.from("job_template_stages").delete().eq("job_template_id", templateId);
+  if (deleteError) return { error: "No se pudieron guardar las etapas." };
+
+  const rows = [
+    { title: "Bandeja de entrada", type: "postulado" as const },
+    ...parsed.data.stages,
+    { title: "Contratado", type: "contratado" as const },
+    { title: "Descartado", type: "descartado" as const },
+  ].map((s, i) => ({
+    organization_id: profile.organization_id,
+    job_template_id: templateId,
+    title: s.title,
+    type: s.type,
+    position: i,
+  }));
+
+  const { error: insertError } = await supabase.from("job_template_stages").insert(rows);
+  if (insertError) return { error: "No se pudieron guardar las etapas." };
+
+  revalidatePath("/configuracion/plantillas-vacante");
+  revalidatePath(`/configuracion/plantillas-vacante/${templateId}/paso-4`);
   redirect(`/configuracion/plantillas-vacante?guardado=1`);
 }

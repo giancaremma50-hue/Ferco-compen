@@ -311,6 +311,29 @@ Corregido en dos capas: el cliente limpia `options` al cambiar el tipo
 "multiple_choice"` antes de construir las filas de opciones — el cliente
 nunca es la barrera real.
 
+## Wizard de plantillas de vacante — Paso 4 "Etapas" (Fase 18, 5/7)
+
+`/configuracion/plantillas-vacante/[id]/paso-4` — kanban de la plantilla.
+"Bandeja de entrada" (`type = 'postulado'`) siempre primera, "Contratado"/
+"Descartado" (`type = 'contratado'`/`'descartado'`) siempre últimas, el
+servidor las arma solo — el cliente solo manda las etapas intermedias
+(`type` restringido a `preseleccion`/`entrevista`/`oferta`, ni la UI ni el
+schema de Zod ofrecen los otros tres). Puede arrancar de un set guardado
+(`pipeline_templates`, catálogo ya existente) — se copian sus etapas
+intermedias, filtrando fuera cualquiera con un `type` reservado (si el set
+de origen ya termina en "Contratado", esa etapa no se copia, para no
+duplicar la columna fija). El set original no se toca.
+
+**Corrección de esquema antes de construir la UI**: `job_template_stages`
+había nacido en la 1/7 con un `kind` propio
+(`bandeja_entrada`/`intermedia`/`contratado`/`descartado`) pensado solo para
+la UI del wizard — pero cuando esta plantilla se materialice en `job_stages`
+(fase futura), cada etapa necesita el mismo `job_stage_type` que ya usan
+`pipeline_template_stages`/`job_stages` (de ahí depende el resto de la app:
+filtros de candidatos, kanban). Se reemplazó `kind` por `type
+job_stage_type` (tabla vacía en ese momento, sin backfill) antes de que
+nadie hubiera usado este paso todavía.
+
 ### Segundo hallazgo: `created_by` necesita `DEFAULT`, no solo backfill
 
 `auth.uid()` no sirve como `DEFAULT` de columna en el momento de la migración
