@@ -1,6 +1,3 @@
-// Generado desde el esquema real de Supabase con generate_typescript_types.
-// No editar a mano — se regenera cada vez que cambie el esquema (Fase 2 en
-// adelante) y se commitea junto con la migración que lo provocó.
 export type Json =
   | string
   | number
@@ -272,6 +269,74 @@ export type Database = {
           },
           {
             foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_tasks: {
+        Row: {
+          application_id: string
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_done: boolean
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          id?: string
+          is_done?: boolean
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_done?: boolean
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_tasks_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

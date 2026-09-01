@@ -57,7 +57,8 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 7 — Centro de errores | ✅ |
 | 8 — Bitácora de auditoría + colaboradores por vacante | ✅ |
 | 9 — Configurador: departamentos, pipelines, motivos de rechazo | ✅ |
-| 10+ | Pendientes |
+| 10 — Tareas del candidato | ✅ |
+| 11+ | Pendientes |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).

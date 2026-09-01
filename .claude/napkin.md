@@ -1,5 +1,26 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 9)_
+_Última actualización: 2026-09-01 (Fase 10)_
+
+## Tareas del candidato (Fase 10) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Primera tabla nueva desde Fase 2 — `candidate_tasks`, migrada con `apply_migration` sin bloqueo del clasificador de auto-modo.**
+   A diferencia del `ALTER TYPE ADD VALUE` bloqueado en Fase 7, un `CREATE TABLE` + RLS completo pasó sin pedir aprobación extra. No hay un patrón claro de qué bloquea el clasificador — no asumir que DDL "grande" se bloquea más que DDL "chico"; cada intento es su propio caso.
+
+2. **[2026-09-01] Verificación de RLS con simulación de rol encontró un falso positivo por mal diseño de la prueba, no un bug real — anotar el error para no repetirlo.**
+   Primera prueba: reutilicé el mismo perfil real (el único que existe en esta demo) como `requested_by` de la vacante Y como el "colaborador ajeno" que se probaba — `can_access_job` daba `true` correctamente (sí era el requester), pero yo esperaba `false`. Parecía un hueco de seguridad grave ("cualquiera puede insertar tareas").
+   Do instead: para probar "colaborador sin ninguna relación", la vacante de prueba necesita `owner_id`/`requested_by` en `null` explícito (bypasear RLS con el rol default de la conexión SQL para el setup, no con `set role authenticated`) — nunca reusar el único perfil real disponible como "el ajeno" a la vez que como dueño de los datos de prueba.
+
+3. **[2026-09-01] BUG REAL (mismo patrón, 3ª vez esta sesión): `assigned_to` de una tarea no se validaba contra la gente con acceso real a la vacante antes de insertar.**
+   El `<select>` del formulario (`task-form.tsx`) ya solo ofrece gente con `can_access_job` (admin+ o colaborador de esa vacante) — la Server Action `addTask` confiaba en eso sin revalidar. Mismo hueco que `job_collaborators` (Fase 8) y `head_profile_id` de departamentos (Fase 9).
+   Do instead: **cualquier id que salga de un `<select>` filtrado en el cliente se re-valida server-side, siempre, sin excepción** — a estas alturas esto debería ser un reflejo antes de escribir la Server Action, no un hallazgo de `/code-review`. Ver `isProfileAssignable()` en `src/lib/applications/get-applications.ts`.
+
+4. **[2026-09-01] Las secciones nuevas de una página deben heredar el mismo gate de rol que las secciones vecinas, no asumir "RLS ya lo esconde".**
+   La sección de Tareas se agregó sin la misma condición `profile.role !== "colaborador"` que ya protege Contratar/Rechazar en la misma página — un colaborador que ve la postulación solo por haber referido al candidato (no por `can_access_job`) habría visto un formulario que RLS le bloquea en silencio, sin explicación. Do instead: cuando una pantalla ya tiene un gate de visibilidad para un rol, cualquier sección nueva en esa misma pantalla hereda el mismo gate por defecto, salvo razón explícita para no hacerlo.
+
+5. **[2026-09-01] Una consulta nueva y menos probada nunca debe compartir `Promise.all` con datos ya estables de los que depende el resto de la página.**
+   `getAssignableProfiles` (recién escrita) se metió en el mismo `Promise.all` que la consulta de `rejection_reasons` (ya estable) — si la nueva fallaba, tumbaba toda la página (CV, notas, calificación, todo). Do instead: envolver la consulta nueva en `.catch(() => valorDeRespaldo)` cuando su fallo no debería impedir que el resto de la página cargue.
+
+---
 
 ## Configurador simple: Departamentos, Pipelines, Motivos de rechazo (Fase 9)
 

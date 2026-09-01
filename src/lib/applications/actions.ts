@@ -9,7 +9,8 @@ import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/n
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
 import { canDecideApplication, canRateApplication } from "./permissions";
-import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
+import { isProfileAssignable } from "./get-applications";
+import { NoteSchema, RejectSchema, RATING_MAX, TaskSchema } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string };
 
@@ -335,4 +336,66 @@ export async function reopenApplication(applicationId: string): Promise<Applicat
 
   revalidatePath(`/postulaciones/${applicationId}`);
   return { success: "Postulación reabierta" };
+}
+
+export async function addTask(
+  applicationId: string,
+  _prevState: ApplicationActionResult | undefined,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  const profile = await requireProfile();
+  const parsed = TaskSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa la tarea." };
+
+  const supabase = await createClient();
+
+  // El <select> del formulario ya solo lista gente con acceso a la
+  // vacante, pero eso es solo la UI — el cliente nunca es fuente de
+  // verdad. Sin esto, un POST directo podría asignar la tarea a alguien
+  // sin ninguna relación con la vacante (ni siquiera podría verla luego,
+  // candidate_tasks_select exige can_access_job).
+  if (parsed.data.assigned_to) {
+    const jobId = await requireApplicationJobId(supabase, applicationId);
+    if (!jobId) return { error: "No se encontró la postulación." };
+    if (!(await isProfileAssignable(parsed.data.assigned_to, jobId, profile.organization_id))) {
+      return { error: "Esa persona no tiene acceso a esta vacante." };
+    }
+  }
+
+  const { error } = await supabase.from("candidate_tasks").insert({
+    organization_id: profile.organization_id,
+    application_id: applicationId,
+    description: parsed.data.description,
+    assigned_to: parsed.data.assigned_to ?? null,
+    created_by: profile.id,
+  });
+  if (error) return { error: "No se pudo agregar la tarea." };
+
+  revalidatePath(`/postulaciones/${applicationId}`);
+  return { success: "Tarea agregada" };
+}
+
+export async function toggleTask(taskId: string, applicationId: string, isDone: boolean): Promise<ApplicationActionResult> {
+  await requireProfile();
+  const supabase = await createClient();
+  // applicationId además de taskId en el WHERE: taskId ya es suficiente
+  // para que RLS decida el permiso real, pero así un id desincronizado no
+  // revalida silenciosamente la página de OTRA postulación por error.
+  const { error } = await supabase
+    .from("candidate_tasks")
+    .update({ is_done: isDone, completed_at: isDone ? new Date().toISOString() : null })
+    .eq("id", taskId)
+    .eq("application_id", applicationId);
+  if (error) return { error: "No se pudo actualizar la tarea." };
+
+  revalidatePath(`/postulaciones/${applicationId}`);
+  return { success: isDone ? "Tarea completada" : "Tarea reabierta" };
+}
+
+export async function deleteTask(taskId: string, applicationId: string): Promise<void> {
+  await requireProfile();
+  const supabase = await createClient();
+  const { error } = await supabase.from("candidate_tasks").delete().eq("id", taskId).eq("application_id", applicationId);
+  if (error) throw new Error("No se pudo eliminar la tarea.");
+  revalidatePath(`/postulaciones/${applicationId}`);
 }

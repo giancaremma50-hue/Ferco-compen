@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
-import { getApplicationDetail } from "@/lib/applications/get-applications";
+import { getApplicationDetail, getAssignableProfiles } from "@/lib/applications/get-applications";
 import { CvLink } from "@/components/postulaciones/cv-link";
 import { ApplicationTimeline } from "@/components/postulaciones/application-timeline";
 import { NoteForm } from "@/components/postulaciones/note-form";
 import { NoteList } from "@/components/postulaciones/note-list";
+import { TaskForm } from "@/components/postulaciones/task-form";
+import { TaskList } from "@/components/postulaciones/task-list";
 import { RatingStars } from "@/components/postulaciones/rating-stars";
 import { RejectDialog } from "@/components/postulaciones/reject-dialog";
 import { HireButton } from "@/components/postulaciones/hire-button";
@@ -16,12 +18,19 @@ export default async function ApplicationDetailPage({
   params: Promise<{ applicationId: string }>;
 }) {
   const { applicationId } = await params;
-  const profile = await requireProfile();
-  const application = await getApplicationDetail(applicationId);
+  // Ninguna depende de la otra — requireProfile() solo redirige si hace
+  // falta, no usa el resultado de getApplicationDetail.
+  const [profile, application] = await Promise.all([requireProfile(), getApplicationDetail(applicationId)]);
   if (!application) notFound();
 
   const supabase = await createClient();
-  const { data: reasons } = await supabase.from("rejection_reasons").select("id, label").eq("is_active", true);
+  const [{ data: reasons }, assignable] = await Promise.all([
+    supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
+    // .catch() a propósito: si esta consulta nueva falla, que se pierda
+    // solo la lista de "asignar a" (el formulario ofrece "Sin asignar"),
+    // no toda la página — CV, notas, calificación, etc. no dependen de esto.
+    getAssignableProfiles(application.jobId, profile.organization_id).catch(() => []),
+  ]);
 
   return (
     <div className="mx-auto grid max-w-4xl gap-10 lg:grid-cols-[1fr_320px]">
@@ -50,6 +59,18 @@ export default async function ApplicationDetailPage({
             <HireButton applicationId={application.id} />
             <RejectDialog applicationId={application.id} reasons={reasons ?? []} />
           </div>
+        )}
+
+        {profile.role !== "colaborador" && (
+          <section className="mt-10">
+            <h2 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Tareas</h2>
+            <div className="mt-3">
+              <TaskForm applicationId={application.id} assignable={assignable} />
+            </div>
+            <div className="mt-4">
+              <TaskList tasks={application.tasks} applicationId={application.id} />
+            </div>
+          </section>
         )}
 
         <section className="mt-10">

@@ -102,6 +102,12 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 - Verificado con simulación de rol real (transacción con rollback: `set_config('request.jwt.claims', ...)` + `set role authenticated`, un job/postulación de prueba) — viewer bloqueado en ambas, interviewer solo puede calificar, approver puede las dos, incluyendo el trigger disparando de verdad, no solo la función aislada.
 - `audit_log_select_super_admin` tiene el mismo hueco de organización que `error_reports` (Fase 7) — sin corregir, mitigado en la app (`getAuditLog()` filtra por `organization_id`). Ver `.claude/napkin.md`.
 
+## Tareas del candidato (Fase 10)
+
+**`candidate_tasks`** — primera tabla nueva desde el esquema fundacional de Fase 2. Mismo patrón de RLS que `notes`: visible/insertable por admin+ o por quien tenga acceso a la vacante (`can_access_job(job_id)`, vía join a `applications`); editable (marcar completada) por quien la creó, a quien se le asignó, o admin+; borrable solo por quien la creó o admin+.
+
+`assigned_to` se valida server-side contra `isProfileAssignable()` (`src/lib/applications/get-applications.ts`) antes de insertar — el `<select>` del formulario ya solo ofrece gente con acceso real a la vacante, pero eso es solo la UI (mismo patrón de validación ya aplicado a `job_collaborators` en Fase 8 y a `head_profile_id` de departamentos en Fase 9).
+
 ## Storage
 
 | Bucket | Público | Contenido |
