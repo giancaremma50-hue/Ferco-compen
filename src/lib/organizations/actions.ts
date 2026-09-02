@@ -72,7 +72,7 @@ export async function updateBranding(
   return { success: "Marca actualizada" };
 }
 
-const BRAND_IMAGE_FIELDS = ["logo_url", "logo_dark_url", "login_image_url"] as const;
+const BRAND_IMAGE_FIELDS = ["logo_url", "logo_dark_url", "login_image_url", "careers_cover_image_url"] as const;
 export type BrandImageField = (typeof BRAND_IMAGE_FIELDS)[number];
 const BrandImageFieldSchema = z.enum(BRAND_IMAGE_FIELDS);
 
@@ -189,11 +189,11 @@ export async function removeBrandImage(fieldInput: BrandImageField) {
   revalidatePath("/", "layout");
 }
 
-// El video de fondo del login puede pesar más de lo que una Server Action
-// admite como body en Vercel — por eso este flujo NO sube el archivo a
-// través de una acción: genera una URL firmada de Storage y el navegador
-// sube el archivo directo desde el cliente (uploadToSignedUrl), sin pasar
-// por el servidor de Next en absoluto.
+// Un video de fondo puede pesar más de lo que una Server Action admite
+// como body en Vercel — por eso este flujo NO sube el archivo a través de
+// una acción: genera una URL firmada de Storage y el navegador sube el
+// archivo directo desde el cliente (uploadToSignedUrl), sin pasar por el
+// servidor de Next en absoluto.
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 const VIDEO_EXTENSION_BY_MIME: Record<string, string> = {
   "video/mp4": "mp4",
@@ -201,16 +201,37 @@ const VIDEO_EXTENSION_BY_MIME: Record<string, string> = {
 };
 const ALLOWED_VIDEO_TYPES = new Set(Object.keys(VIDEO_EXTENSION_BY_MIME));
 
-function loginVideoPaths(organizationId: string) {
-  return Object.values(VIDEO_EXTENSION_BY_MIME).map((ext) => `${organizationId}/login_video.${ext}`);
+const BRAND_VIDEO_FIELDS = ["login_video_url", "careers_cover_video_url"] as const;
+export type BrandVideoField = (typeof BRAND_VIDEO_FIELDS)[number];
+const BrandVideoFieldSchema = z.enum(BRAND_VIDEO_FIELDS);
+
+// El nombre de archivo en Storage es distinto del nombre de columna a
+// propósito — "login_video" ya tiene videos subidos bajo ese path para
+// organizaciones existentes; cambiarlo para que coincida con la columna
+// (login_video_url) los dejaría huérfanos.
+const VIDEO_PATH_STEM: Record<BrandVideoField, string> = {
+  login_video_url: "login_video",
+  careers_cover_video_url: "careers_cover_video",
+};
+
+function brandVideoPaths(organizationId: string, field: BrandVideoField) {
+  return Object.values(VIDEO_EXTENSION_BY_MIME).map((ext) => `${organizationId}/${VIDEO_PATH_STEM[field]}.${ext}`);
 }
 
 export type CreateUploadUrlState =
   | { ok: true; path: string; token: string }
   | { ok: false; error: string };
 
-export async function createLoginVideoUploadUrl(mimeType: string, sizeBytes: number): Promise<CreateUploadUrlState> {
+export async function createBrandVideoUploadUrl(
+  fieldInput: BrandVideoField,
+  mimeType: string,
+  sizeBytes: number,
+): Promise<CreateUploadUrlState> {
   const profile = await requireSuperAdmin();
+
+  const parsedField = BrandVideoFieldSchema.safeParse(fieldInput);
+  if (!parsedField.success) return { ok: false, error: "Campo de video inválido." };
+  const field = parsedField.data;
 
   if (!ALLOWED_VIDEO_TYPES.has(mimeType)) {
     return { ok: false, error: "Formato no admitido. Usa MP4 o WebM." };
@@ -220,7 +241,7 @@ export async function createLoginVideoUploadUrl(mimeType: string, sizeBytes: num
   }
 
   const extension = VIDEO_EXTENSION_BY_MIME[mimeType];
-  const path = `${profile.organization_id}/login_video.${extension}`;
+  const path = `${profile.organization_id}/${VIDEO_PATH_STEM[field]}.${extension}`;
 
   const supabase = await createClient();
   const { data, error } = await supabase.storage.from("marca-publico").createSignedUploadUrl(path, { upsert: true });
@@ -231,14 +252,18 @@ export async function createLoginVideoUploadUrl(mimeType: string, sizeBytes: num
 
 export type ConfirmVideoState = { error?: string; success?: boolean } | undefined;
 
-export async function confirmLoginVideoUpload(path: string): Promise<ConfirmVideoState> {
+export async function confirmBrandVideoUpload(fieldInput: BrandVideoField, path: string): Promise<ConfirmVideoState> {
   const profile = await requireSuperAdmin();
 
-  // El path lo generó createLoginVideoUploadUrl() para esta misma
-  // organización — si no coincide con ese patrón, no hay nada que confirmar
-  // (una llamada fabricada a mano no debería poder apuntar la URL pública a
-  // una ruta arbitraria de otra organización).
-  if (!loginVideoPaths(profile.organization_id).includes(path)) {
+  const parsedField = BrandVideoFieldSchema.safeParse(fieldInput);
+  if (!parsedField.success) return { error: "Campo de video inválido." };
+  const field = parsedField.data;
+
+  // El path lo generó createBrandVideoUploadUrl() para esta misma
+  // organización y campo — si no coincide con ese patrón, no hay nada que
+  // confirmar (una llamada fabricada a mano no debería poder apuntar la URL
+  // pública a una ruta arbitraria de otra organización).
+  if (!brandVideoPaths(profile.organization_id, field).includes(path)) {
     return { error: "Ruta de video inválida." };
   }
 
@@ -246,31 +271,34 @@ export async function confirmLoginVideoUpload(path: string): Promise<ConfirmVide
   const { data: publicUrl } = supabase.storage.from("marca-publico").getPublicUrl(path);
   const cacheBusted = `${publicUrl.publicUrl}?v=${Date.now()}`;
 
-  const { error } = await supabase
-    .from("organizations")
-    .update({ login_video_url: cacheBusted })
-    .eq("id", profile.organization_id);
+  const update: Partial<Record<BrandVideoField, string>> = { [field]: cacheBusted };
+  const { error } = await supabase.from("organizations").update(update).eq("id", profile.organization_id);
   if (error) return { error: "El video se subió pero no se pudo guardar. Inténtalo de nuevo." };
 
-  const stalePaths = loginVideoPaths(profile.organization_id).filter((p) => p !== path);
+  const stalePaths = brandVideoPaths(profile.organization_id, field).filter((p) => p !== path);
   await supabase.storage.from("marca-publico").remove(stalePaths);
 
   revalidatePath("/", "layout");
   revalidatePath("/login");
+  revalidatePath("/empleos");
   return { success: true };
 }
 
-export async function removeLoginVideo(): Promise<void> {
+export async function removeBrandVideo(fieldInput: BrandVideoField): Promise<void> {
   const profile = await requireSuperAdmin();
+
+  const parsedField = BrandVideoFieldSchema.safeParse(fieldInput);
+  if (!parsedField.success) throw new Error("Campo de video inválido.");
+  const field = parsedField.data;
+
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("organizations")
-    .update({ login_video_url: null })
-    .eq("id", profile.organization_id);
+  const update: Partial<Record<BrandVideoField, null>> = { [field]: null };
+  const { error } = await supabase.from("organizations").update(update).eq("id", profile.organization_id);
   if (error) throw new Error("No se pudo quitar el video.");
 
-  await supabase.storage.from("marca-publico").remove(loginVideoPaths(profile.organization_id));
+  await supabase.storage.from("marca-publico").remove(brandVideoPaths(profile.organization_id, field));
   revalidatePath("/", "layout");
   revalidatePath("/login");
+  revalidatePath("/empleos");
 }

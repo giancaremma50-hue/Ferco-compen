@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getOrganization } from "@/lib/organizations/get-organization";
 import { signInWithGoogle } from "@/lib/auth/actions";
 import { ActionButton } from "@/components/ui/action-button";
-import { LoginBackgroundMedia } from "@/components/layout/login-background-media";
+import { HeroBackgroundMedia } from "@/components/layout/hero-background-media";
 
 function GoogleIcon() {
   return (
@@ -69,7 +69,7 @@ export default async function LoginPage({
       </div>
 
       <div className="relative hidden overflow-hidden bg-accent lg:flex lg:flex-col lg:justify-end lg:p-14">
-        <LoginBackgroundMedia
+        <HeroBackgroundMedia
           videoUrl={organization?.login_video_url ?? null}
           imageUrl={organization?.login_image_url ?? null}
           priority

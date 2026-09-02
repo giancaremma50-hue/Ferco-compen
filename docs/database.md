@@ -556,13 +556,36 @@ Aplicación: `src/lib/users/invite-actions.ts` (crear/borrar invitación, RLS-sc
 
 | Bucket | Público | Tipos permitidos | Límite | Contenido |
 |---|---|---|---|---|
-| `marca-publico` | sí | PNG, JPG, WebP, SVG (bucket) + video MP4/WebM — la app solo sube PNG/JPG/WebP para logos/imagen (ver `EXTENSION_BY_MIME` en `src/lib/organizations/actions.ts`), el video de login se sube directo por URL firmada | 20 MB | Logos, imagen y video de login, editables por el super admin. Ruta: `{organization_id}/{campo}.{ext}` |
+| `marca-publico` | sí | PNG, JPG, WebP, SVG (bucket) + video MP4/WebM — la app solo sube PNG/JPG/WebP para logos/imagen (ver `EXTENSION_BY_MIME` en `src/lib/organizations/actions.ts`), los videos se suben directo por URL firmada | 20 MB | Logos, imagen/video de login, foto/video de portada de la bolsa de empleo — editables por el super admin. Ruta: `{organization_id}/{campo}.{ext}` (imágenes) o `{organization_id}/{stem}.{ext}` (videos, `VIDEO_PATH_STEM` en `actions.ts` — el nombre de archivo no coincide 1:1 con la columna, `login_video_url` sigue usando el stem `login_video` por compatibilidad) |
 | `cvs-privado` | no | PDF, DOC, DOCX, JPG, PNG | 10 MB | CVs y adjuntos de postulación, servidos siempre por URL firmada de 60 s. Ruta: `{organization_id}/{candidate_id}/{archivo}` (el segundo segmento tiene que ser el `candidate_id` — lo exige la política RLS de `storage.objects`, no es solo convención) |
 | `avatares` | sí | PNG, JPG, WebP | 3 MB | Foto de perfil de cada usuario, ruta `{user_id}/{archivo}` — cada quien solo escribe/borra la suya |
 
 Auditoría post-Fase 18 (detalle completo en `.claude/napkin.md`): se encontraron y corrigieron 2 bugs reales — `next.config.ts` no overrideaba el límite de 1 MB por defecto de las Server Actions (bloqueaba imágenes de marca > 1 MB antes de que corriera cualquier validación propia), y `cvs-privado.allowed_mime_types` solo incluía tipos de CV, por lo que los archivos adicionales JPG/PNG de la postulación (agregados en Fase 18) se perdían en silencio.
 
 `V1-motoslam` tenía un bucket `archivos` del sistema anterior con 1 objeto huérfano (además `archivos_planes` y `firmas`, con política de solo-lectura para `authenticated`). Los objetos y buckets de Storage no se pueden borrar por SQL directo (`Direct deletion from storage tables is not allowed`); requiere la API de Storage con la service role key, que no se expone por MCP. **Queda pendiente que el usuario los borre manualmente** desde el Dashboard si quiere el proyecto completamente limpio — no interfieren con el ATS porque usa nombres de bucket distintos.
+
+## Bolsa de empleo aspiracional: portada + cifras + filtros (post-Fase 18, sin número de fase)
+
+Pedido directo del usuario tras revisar un informe de investigación de marca de un cliente
+(AJE Group) — la bolsa pública (`/empleos`) pasó de título + lista plana a un héroe de foto o
+video de portada (reusa exactamente el patrón del video de login: `createBrandVideoUploadUrl`/
+`confirmBrandVideoUpload`/`removeBrandVideo`, generalizados con un `BrandVideoField` — antes
+eran 3 funciones solo para `login_video_url`), con las leyendas reales del configurador
+(`careers_headline`/`careers_intro`, sin copy inventado), cifras de confianza calculadas de
+datos reales (nunca inventadas), y filtros de país/modalidad/área que solo se muestran si hay
+2+ valores distintos entre las vacantes abiertas.
+
+- `organizations` gana `careers_cover_image_url`/`careers_cover_video_url` (`text`, nullable).
+  Mismo bucket `marca-publico`, mismo límite (20 MB, ver Storage arriba).
+- **RLS nueva**: `departments_select_public` (`to anon, authenticated`) — antes `departments`
+  solo era legible por `authenticated`, así que un join `jobs → departments(name)` desde el
+  portal público (sesión `anon`) devolvía `null` en silencio. Igual patrón que
+  `job_questions_select_public` (Fase 18): visible solo si el departamento tiene al menos una
+  vacante pública y abierta, no todos los departamentos de la organización.
+- El filtrado de la lista es 100% en cliente (`JobsBoard`, estado de React) — la lista completa
+  ya se trajo del servidor (son pocas vacantes, sin paginación), ir y volver al servidor en cada
+  tecla del buscador no tenía sentido.
+- Detalle completo (incluido un bug real de degrade encontrado en review) en `.claude/napkin.md`.
 
 ## Seed
 

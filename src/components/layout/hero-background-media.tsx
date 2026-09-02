@@ -8,15 +8,16 @@ import Image from "next/image";
  * video en bucle autoplay no puede ignorarla. Cuando el visitante lo pide,
  * cae a la foto de fondo (si hay una) en vez de reproducir el video.
  */
-export function LoginBackgroundMedia({
+export function HeroBackgroundMedia({
   videoUrl,
   imageUrl,
   priority = false,
 }: {
   videoUrl: string | null;
   imageUrl: string | null;
-  /** Solo para el hero real de /login — la miniatura de vista previa en
-   * /configuracion/marca no está sobre el pliegue y no debe precargarse. */
+  /** Solo para un hero real (login, bolsa de empleo) — una miniatura de
+   * vista previa en /configuracion/marca no está sobre el pliegue y no
+   * debe precargarse. */
   priority?: boolean;
 }) {
   const [reducedMotion, setReducedMotion] = useState(false);

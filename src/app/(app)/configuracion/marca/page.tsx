@@ -2,8 +2,8 @@ import { requireSuperAdmin } from "@/lib/auth/dal";
 import { getOrganization } from "@/lib/organizations/get-organization";
 import { BrandingForm } from "@/components/configuracion/branding-form";
 import { BrandImageField } from "@/components/configuracion/brand-image-field";
-import { LoginVideoField } from "@/components/configuracion/login-video-field";
-import { LoginBackgroundMedia } from "@/components/layout/login-background-media";
+import { BrandVideoField } from "@/components/configuracion/brand-video-field";
+import { HeroBackgroundMedia } from "@/components/layout/hero-background-media";
 
 export default async function MarcaPage() {
   const [, organization] = await Promise.all([requireSuperAdmin(), getOrganization()]);
@@ -17,6 +17,8 @@ export default async function MarcaPage() {
     login_video_url: null,
     careers_headline: null,
     careers_intro: null,
+    careers_cover_image_url: null,
+    careers_cover_video_url: null,
   };
 
   return (
@@ -47,7 +49,33 @@ export default async function MarcaPage() {
             hint="Recomendado 1200 × 1600 px, vertical"
             currentUrl={org.login_image_url}
           />
-          <LoginVideoField currentUrl={org.login_video_url} />
+          <BrandVideoField
+            field="login_video_url"
+            label="Video de fondo del login"
+            hint="Reemplaza a la foto de fondo si subes uno — se reproduce en bucle, sin sonido. MP4 o WebM, máx. 20 MB, ideal 10-15 segundos."
+            currentUrl={org.login_video_url}
+          />
+
+          <div className="border-t border-border pt-5">
+            <h3 className="font-serif text-lg">Bolsa de empleo pública</h3>
+            <p className="mt-1 mb-4 text-[13px] leading-relaxed text-muted-foreground">
+              Foto o video de portada de /empleos — si subes un video, reemplaza a la foto.
+            </p>
+            <div className="flex flex-col gap-5">
+              <BrandImageField
+                field="careers_cover_image_url"
+                label="Foto de portada de la bolsa de empleo"
+                hint="Recomendado 1920 × 1080 px o más ancho, horizontal"
+                currentUrl={org.careers_cover_image_url}
+              />
+              <BrandVideoField
+                field="careers_cover_video_url"
+                label="Video de portada de la bolsa de empleo"
+                hint="Reemplaza a la foto de portada si subes uno — se reproduce en bucle, sin sonido. MP4 o WebM, máx. 20 MB, ideal 10-15 segundos."
+                currentUrl={org.careers_cover_video_url}
+              />
+            </div>
+          </div>
 
           <div className="border-t border-border pt-5">
             <BrandingForm
@@ -73,7 +101,7 @@ export default async function MarcaPage() {
             className="relative flex items-end p-7"
             style={{ backgroundColor: org.accent_color }}
           >
-            <LoginBackgroundMedia videoUrl={org.login_video_url} imageUrl={org.login_image_url} />
+            <HeroBackgroundMedia videoUrl={org.login_video_url} imageUrl={org.login_image_url} />
             <p className="font-serif relative z-10 text-[19px] leading-snug text-white">
               Contratar bien es la decisión más cara que toma una empresa.
             </p>
