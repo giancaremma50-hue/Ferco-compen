@@ -447,13 +447,9 @@ ninguna empresa real.
 
 ---
 
-## ⚠️ Pasos manuales pendientes fuera de este entorno (revisar antes de cada release)
+## ✅ Pasos manuales fuera de este entorno — ya resueltos (2026-09-02)
 
-1. **[2026-08-31] Activar el custom access token hook en el Dashboard de Supabase.**
-   Authentication → Hooks → "Customize Access Token (JWT) Claims hook" → seleccionar `public.custom_access_token_hook`. Sin esto, `private.auth_role()`/`auth_org_id()` devuelven `null` y casi toda política RLS deniega todo (hay un fallback para ver el propio perfil, ver más abajo, pero nada más).
-
-2. **[2026-08-31] Habilitar el proveedor de Google en Supabase Auth.**
-   Authentication → Providers → Google: crear un OAuth Client ID/Secret en Google Cloud Console con el redirect URI `https://cgudnnlcwcotovcslgzu.supabase.co/auth/v1/callback`, y pegarlos ahí. Sin esto, `signInWithOAuth({ provider: "google" })` falla y el login no funciona en absoluto — se probó todo lo demás (redirecciones, RLS, diseño) sin este paso porque no se puede automatizar desde aquí.
+Ambos confirmados por captura del Dashboard de Supabase: "Customize Access Token (JWT) Claims hook" en **ENABLED** con `public.custom_access_token_hook`, y el proveedor **Google** en **Enabled** bajo Authentication → Sign In / Providers. El login ya funciona de punta a punta. Ver `docs/PENDIENTE.md` para lo que sigue pendiente de verdad (dominio corporativo, Fase 19).
 
 ---
 

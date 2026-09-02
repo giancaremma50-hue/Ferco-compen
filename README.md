@@ -69,16 +69,15 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | Mejoras post-Fase 7 (invitaciones, avatar, video de login, tutorial) | ✅ |
 | 19 — Endurecimiento y despliegue | Pendiente |
 
-**Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
-1. Activar el custom access token hook (Authentication → Hooks).
-2. Configurar el proveedor de Google (Authentication → Providers).
+Los dos pasos manuales que bloqueaban el login en el Dashboard de Supabase (activar el custom access token hook, configurar el proveedor de Google) **ya están hechos** — confirmado en el Dashboard el 2026-09-02.
 
-**Dominio corporativo aún sin definir**: `organizations.allowed_email_domain` queda sin valor hasta que el usuario confirme el dominio real de la empresa — mientras tanto, cualquier cuenta de Google puede entrar. La restricción y su lista de excepciones (`profile_invites`) ya están construidas y activas en el código; falta solo escribir el dominio en esa columna (por ahora vía SQL/MCP de Supabase — todavía no hay un campo en `/configuracion` para editarlo) cuando el usuario lo tenga. Ver `docs/database.md`, sección "Mejoras post-Fase 7".
+**Dominio corporativo aún sin definir**: `organizations.allowed_email_domain` queda sin valor hasta que el usuario confirme el dominio real de la empresa — mientras tanto, cualquier cuenta de Google puede entrar. La restricción y su lista de excepciones (`profile_invites`) ya están construidas y activas en el código; falta solo escribir el dominio en esa columna (por ahora vía SQL/MCP de Supabase — todavía no hay un campo en `/configuracion` para editarlo) cuando el usuario lo tenga. Ver `docs/PENDIENTE.md` para esto y el resto de lo que falta.
 
 ## Para agentes de IA
 
 Lee **`AGENTS.md`** antes de trabajar: contiene el uso obligatorio de skills, las reglas de interacción no negociables y las reglas de diseño visual.
 Lee **`.claude/napkin.md`**: trampas conocidas, empezando por que en Next.js 16 el middleware ahora se llama `proxy.ts`.
+Lee **`docs/PENDIENTE.md`**: qué falta de verdad ahora mismo, para no repetir trabajo ya hecho ni asumir que algo pendiente ya se resolvió.
 
 ### Herramientas requeridas
 
