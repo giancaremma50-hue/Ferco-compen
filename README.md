@@ -41,6 +41,7 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 - Rol y organización viajan en el JWT; las políticas leen `auth.jwt()` y nunca consultan `profiles`.
 - CVs en bucket privado con URL firmada de 60 s.
 - HSTS y cabeceras de seguridad en `next.config.ts`.
+- Content-Security-Policy con nonce por request (`src/proxy.ts`) — `script-src` estricto (sin `unsafe-inline`/`unsafe-eval` en producción).
 - `SUPABASE_SERVICE_ROLE_KEY` y `RESEND_API_KEY` solo en el servidor.
 
 ## Estado del proyecto
@@ -67,7 +68,8 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 17 — Fusión de plantilla de vacante + pipeline/competencias | ✅ |
 | 18 — Wizard de plantillas de vacante, creación desde plantilla, portal público dinámico, bitácora en vacante, tooltips | ✅ |
 | Mejoras post-Fase 7 (invitaciones, avatar, video de login, tutorial) | ✅ |
-| 19 — Endurecimiento y despliegue | Pendiente |
+| Bolsa de empleo aspiracional (portada foto/video, cifras, filtros) | ✅ |
+| 19 — Endurecimiento y despliegue | ✅ |
 
 Los dos pasos manuales que bloqueaban el login en el Dashboard de Supabase (activar el custom access token hook, configurar el proveedor de Google) **ya están hechos** — confirmado en el Dashboard el 2026-09-02.
 
