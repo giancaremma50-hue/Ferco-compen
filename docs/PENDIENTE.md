@@ -30,9 +30,9 @@ Del plan maestro original, lo que falta:
 - `RESEND_API_KEY` está vacío en este entorno de desarrollo — sin él, ningún correo sale de verdad (el diseño ya contempla esto: `notifyBestEffort()` falla en silencio, nunca rompe una mutación). **Falta confirmar si ya está cargado en las variables de entorno de Vercel** — no es algo que se pueda verificar por MCP.
 - `ANTHROPIC_API_KEY` también vacío. El parseo de CV con IA nunca se construyó — quedó fuera de alcance desde la Fase 4 (el reclutador siempre revisa los datos a mano). Sigue siendo v2, no bloquea nada del uso actual.
 
-### 4. Limpieza menor: variables de entorno muertas
+### 4. ~~Limpieza menor: variables de entorno muertas~~ — Resuelto 2026-09-02
 
-`.env.example` lista `ALLOWED_EMAIL_DOMAIN` y `SUPER_ADMIN_EMAIL`, pero **ningún archivo del código las lee** — el dominio permitido vive en `organizations.allowed_email_domain` (columna de base de datos, no env var) y el super admin se resuelve por correo hardcodeado en el trigger `handle_new_user()`. No es un bug (el mecanismo real funciona), pero el `.env.example` engaña sobre cómo configurar esas dos cosas. Pendiente: o se borran esas dos líneas de `.env.example`, o se conecta el código para que sí las lea — lo segundo tiene más sentido para `SUPER_ADMIN_EMAIL` (evitaría un valor hardcodeado en SQL), lo primero es más simple para `ALLOWED_EMAIL_DOMAIN` (que de todos modos necesita vivir en la base para ser editable por organización).
+`.env.example` en realidad **nunca llegó al repo** — `.gitignore` tenía `.env*` sin excepción, así que cualquier intento de commitearlo se ignoraba en silencio. En un repo público, eso significa que nadie que clone el proyecto tiene plantilla de qué variables llenar (el `cp .env.example .env.local` del README fallaba). Se agregó `!.env.example` al `.gitignore` y se creó el archivo desde cero, solo con las 6 variables que el código de verdad lee (`process.env.*` grepeado en `src/`) — sin `ALLOWED_EMAIL_DOMAIN` ni `SUPER_ADMIN_EMAIL`, que nunca existieron como variables reales.
 
 ### 5. V2 del plan maestro (no urgente, no empezado)
 

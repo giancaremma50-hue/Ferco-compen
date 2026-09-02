@@ -1,5 +1,13 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-02 (fusión de las dos líneas de desarrollo — Fases 8-18 + mejoras post-Fase 7)_
+_Última actualización: 2026-09-02 (auditoría de secretos + `.env.example` recuperado)_
+
+## Auditoría de secretos en el repo público — MÁXIMA PRIORIDAD
+
+1. **[2026-09-02] BUG REAL: `.env.example` nunca estuvo en el repo — `.gitignore` tenía `.env*` sin ninguna excepción, así que el archivo se ignoraba en silencio cada vez que alguien intentaba agregarlo.** El repo es **público** en GitHub. README y `docs/PENDIENTE.md` hablaban de él como si existiera (`cp .env.example .env.local`, "limpiar 2 variables muertas de `.env.example`") — nadie lo había notado porque el resto del setup igual funciona si ya tienes las variables de otra fuente. Fix: `!.env.example` agregado al `.gitignore`, archivo recreado desde cero con las 6 variables reales (grep de `process.env.` en `src/`), sin las 2 variables fantasma (`ALLOWED_EMAIL_DOMAIN`/`SUPER_ADMIN_EMAIL`) que ningún archivo leía. Do instead: un patrón `.env*` en `.gitignore` es correcto para no commitear secretos, pero SIEMPRE necesita `!.env.example` al lado — si no, el único archivo que SÍ debería versionarse (la plantilla sin valores) desaparece con el resto.
+2. **[2026-09-02] Verificado, no hay secretos reales filtrados en la historia completa del repo (67 commits, `git log --all -p`).** Sin JWT (`eyJ...`), sin `SUPABASE_SERVICE_ROLE_KEY=`/`RESEND_API_KEY=re_`/`ANTHROPIC_API_KEY=sk-` con valor real, sin claves AWS (`AKIA...`), sin `client_secret` de Google (`GOCSPX-...`), sin connection strings con contraseña embebida, sin archivos `.pem`/`.key`/`credentials.json` jamás commiteados. `gh api repos/.../secret-scanning/alerts` también devuelve `[]` — confirmación independiente de GitHub. Do instead: en un repo público, repetir este chequeo (`git log --all -p` + grep de patrones de secretos + `gh api .../secret-scanning/alerts`) antes de cualquier auditoría de seguridad más profunda — es gratis y descarta la categoría de hallazgo más grave de entrada.
+
+---
+
 
 ## Mejoras post-Fase 7 (invitaciones, avatar, video de login) — MÁXIMA PRIORIDAD
 
