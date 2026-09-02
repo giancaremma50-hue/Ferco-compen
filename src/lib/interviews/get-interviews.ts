@@ -9,14 +9,16 @@ export type ApplicationInterview = {
   location: string | null;
   notes: string | null;
   status: Database["public"]["Enums"]["interview_status"];
-  interviewerName: string;
+  attendeeNames: string[];
 };
 
 export async function getApplicationInterviews(applicationId: string): Promise<ApplicationInterview[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("interviews")
-    .select("id, scheduled_at, duration_minutes, location, notes, status, interviewer:profiles!interviews_interviewer_id_fkey(display_name)")
+    .select(
+      "id, scheduled_at, duration_minutes, location, notes, status, interview_attendees(profiles(display_name))",
+    )
     .eq("application_id", applicationId)
     .order("scheduled_at", { ascending: false });
 
@@ -27,6 +29,6 @@ export async function getApplicationInterviews(applicationId: string): Promise<A
     location: i.location,
     notes: i.notes,
     status: i.status,
-    interviewerName: i.interviewer?.display_name ?? "—",
+    attendeeNames: i.interview_attendees.map((a) => a.profiles?.display_name).filter((n): n is string => Boolean(n)),
   }));
 }

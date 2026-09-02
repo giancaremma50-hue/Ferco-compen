@@ -860,6 +860,52 @@ export type Database = {
           },
         ]
       }
+      interview_attendees: {
+        Row: {
+          created_at: string
+          id: string
+          interview_id: string
+          organization_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interview_id: string
+          organization_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interview_id?: string
+          organization_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_attendees_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interview_attendees_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interview_attendees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interviews: {
         Row: {
           application_id: string
@@ -867,7 +913,7 @@ export type Database = {
           created_by: string
           duration_minutes: number
           id: string
-          interviewer_id: string
+          interviewer_id: string | null
           location: string | null
           notes: string | null
           organization_id: string
@@ -881,7 +927,7 @@ export type Database = {
           created_by: string
           duration_minutes?: number
           id?: string
-          interviewer_id: string
+          interviewer_id?: string | null
           location?: string | null
           notes?: string | null
           organization_id: string
@@ -895,7 +941,7 @@ export type Database = {
           created_by?: string
           duration_minutes?: number
           id?: string
-          interviewer_id?: string
+          interviewer_id?: string | null
           location?: string | null
           notes?: string | null
           organization_id?: string

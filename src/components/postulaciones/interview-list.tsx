@@ -48,7 +48,7 @@ function InterviewRow({
             {new Date(interview.scheduledAt).toLocaleString("es", { dateStyle: "long", timeStyle: "short" })}
           </p>
           <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-            {interview.interviewerName} · {interview.durationMinutes} min
+            {interview.attendeeNames.length > 0 ? interview.attendeeNames.join(", ") : "—"} · {interview.durationMinutes} min
             {interview.location && <> · {interview.location}</>}
           </p>
         </div>

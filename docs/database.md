@@ -564,6 +564,37 @@ Auditoría post-Fase 18 (detalle completo en `.claude/napkin.md`): se encontraro
 
 `V1-motoslam` tenía un bucket `archivos` del sistema anterior con 1 objeto huérfano (además `archivos_planes` y `firmas`, con política de solo-lectura para `authenticated`). Los objetos y buckets de Storage no se pueden borrar por SQL directo (`Direct deletion from storage tables is not allowed`); requiere la API de Storage con la service role key, que no se expone por MCP. **Queda pendiente que el usuario los borre manualmente** desde el Dashboard si quiere el proyecto completamente limpio — no interfieren con el ATS porque usa nombres de bucket distintos.
 
+## Pipeline a pantalla completa + drawer de candidato + reuniones multi-destinatario (post-Fase 18, sin número de fase)
+
+Pedido directo del usuario. Seleccionar una vacante ya aprobada lleva directo al pipeline
+(pantalla completa, ya no acotado a `max-w-6xl`) en vez del detalle clásico — el detalle
+completo (colaboradores, competencias, aprobar/editar, bitácora) sigue existiendo en
+`/vacantes/[id]`, un clic de distancia vía `JobInfoModal` ("Ver detalle completo"). Un
+`colaborador` (no gestiona pipeline, AGENTS.md) y una vacante sin aprobar todavía siguen
+yendo al detalle clásico directamente.
+
+- **`interviews.interviewer_id` (un solo entrevistador) reemplazada por `interview_attendees`**
+  (tabla nueva, `interview_id` + `profile_id`, RLS mirror de `interviews_select`) — "Agendar
+  reunión" ahora admite varios destinatarios reales, cada uno con su propio enlace de
+  calendario. `interviewer_id` quedó nullable en vez de dropeada (más barato de revertir),
+  ya no es la fuente de verdad de nada.
+- **Tarjeta del kanban**: nombre + días desde la postulación (`appliedAt`, ya existía, solo
+  faltaba mostrarse) + calificación de estrellas. Clic abre un drawer en vez de navegar a
+  `/postulaciones/[id]` (esa ruta sigue existiendo tal cual, para enlaces directos desde
+  notificaciones).
+- **Drawer de candidato**: toda su data (detalle + respuestas de candidatura + archivos
+  adicionales + entrevistas + destinatarios asignables + motivos de rechazo + plantillas de
+  mensaje + `canDecide`) se trae en una sola llamada (`getApplicationDrawerData`), no una
+  consulta por botón. El CV se firma al momento del clic en "Ver CV", no al abrir el drawer
+  — la URL firmada vale 60s y el drawer puede quedar abierto mucho más que eso.
+- **Botonera del drawer**: mismo componente visual que el menú flotante principal
+  (`CandidateActionBar`, calcado de `FloatingNav` — píldora oscura, íconos con tooltip).
+  Descartar/Siguiente etapa/Agendar reunión/Mensaje exigen `canDecideApplication` (mismo
+  nivel que rechazar/contratar); Seguimientos y Asignar tarea quedan siempre visibles porque
+  `candidate_tasks`/notas ya eran de nivel más permisivo (`can_access_job`) — ocultarlos
+  detrás de `canDecide` habría insinuado una garantía que el servidor no cumple.
+- Detalle completo (incluidos los 2 bugs reales encontrados en review) en `.claude/napkin.md`.
+
 ## Bolsa de empleo aspiracional: portada + cifras + filtros (post-Fase 18, sin número de fase)
 
 Pedido directo del usuario tras revisar un informe de investigación de marca de un cliente

@@ -13,6 +13,8 @@ import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
 import { MensajeCandidatoEmail } from "@/emails/mensaje-candidato";
 import { canDecideApplication, canRateApplication } from "./permissions";
 import { isProfileAssignable } from "./get-applications";
+import { getDrawerData, type DrawerData } from "./get-drawer-data";
+import { getSignedCvUrl } from "@/lib/candidates/get-signed-cv-url";
 import { NoteSchema, RejectSchema, RATING_MAX, TaskSchema, SendMessageSchema } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string; field?: string };
@@ -452,4 +454,25 @@ export async function deleteTask(taskId: string, applicationId: string): Promise
   const { error } = await supabase.from("candidate_tasks").delete().eq("id", taskId).eq("application_id", applicationId);
   if (error) throw new Error("No se pudo eliminar la tarea.");
   revalidatePath(`/postulaciones/${applicationId}`);
+}
+
+/**
+ * Todo lo que el drawer de candidato necesita, en una sola llamada — se
+ * pide al abrir el drawer desde el pipeline (en vez de navegar a
+ * /postulaciones/[id], que sigue existiendo como página completa para
+ * enlaces directos, ej. desde una notificación).
+ */
+export async function getApplicationDrawerData(applicationId: string): Promise<DrawerData | null> {
+  const profile = await requireProfile();
+  return getDrawerData(applicationId, { id: profile.id, role: profile.role, organizationId: profile.organization_id });
+}
+
+/**
+ * Se pide al momento del clic, no cuando se abre el drawer — la URL firmada
+ * vale 60s, y el drawer puede quedar abierto mucho más que eso antes de que
+ * alguien haga clic en "Ver CV".
+ */
+export async function getCvViewUrl(cvFilePath: string): Promise<{ url: string | null }> {
+  await requireProfile();
+  return { url: await getSignedCvUrl(cvFilePath) };
 }

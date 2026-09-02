@@ -39,7 +39,7 @@ export default async function VacantesPage() {
       ) : (
         <div className="mt-8 grid gap-3">
           {jobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+            <JobCard key={job.id} job={job} viewerRole={profile.role} />
           ))}
         </div>
       )}

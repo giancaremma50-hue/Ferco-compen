@@ -74,7 +74,9 @@ export type ApplicationDetail = {
   candidateName: string;
   candidateEmail: string;
   candidatePhone: string | null;
+  candidateAddress: string | null;
   cvFilePath: string | null;
+  coverLetter: string | null;
   rejectionReasonLabel: string | null;
   events: ApplicationEvent[];
   notes: ApplicationNote[];
@@ -96,7 +98,7 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
   const { data: app } = await supabase
     .from("applications")
     .select(
-      "id, status, rating, stage_id, job_stages(name), job_id, jobs(title), candidate_id, candidates(full_name, email, phone, cv_file_path), rejection_reason_id, rejection_reasons(label)",
+      "id, status, rating, stage_id, job_stages(name), job_id, jobs(title), candidate_id, candidates(full_name, email, phone, address, cv_file_path), rejection_reason_id, rejection_reasons(label), cover_letter",
     )
     .eq("id", applicationId)
     .maybeSingle();
@@ -135,7 +137,9 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
     candidateName: app.candidates!.full_name,
     candidateEmail: app.candidates!.email,
     candidatePhone: app.candidates!.phone,
+    candidateAddress: app.candidates!.address,
     cvFilePath: app.candidates!.cv_file_path,
+    coverLetter: app.cover_letter,
     rejectionReasonLabel: app.rejection_reasons?.label ?? null,
     events: (events ?? []).map((e) => ({
       id: e.id,

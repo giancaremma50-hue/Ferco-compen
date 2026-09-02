@@ -58,11 +58,13 @@ export async function scheduleInterview(
     return { error: "Tu perfil no puede agendar entrevistas en esta vacante." };
   }
 
-  // El <select> del formulario ya solo ofrece gente con acceso real a la
+  // El checklist del wizard ya solo ofrece gente con acceso real a la
   // vacante, pero eso es solo la UI — mismo patrón que assigned_to en
-  // Tareas (Fase 10).
-  if (!(await isProfileAssignable(parsed.data.interviewer_id, application.job_id, profile.organization_id))) {
-    return { error: "Esa persona no tiene acceso a esta vacante." };
+  // Tareas (Fase 10). Se revalida cada destinatario, no solo el primero.
+  for (const attendeeId of parsed.data.attendee_ids) {
+    if (!(await isProfileAssignable(attendeeId, application.job_id, profile.organization_id))) {
+      return { error: "Uno de los destinatarios no tiene acceso a esta vacante." };
+    }
   }
 
   const location = parsed.data.location ?? null;
@@ -71,7 +73,6 @@ export async function scheduleInterview(
     .insert({
       organization_id: profile.organization_id,
       application_id: applicationId,
-      interviewer_id: parsed.data.interviewer_id,
       scheduled_at: parsed.data.scheduled_at,
       duration_minutes: parsed.data.duration_minutes,
       location,
@@ -81,6 +82,17 @@ export async function scheduleInterview(
     .select("id")
     .single();
   if (error || !interview) return { error: "No se pudo agendar la entrevista." };
+
+  // Best-effort: la entrevista en sí ya quedó registrada — si esto falla,
+  // queda sin destinatarios visibles pero no rompe lo que ya se guardó.
+  const { error: attendeesError } = await supabase.from("interview_attendees").insert(
+    parsed.data.attendee_ids.map((profileId) => ({
+      organization_id: profile.organization_id,
+      interview_id: interview.id,
+      profile_id: profileId,
+    })),
+  );
+  if (attendeesError) return { error: "La entrevista se agendó pero no se pudieron guardar los destinatarios." };
 
   notifyBestEffort(() =>
     notifyCandidateOfInterview(
@@ -110,18 +122,18 @@ export async function updateInterviewStatus(
 
   const { data: interview } = await supabase
     .from("interviews")
-    .select("interviewer_id, applications!inner(job_id)")
+    .select("applications!inner(job_id), interview_attendees(profile_id)")
     .eq("id", interviewId)
     .eq("application_id", applicationId)
     .single();
   if (!interview) return { error: "No se encontró la entrevista." };
 
-  // Quien entrevista puede marcar su propia entrevista sin ser
-  // approver/owner de la vacante (mismo auto-servicio que permite RLS vía
+  // Quien es destinatario puede marcar su propia entrevista sin ser
+  // approver/owner de la vacante (mismo auto-servicio que antes permitía
   // interviewer_id = auth.uid()); cualquier otra persona necesita el mismo
   // nivel de decisión que agendar.
-  const isInterviewer = interview.interviewer_id === profile.id;
-  if (!isInterviewer && !(await canDecideApplication(profile.role, profile.id, interview.applications!.job_id))) {
+  const isAttendee = interview.interview_attendees.some((a) => a.profile_id === profile.id);
+  if (!isAttendee && !(await canDecideApplication(profile.role, profile.id, interview.applications!.job_id))) {
     return { error: "Tu perfil no puede actualizar entrevistas en esta vacante." };
   }
 
