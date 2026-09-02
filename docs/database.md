@@ -94,6 +94,15 @@ Quedan como advertencias aceptadas, no corregidas:
 
 Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `referCandidate` en `src/lib/jobs/actions.ts`; `moveApplicationStage` en `src/lib/applications/actions.ts`; `POST /api/postular`) corren su notificación/correo con `after()` de Next (`notifyBestEffort()`), nunca `await` antes de responder — un fallo de Resend o de la propia inserción en `notifications` no debe convertir una mutación ya guardada en un error de cara al usuario. Ver `.claude/napkin.md`, sección "Notificaciones in-app y correo (Fase 6)", para el detalle de cada hallazgo (incluye un bug real que rompía `next build` por instanciar el cliente de Resend a nivel de módulo).
 
+## Centro de errores (Fase 7)
+
+`error_reports` y `error_report_messages` se crearon completas en Fase 2 (columnas, RLS, `code` autogenerado `ERR-YYYY-NNNN` por secuencia) — Fase 7 es pura capa de aplicación, sin migraciones nuevas.
+
+- Una sola puerta de entrada, `<ReportErrorDialog>` (`src/components/errors/report-error-dialog.tsx`), monta un `<DialogShell>` reutilizable con una única pregunta ("¿Qué estabas intentando hacer?"); el resto del contexto (`motivo`, `url`, `user_agent`, `technical_detail`) se captura solo desde `src/app/error.tsx`/`global-error.tsx` o desde una tarjeta de error de negocio, nunca lo escribe la persona.
+- `createErrorReport()` y `replyToErrorReport()` (`src/lib/errors/actions.ts`) notifican con `notify()`/`notifyBestEffort()` a todos los super admin activos de la organización (sin "asignado" por defecto) o al reportante cuando responde soporte — `ErrorThread` (`src/components/errors/error-thread.tsx`) es el mismo componente para ambos lados de la conversación.
+- `error_reports_select`/`error_report_messages_select` son `reporter_id = auth.uid() OR is_super_admin()`, y `is_super_admin()` **no valida organización** — un super admin de OTRA organización pasaría igual esa condición. Mientras esa política no se corrija (ver napkin), cada función de `get-error-reports.ts` repite el filtro `organization_id` a propósito, nunca confía en que "ya lo filtra el caller".
+- `updateErrorReportStatus()` usa compare-and-swap (`previousStatus` en el `WHERE`, mismo patrón que vacantes/postulaciones) para que dos super admin cambiando el estado casi al mismo tiempo no se pisen en silencio.
+- La bandeja de super admin (`/configuracion/errores`) es un panel maestro-detalle (lista de 380px + detalle) con filtros por severidad/estado, ya materializado en `getErrorReportsInbox()`; el usuario ve el mismo hilo desde `/mi-cuenta/reportes/[id]`, enlazado desde la sección "Mis reportes" en `/mi-cuenta`.
 ## Colaboradores por vacante + bitácora (Fase 8)
 
 `job_collaborators` y `audit_log` ya existían completos desde Fase 2 (esquema + RLS); Fase 8 fue capa de aplicación sobre ellas, más una migración nueva:
@@ -529,12 +538,27 @@ Action. `getJobTemplates()` también amplió su lista de columnas para incluir
 las 5 nuevas (antes solo pedía las de Fase 15/17) — sin eso, el tipo que
 devuelve no cumplía `JobTemplate` y el build no compilaba.
 
+## Mejoras post-Fase 7: invitaciones, avatar, video de login, tutorial
+
+Ocho migraciones (`35` a `42`) sobre el esquema que ya existía, para cuatro funcionalidades pedidas después de que Fase 7 quedó cerrada y desplegada — aplicadas después de toda la serie de Fases 8-18 de arriba (migraciones intercaladas en la misma base de datos, dos líneas de trabajo en paralelo sobre el mismo proyecto):
+
+- **`35_seed_areas`** — sembró las 3 áreas pedidas (Comercial, Operaciones, Administración) como filas de `departments` para la organización `principal`.
+- **`36_profile_invites`** — tabla nueva `profile_invites (id, organization_id, email, role app_role default 'colaborador', invited_by, created_at, consumed_at)`, único por `(organization_id, lower(email))`, RLS `profile_invites_super_admin` (`FOR ALL`, solo super admin de la organización). Es la **lista de excepciones** al dominio corporativo: el usuario pidió restringir el login a correos de la empresa, pero el dominio real todavía no se conoce (`organizations.allowed_email_domain` queda sin definir), así que el mecanismo de excepción no puede depender de que el dominio ya esté configurado — funciona igual antes y después de que se defina.
+- **`37_login_video_and_tutorial_flag`** — `organizations.login_video_url` (video de fondo del login, alternativa a `login_image_url`) y `profiles.has_seen_tutorial` (flag del tour guiado).
+- **`38_handle_new_user_invites`** — `handle_new_user()` ahora busca en `profile_invites` (por organización + correo en minúsculas) el rol a asignar antes de caer al default `colaborador`; el correo del super admin sigue siendo un caso aparte, hardcodeado.
+- **`39_avatares_bucket`** — bucket público `avatares` + 4 políticas de Storage con el path `{user_id}/{archivo}` (`(storage.foldername(name))[1] = auth.uid()::text`), para que cada quien solo pueda escribir/borrar su propio avatar.
+- **`40_profile_invites_consumed_at`** — agregó la columna `consumed_at` (ver napkin, "consumed_at, no DELETE"): la fila de invitación nunca se borra tras el primer uso porque el filtro de dominio corre en **cada** login, no solo el primero — borrarla habría expulsado al mismo invitado en su segundo intento.
+- **`41_marca_publico_allow_video`** / **`42_avatares_size_and_mime_limit`** — límites de tamaño/MIME a nivel de bucket, la capa de aplicación real: `marca-publico` solo aceptaba imágenes de hasta 5 MB y bloqueaba cualquier subida de video sin importar la validación en el Server Action; `avatares` no tenía límites configurados en absoluto.
+
+Aplicación: `src/lib/users/invite-actions.ts` (crear/borrar invitación, RLS-scoped por `organization_id`), `src/lib/users/get-invites.ts` (lista de pendientes, `consumed_at is null`), `src/app/auth/callback/route.ts` (verifica dominio, consulta `profile_invites` con `createAdminClient()` porque la política es super-admin-only y el propio invitado nunca podría leer su fila con su cliente de sesión), `src/lib/profile/actions.ts` (subida/borrado de avatar), `src/lib/organizations/actions.ts` (subida directa del video de login vía URL firmada, sin pasar por el límite de tamaño de un Server Action de Vercel).
+
 ## Storage
 
 | Bucket | Público | Tipos permitidos | Límite | Contenido |
 |---|---|---|---|---|
-| `marca-publico` | sí | PNG, JPG, WebP, SVG (bucket) — la app solo sube PNG/JPG/WebP, nunca SVG (ver `EXTENSION_BY_MIME` en `src/lib/organizations/actions.ts`) | 5 MB | Logos y la imagen de login, editables por el super admin. Ruta: `{organization_id}/{campo}.{ext}` |
+| `marca-publico` | sí | PNG, JPG, WebP, SVG (bucket) + video MP4/WebM — la app solo sube PNG/JPG/WebP para logos/imagen (ver `EXTENSION_BY_MIME` en `src/lib/organizations/actions.ts`), el video de login se sube directo por URL firmada | 20 MB | Logos, imagen y video de login, editables por el super admin. Ruta: `{organization_id}/{campo}.{ext}` |
 | `cvs-privado` | no | PDF, DOC, DOCX, JPG, PNG | 10 MB | CVs y adjuntos de postulación, servidos siempre por URL firmada de 60 s. Ruta: `{organization_id}/{candidate_id}/{archivo}` (el segundo segmento tiene que ser el `candidate_id` — lo exige la política RLS de `storage.objects`, no es solo convención) |
+| `avatares` | sí | PNG, JPG, WebP | 3 MB | Foto de perfil de cada usuario, ruta `{user_id}/{archivo}` — cada quien solo escribe/borra la suya |
 
 Auditoría post-Fase 18 (detalle completo en `.claude/napkin.md`): se encontraron y corrigieron 2 bugs reales — `next.config.ts` no overrideaba el límite de 1 MB por defecto de las Server Actions (bloqueaba imágenes de marca > 1 MB antes de que corriera cualquier validación propia), y `cvs-privado.allowed_mime_types` solo incluía tipos de CV, por lo que los archivos adicionales JPG/PNG de la postulación (agregados en Fase 18) se perdían en silencio.
 

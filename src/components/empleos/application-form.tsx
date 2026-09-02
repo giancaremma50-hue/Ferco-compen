@@ -6,8 +6,6 @@ import { notifySuccess } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
 import type { CandidacyFields } from "@/lib/job-templates/candidacy-fields";
 
-const FIELD_CLASS = "h-11 rounded-md border border-border bg-background px-3 text-sm";
-
 export type PublicQuestion = {
   id: string;
   prompt: string;
@@ -26,12 +24,14 @@ export function ApplicationForm({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
     setError(null);
+    setErrorField(null);
 
     const formData = new FormData(e.currentTarget);
     formData.set("job_id", jobId);
@@ -41,6 +41,7 @@ export function ApplicationForm({
       const body = await res.json();
       if (!res.ok) {
         setError(body.error ?? "No se pudo enviar tu postulación.");
+        setErrorField(body.field ?? null);
         return;
       }
       notifySuccess("Postulación enviada");
@@ -52,6 +53,10 @@ export function ApplicationForm({
     }
   }
 
+  function fieldClass(name: string) {
+    return `h-11 rounded-md border bg-background px-3 text-sm ${errorField === name ? "border-destructive" : "border-border"}`;
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" aria-busy={pending}>
       {candidacyFields.full_name !== "hidden" && (
@@ -59,16 +64,25 @@ export function ApplicationForm({
           name="full_name"
           required={candidacyFields.full_name === "required"}
           placeholder="Nombre completo"
-          className={FIELD_CLASS}
+          aria-invalid={errorField === "full_name"}
+          className={fieldClass("full_name")}
         />
       )}
-      <input name="email" type="email" required placeholder="Correo" className={FIELD_CLASS} />
+      <input
+        name="email"
+        type="email"
+        required
+        placeholder="Correo"
+        aria-invalid={errorField === "email"}
+        className={fieldClass("email")}
+      />
       {candidacyFields.phone !== "hidden" && (
         <input
           name="phone"
           required={candidacyFields.phone === "required"}
           placeholder="Teléfono"
-          className={FIELD_CLASS}
+          aria-invalid={errorField === "phone"}
+          className={fieldClass("phone")}
         />
       )}
       {candidacyFields.address !== "hidden" && (
@@ -76,10 +90,16 @@ export function ApplicationForm({
           name="address"
           required={candidacyFields.address === "required"}
           placeholder="Dirección"
-          className={FIELD_CLASS}
+          aria-invalid={errorField === "address"}
+          className={fieldClass("address")}
         />
       )}
-      <input name="current_title" placeholder="Puesto actual (opcional)" className={FIELD_CLASS} />
+      <input
+        name="current_title"
+        placeholder="Puesto actual (opcional)"
+        aria-invalid={errorField === "current_title"}
+        className={fieldClass("current_title")}
+      />
 
       {candidacyFields.resume !== "hidden" && (
         <label className="flex flex-col gap-2 text-sm text-muted-foreground">
@@ -89,7 +109,8 @@ export function ApplicationForm({
             type="file"
             accept="application/pdf"
             required={candidacyFields.resume === "required"}
-            className="text-sm"
+            aria-invalid={errorField === "cv"}
+            className={`text-sm ${errorField === "cv" ? "text-destructive" : ""}`}
           />
         </label>
       )}

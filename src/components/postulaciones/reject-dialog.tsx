@@ -37,7 +37,8 @@ export function RejectDialog({ applicationId, reasons }: { applicationId: string
             name="rejection_reason_id"
             required
             defaultValue=""
-            className="h-11 rounded-md border border-border bg-background px-3 text-sm"
+            aria-invalid={state?.field === "rejection_reason_id"}
+            className={`h-11 rounded-md border bg-background px-3 text-sm ${state?.field === "rejection_reason_id" ? "border-destructive" : "border-border"}`}
           >
             <option value="" disabled>
               Elige un motivo
@@ -48,6 +49,7 @@ export function RejectDialog({ applicationId, reasons }: { applicationId: string
               </option>
             ))}
           </select>
+          {state?.field === "rejection_reason_id" && <p className="text-xs text-destructive">{state.error}</p>}
           <ActionButton variant="destructive">Sí, rechazar</ActionButton>
         </form>
       </DialogShell>

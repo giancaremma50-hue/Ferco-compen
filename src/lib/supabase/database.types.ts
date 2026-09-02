@@ -1,3 +1,6 @@
+// Generado con mcp__Supabase__generate_typescript_types — no editar a mano.
+// Se regenera cada vez que cambia el esquema (ver docs/database.md).
+
 export type Json =
   | string
   | number
@@ -1766,6 +1769,7 @@ export type Database = {
           created_at: string
           id: string
           login_image_url: string | null
+          login_video_url: string | null
           logo_dark_url: string | null
           logo_url: string | null
           name: string
@@ -1781,6 +1785,7 @@ export type Database = {
           created_at?: string
           id?: string
           login_image_url?: string | null
+          login_video_url?: string | null
           logo_dark_url?: string | null
           logo_url?: string | null
           name: string
@@ -1796,6 +1801,7 @@ export type Database = {
           created_at?: string
           id?: string
           login_image_url?: string | null
+          login_video_url?: string | null
           logo_dark_url?: string | null
           logo_url?: string | null
           name?: string
@@ -1885,6 +1891,51 @@ export type Database = {
           },
         ]
       }
+      profile_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1893,6 +1944,7 @@ export type Database = {
           department_id: string | null
           display_name: string
           email: string
+          has_seen_tutorial: boolean
           id: string
           is_active: boolean
           last_login_at: string | null
@@ -1907,6 +1959,7 @@ export type Database = {
           department_id?: string | null
           display_name: string
           email: string
+          has_seen_tutorial?: boolean
           id: string
           is_active?: boolean
           last_login_at?: string | null
@@ -1921,6 +1974,7 @@ export type Database = {
           department_id?: string | null
           display_name?: string
           email?: string
+          has_seen_tutorial?: boolean
           id?: string
           is_active?: boolean
           last_login_at?: string | null

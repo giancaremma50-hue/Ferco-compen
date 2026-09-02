@@ -66,11 +66,14 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 16 — Configurador de bolsa pública | ✅ |
 | 17 — Fusión de plantilla de vacante + pipeline/competencias | ✅ |
 | 18 — Wizard de plantillas de vacante, creación desde plantilla, portal público dinámico, bitácora en vacante, tooltips | ✅ |
-| 19+ | Pendientes |
+| Mejoras post-Fase 7 (invitaciones, avatar, video de login, tutorial) | ✅ |
+| 19 — Endurecimiento y despliegue | Pendiente |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).
 2. Configurar el proveedor de Google (Authentication → Providers).
+
+**Dominio corporativo aún sin definir**: `organizations.allowed_email_domain` queda sin valor hasta que el usuario confirme el dominio real de la empresa — mientras tanto, cualquier cuenta de Google puede entrar. La restricción y su lista de excepciones (`profile_invites`) ya están construidas y activas en el código; falta solo escribir el dominio en esa columna (por ahora vía SQL/MCP de Supabase — todavía no hay un campo en `/configuracion` para editarlo) cuando el usuario lo tenga. Ver `docs/database.md`, sección "Mejoras post-Fase 7".
 
 ## Para agentes de IA
 

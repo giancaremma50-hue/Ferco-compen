@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { COUNTRIES } from "@/lib/geo/countries";
+import { optionalUuid as sharedOptionalUuid } from "@/lib/zod-helpers";
 
 export const JobStatusSchema = z.enum([
   "borrador",
@@ -41,7 +43,7 @@ const optionalNumber = z.preprocess(
 export const JobBaseSchema = z.object({
   title: z.string().trim().min(4, { error: "El título debe tener al menos 4 caracteres." }).max(120),
   department_id: optionalUuid,
-  country: z.string().trim().min(2, { error: "Indica el país." }).max(60),
+  country: z.enum(COUNTRIES, { error: "Elige un país." }),
   location: z.string().trim().min(2, { error: "Indica la ubicación." }).max(120),
   work_mode: z.enum(["presencial", "remoto", "hibrido"], { error: "Elige una modalidad." }),
   employment_type: z.enum(["indefinido", "temporal", "por_obra", "pasantia"], {
@@ -82,7 +84,7 @@ export type VacancyType = keyof typeof VACANCY_TYPE_LABEL;
 export const CreateJobFromTemplateSchema = z
   .object({
     template_id: z.uuid({ error: "Elige una plantilla." }),
-    country: z.string().trim().min(2, { error: "Indica el país." }).max(60),
+    country: z.enum(COUNTRIES, { error: "Elige un país." }),
     work_mode: z.enum(["presencial", "remoto", "hibrido"], { error: "Elige una modalidad." }),
     salary_min: optionalNumber,
     salary_max: optionalNumber,
@@ -94,7 +96,7 @@ export const CreateJobFromTemplateSchema = z
         .positive({ error: "El número de plazas debe ser al menos 1." }),
     ),
     vacancy_type: z.enum(["nueva_posicion", "reemplazo", "crecimiento"], { error: "Elige el tipo de vacante." }),
-    employment_reason_id: optionalUuid,
+    employment_reason_id: sharedOptionalUuid("Ese motivo de vacante no es válido."),
     owner_id: z.uuid({ error: "Elige quién queda como reclutador encargado." }),
     // Llega como JSON serializado desde CollaboratorsPicker — un <select
     // multiple> perdería todas las opciones salvo la última al pasar por

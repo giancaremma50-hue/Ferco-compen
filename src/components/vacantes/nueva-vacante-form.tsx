@@ -9,6 +9,7 @@ import { LabelSelect } from "@/components/ui/label-select";
 import { EmploymentReasonSelect } from "@/components/vacantes/employment-reason-select";
 import { CollaboratorsPicker } from "@/components/vacantes/collaborators-picker";
 import { WORK_MODE_LABEL, VACANCY_TYPE_LABEL } from "@/lib/jobs/schema";
+import { COUNTRIES } from "@/lib/geo/countries";
 import type { EmploymentReasonOption } from "@/lib/employment-reasons/get-employment-reasons";
 import type { TeamMemberOption } from "@/lib/jobs/get-team-options";
 
@@ -95,7 +96,25 @@ export function NuevaVacanteForm({
       <div key={templateId} className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">País</span>
-          <input name="country" required defaultValue={selected?.country} className={FIELD_CLASS} />
+          <select name="country" required defaultValue={selected?.country ?? ""} className={FIELD_CLASS}>
+            <option value="" disabled>
+              Elige un país
+            </option>
+            {/* La plantilla puede traer un país que ya no está en la lista
+                (se cargó antes de que "País" fuera un select fijo) — se
+                muestra deshabilitado para que quede claro que hay que
+                elegir uno real antes de crear la vacante. */}
+            {selected?.country && !(COUNTRIES as readonly string[]).includes(selected.country) && (
+              <option value={selected.country} disabled>
+                {selected.country} (elige uno de la lista)
+              </option>
+            )}
+            {COUNTRIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Modalidad</span>

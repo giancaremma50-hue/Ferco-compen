@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { sendEmail } from "@/lib/email/send-email";
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
@@ -14,7 +15,7 @@ import { canDecideApplication, canRateApplication } from "./permissions";
 import { isProfileAssignable } from "./get-applications";
 import { NoteSchema, RejectSchema, RATING_MAX, TaskSchema, SendMessageSchema } from "./schema";
 
-export type ApplicationActionResult = { error?: string; success?: string };
+export type ApplicationActionResult = { error?: string; success?: string; field?: string };
 
 /** Repetido en setRating/rejectApplication/hireApplication/reopenApplication — un solo lugar para no desincronizar el shape de la query. */
 async function requireApplicationJobId(
@@ -186,7 +187,7 @@ export async function addNote(
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
   const parsed = NoteSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa la nota." };
+  if (!parsed.success) return zodFieldError(parsed.error, "Revisa la nota.");
 
   const supabase = await createClient();
   const { data: note, error } = await supabase
@@ -258,7 +259,7 @@ export async function rejectApplication(
   const profile = await requireProfile();
 
   const parsed = RejectSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Elige un motivo." };
+  if (!parsed.success) return zodFieldError(parsed.error, "Elige un motivo.");
 
   const supabase = await createClient();
 

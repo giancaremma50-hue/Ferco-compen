@@ -10,6 +10,7 @@ import {
 import { buildApplySchema } from "@/lib/jobs/build-apply-schema";
 import { computePrequalified } from "@/lib/jobs/compute-prequalified";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { sendEmail } from "@/lib/email/send-email";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import { PostulacionRecibidaEmail } from "@/emails/postulacion-recibida";
@@ -67,29 +68,26 @@ export async function POST(request: NextRequest) {
   const applySchema = buildApplySchema(candidacyFields);
   const parsed = applySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Revisa los datos del formulario." },
-      { status: 400 },
-    );
+    return NextResponse.json(zodFieldError(parsed.error), { status: 400 });
   }
 
   const cv = formData.get("cv");
   const resumeRequired = candidacyFields.resume === "required";
   const resumeOffered = candidacyFields.resume !== "hidden";
   if (resumeOffered && resumeRequired && (!(cv instanceof File) || cv.size === 0)) {
-    return NextResponse.json({ error: "Adjunta tu CV en PDF." }, { status: 400 });
+    return NextResponse.json({ error: "Adjunta tu CV en PDF.", field: "cv" }, { status: 400 });
   }
   const hasCv = resumeOffered && cv instanceof File && cv.size > 0;
   if (hasCv) {
     const cvFile = cv as File;
     if (cvFile.size > MAX_CV_BYTES) {
       return NextResponse.json(
-        { error: "El CV pesa más de 10 MB. Comprímelo e inténtalo de nuevo." },
+        { error: "El CV pesa más de 10 MB. Comprímelo e inténtalo de nuevo.", field: "cv" },
         { status: 400 },
       );
     }
     if (cvFile.type !== ALLOWED_CV_TYPE) {
-      return NextResponse.json({ error: "El CV debe ser un archivo PDF." }, { status: 400 });
+      return NextResponse.json({ error: "El CV debe ser un archivo PDF.", field: "cv" }, { status: 400 });
     }
   }
 

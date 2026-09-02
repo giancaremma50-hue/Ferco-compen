@@ -75,6 +75,7 @@ export function FloatingNav({ role }: { role: Role }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour={`nav-${item.href.slice(1)}`}
                   aria-label={item.label}
                   className="group relative flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium"
                 >

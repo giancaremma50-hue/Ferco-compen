@@ -2,6 +2,7 @@ import Image from "next/image";
 import { getOrganization } from "@/lib/organizations/get-organization";
 import { signInWithGoogle } from "@/lib/auth/actions";
 import { ActionButton } from "@/components/ui/action-button";
+import { LoginBackgroundMedia } from "@/components/layout/login-background-media";
 
 function GoogleIcon() {
   return (
@@ -68,15 +69,11 @@ export default async function LoginPage({
       </div>
 
       <div className="relative hidden overflow-hidden bg-accent lg:flex lg:flex-col lg:justify-end lg:p-14">
-        {organization?.login_image_url && (
-          <Image
-            src={organization.login_image_url}
-            alt=""
-            fill
-            className="object-cover"
-            priority
-          />
-        )}
+        <LoginBackgroundMedia
+          videoUrl={organization?.login_video_url ?? null}
+          imageUrl={organization?.login_image_url ?? null}
+          priority
+        />
         <blockquote className="font-serif relative z-10 max-w-[460px] text-[32px] leading-[1.3] text-accent-foreground">
           Contratar bien es la decisión más cara que toma una empresa.
         </blockquote>

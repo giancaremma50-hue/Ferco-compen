@@ -33,8 +33,14 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      // Logos y portadas servidas desde el bucket público de marca.
+      // Logos, portadas y fotos de perfil subidas, servidas desde buckets
+      // públicos de Supabase Storage.
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
+      // Foto de perfil de Google, la que trae la cuenta por defecto antes
+      // de que alguien suba una propia — sin este patrón, next/image
+      // bloquea el host y avatar_url nunca se muestra para nadie que no
+      // haya subido su propia foto todavía.
+      { protocol: "https", hostname: "*.googleusercontent.com" },
     ],
     // Sin dangerouslyAllowSVG a propósito: el configurador de marca no
     // admite subir SVG (ver src/lib/organizations/actions.ts) precisamente

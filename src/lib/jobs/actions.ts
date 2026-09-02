@@ -14,6 +14,7 @@ import { assertBelongsToOrg } from "@/lib/assert-belongs-to-org";
 import { TERMINAL_JOB_STATUSES } from "./permissions";
 import { findOrCreateCandidate, createApplicationForCandidate } from "./create-application";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { VacantePendienteAprobacionEmail } from "@/emails/vacante-pendiente-aprobacion";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import type { CompetencyDraft } from "@/lib/job-templates/schema";
@@ -21,7 +22,7 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
-export type JobActionResult = { error?: string; success?: string };
+export type JobActionResult = { error?: string; success?: string; field?: string };
 
 /**
  * Los campos opcionales llegan como `undefined` cuando el formulario los
@@ -102,7 +103,7 @@ export async function createJob(
 
   const parsed = CreateJobFromTemplateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos del formulario." };
+    return zodFieldError(parsed.error, "Revisa los datos del formulario.");
   }
 
   const supabase = await createClient();
@@ -281,13 +282,13 @@ export async function updateJob(
   const profile = await requireProfile();
   const parsed = JobFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos del formulario." };
+    return zodFieldError(parsed.error, "Revisa los datos del formulario.");
   }
 
   const supabase = await createClient();
 
   const departmentError = await assertBelongsToOrg(supabase, "departments", parsed.data.department_id, profile.organization_id, "Ese departamento no es válido.");
-  if (departmentError) return { error: departmentError };
+  if (departmentError) return { error: departmentError, field: "department_id" };
 
   // RLS decide si esta fila es editable para este actor (admin+, o el propio
   // solicitante mientras siga en "borrador") — un 0 filas afectadas aquí es
@@ -484,7 +485,7 @@ export async function referCandidate(
   const profile = await requireProfile();
   const parsed = ReferCandidateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos del candidato." };
+    return zodFieldError(parsed.error, "Revisa los datos del candidato.");
   }
 
   const supabase = await createClient();
