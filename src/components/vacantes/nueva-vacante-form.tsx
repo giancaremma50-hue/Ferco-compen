@@ -62,7 +62,7 @@ export function NuevaVacanteForm({
   return (
     <form action={formAction} className="flex flex-col gap-5">
       <label className="flex flex-col gap-2">
-        <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Plantilla</span>
+        <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Plantilla de puesto</span>
         <select
           name="template_id"
           required

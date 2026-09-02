@@ -5,7 +5,7 @@ import type { StageType } from "./schema";
 export type PipelineTemplateWithStages = { id: string; name: string; stages: { title: string; type: StageType }[] };
 
 /**
- * Para el paso "Etapas" del wizard de plantillas de vacante — el <select>
+ * Para el paso "Etapas" del wizard de plantillas de puesto — el <select>
  * "Empezar desde un set guardado" necesita las etapas de TODAS las
  * plantillas de pipeline de la organización de una vez (son pocas, sin
  * paginación), para no pedirle al servidor una por cada cambio del select.

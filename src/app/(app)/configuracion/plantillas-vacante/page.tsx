@@ -26,7 +26,7 @@ export default async function PlantillasVacantePage({
       {confidencial && <NotifyOnMount message="Guardado — como no la creaste vos, ya no te aparece" />}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-serif text-2xl">Plantillas de vacante</h2>
+          <h2 className="font-serif text-2xl">Plantillas de puesto</h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
             Puestos recurrentes listos para prellenar al solicitar una vacante nueva.
           </p>

@@ -13,7 +13,7 @@ export default async function NuevaPlantillaWizardPage() {
         <WizardStepsNav current={1} />
       </aside>
       <div className="flex-1">
-        <h1 className="font-serif text-[32px]">Nueva plantilla de vacante</h1>
+        <h1 className="font-serif text-[32px]">Nueva plantilla de puesto</h1>
         <p className="mt-1 mb-8 text-sm text-muted-foreground">
           Detalles de la vacante — la información general que trae cada vacante creada desde esta plantilla.
         </p>

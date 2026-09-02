@@ -14,7 +14,7 @@ type Department = { id: string; name: string };
 
 /**
  * `ref` expone el <form> — lo usa NuevaVacanteForm para fusionar los datos
- * de una plantilla de vacante campo por campo (solo los que están vacíos),
+ * de una plantilla de puesto campo por campo (solo los que están vacíos),
  * sin pasar por `defaultValues` (que un formulario no controlado solo lee
  * al montar, nunca al recibir props nuevas).
  */
