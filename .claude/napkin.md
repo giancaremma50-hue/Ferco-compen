@@ -1,5 +1,20 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-02 (auditoría de secretos + `.env.example` recuperado)_
+_Última actualización: 2026-09-02 (tour contextual del wizard de plantilla + Nueva vacante)_
+
+## Tour contextual: wizard de plantilla de puesto + Nueva vacante — MÁXIMA PRIORIDAD
+
+Pedido real del usuario: el tour de `driver.js` que ya existía (Fase post-7) solo señala
+íconos del menú una vez en el primer login — no enseña a llenar nada. Se agregó un
+botón "¿Cómo funciona esto?" (`src/components/ui/help-tour-button.tsx`, reutiliza la
+misma librería) en cada uno de los 6 pasos del wizard y en "Nueva vacante" — a demanda,
+sin persistencia, se puede abrir cuantas veces haga falta.
+
+1. **[2026-09-02] Redactar contenido de ayuda es tan revisable como código — 2 de las ~20 descripciones escritas eran incorrectas, encontradas por un review dedicado, no por typecheck/build.** Una decía que publicar una plantilla exige al menos una etapa intermedia (falso: `publishTemplate` solo exige que `job_template_stages` no esté vacío, y el paso 4 siempre inserta las 3 etapas fijas al guardarse — el gate real es "haber pasado por el paso 4 una vez", no "tener una etapa intermedia"). Otra decía que una postulación precalificada se ve como insignia en el pipeline — no existe esa UI, `KanbanCard` solo expone nombre y rating. Do instead: contenido de ayuda que describe comportamiento real del sistema necesita el mismo nivel de verificación que una migración — cada afirmación se contrasta contra el código que la implementa, no se redacta de memoria/intuición aunque "suene razonable".
+2. **`HelpTourButton` filtra en silencio cualquier paso cuyo `selector` no matchee nada en el DOM en el momento del clic — un `data-tour` mal escrito no rompe nada, simplemente ese paso nunca aparece.** Mismo patrón que `OnboardingTour` (Fase post-7) — deliberado, un tour no debe reventar la página por un elemento condicional que no está montado. Pero significa que un typo en el string del selector es indetectable por build/typecheck, solo por lectura cuidadosa o probando en navegador real. Este entorno no tiene salida a `*.supabase.co` (ver nota de entorno, Fase 17) — se verificó por inspección + un review dedicado a comparar cada `data-tour="X"` contra su `HELP_STEPS`, no en navegador.
+3. **Decisión: este tour es a demanda (botón "?"), no forzado como el de navegación.** El de navegación se muestra una sola vez porque orienta sobre algo que se ve siempre (el menú); el de una pantalla de contenido denso (el wizard) tiene sentido reabrirlo meses después cuando ya nadie se acuerda — forzarlo una sola vez sería inútil la segunda vez que alguien vuelve a crear una plantilla.
+
+---
+
 
 ## Auditoría de secretos en el repo público — MÁXIMA PRIORIDAD
 

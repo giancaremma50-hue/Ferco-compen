@@ -61,7 +61,7 @@ export function NuevaVacanteForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <label className="flex flex-col gap-2">
+      <label className="flex flex-col gap-2" data-tour="nv-plantilla">
         <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Plantilla de puesto</span>
         <select
           name="template_id"
@@ -82,7 +82,7 @@ export function NuevaVacanteForm({
       </label>
 
       {selected && (
-        <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">
+        <div className="rounded-md border border-border bg-muted/30 p-4 text-sm" data-tour="nv-preview">
           <p className="font-medium">{selected.title}</p>
           <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{selected.description}</p>
           <p className="mt-3 text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Requisitos</p>
@@ -122,7 +122,7 @@ export function NuevaVacanteForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4" data-tour="nv-salario">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Salario mín. (opcional)</span>
           <input name="salary_min" type="number" min={0} className={`${FIELD_CLASS} tabular-nums`} />
@@ -137,7 +137,7 @@ export function NuevaVacanteForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4" data-tour="nv-tipo">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Tipo de vacante</span>
           <LabelSelect name="vacancy_type" required labels={VACANCY_TYPE_LABEL} className={FIELD_CLASS} />
@@ -148,7 +148,7 @@ export function NuevaVacanteForm({
         </label>
       </div>
 
-      <div className="border-t border-border pt-5">
+      <div className="border-t border-border pt-5" data-tour="nv-equipo">
         <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Equipo de reclutamiento</span>
         <div className="mt-3 flex flex-col gap-4">
           <label className="flex flex-col gap-2">

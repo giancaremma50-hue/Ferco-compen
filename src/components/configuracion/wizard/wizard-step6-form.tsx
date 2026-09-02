@@ -15,7 +15,7 @@ function DraftForm({ templateId }: { templateId: string }) {
   }, [state]);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} data-tour="w6-borrador">
       <ActionButton type="submit" variant="secondary" pendingLabel="Guardando…">
         Crear borrador
       </ActionButton>
@@ -32,7 +32,7 @@ function PublishForm({ templateId }: { templateId: string }) {
   }, [state]);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} data-tour="w6-publicar">
       <ActionButton type="submit" pendingLabel="Publicando…">
         Crear plantilla
       </ActionButton>

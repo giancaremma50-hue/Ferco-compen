@@ -90,6 +90,7 @@ export function QuestionListEditor({ initialQuestions }: { initialQuestions: Que
                   className="h-9 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-foreground"
                 />
                 <select
+                  data-tour="w3-tipo"
                   value={question.type}
                   onChange={(e) => {
                     const type = e.target.value as QuestionDraft["type"];
@@ -127,7 +128,7 @@ export function QuestionListEditor({ initialQuestions }: { initialQuestions: Que
                         placeholder="Texto de la opción"
                         className="h-8 flex-1 rounded-md border border-border bg-background px-2 text-sm outline-none focus:border-foreground"
                       />
-                      <label className="flex flex-none items-center gap-1.5 text-xs text-muted-foreground">
+                      <label className="flex flex-none items-center gap-1.5 text-xs text-muted-foreground" data-tour="w3-esperada">
                         <input
                           type="checkbox"
                           checked={option.is_expected}

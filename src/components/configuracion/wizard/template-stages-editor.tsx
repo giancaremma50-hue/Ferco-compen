@@ -77,7 +77,7 @@ export function TemplateStagesEditor({
   return (
     <div className="flex flex-col gap-4">
       {savedSets.length > 0 && (
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1" data-tour="w4-set-guardado">
           <span className="text-xs text-muted-foreground">Empezar desde un set guardado (opcional)</span>
           <select
             defaultValue=""
@@ -108,7 +108,7 @@ export function TemplateStagesEditor({
         value={JSON.stringify(stages.map(({ title, type }) => ({ title, type })))}
       />
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2.5" data-tour="w4-kanban">
         <FixedStagePill label="Bandeja de entrada" />
 
         {stages.map((stage, i) => (
@@ -172,7 +172,7 @@ export function TemplateStagesEditor({
       </div>
 
       {stages.length > 0 && (
-        <label className="flex flex-col gap-1 border-t border-border pt-4">
+        <label className="flex flex-col gap-1 border-t border-border pt-4" data-tour="w4-reutilizable">
           <span className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

@@ -50,7 +50,7 @@ export function WizardStep1Form({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1" data-tour="w1-puesto">
         <span className="text-xs text-muted-foreground">Puesto</span>
         <input
           name="name"
@@ -61,7 +61,7 @@ export function WizardStep1Form({
           className={FIELD_CLASS}
         />
       </label>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1" data-tour="w1-titulo">
         <span className="text-xs text-muted-foreground">Título del anuncio de la vacante</span>
         <input name="title" required maxLength={120} defaultValue={initialValues?.title} className={FIELD_CLASS} />
       </label>
@@ -108,7 +108,7 @@ export function WizardStep1Form({
           />
         </label>
       </div>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1" data-tour="w1-descripcion">
         <span className="text-xs text-muted-foreground">Descripción del puesto</span>
         <textarea name="description" required rows={4} defaultValue={initialValues?.description} className={TEXTAREA_CLASS} />
       </label>
@@ -117,7 +117,7 @@ export function WizardStep1Form({
         <textarea name="requirements" required rows={3} defaultValue={initialValues?.requirements} className={TEXTAREA_CLASS} />
       </label>
 
-      <div className="border-t border-border pt-4">
+      <div className="border-t border-border pt-4" data-tour="w1-rubrica">
         <span className="text-xs text-muted-foreground">Rúbrica de evaluación (opcional)</span>
         <div className="mt-1.5">
           <CompetencyListEditor initialCompetencies={initialValues?.competencies ?? []} />

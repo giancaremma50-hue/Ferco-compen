@@ -16,7 +16,7 @@ export function WizardStep5Form({ templateId, isConfidential }: { templateId: st
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <label className="flex items-start justify-between gap-4 rounded-md border border-border p-4">
+      <label className="flex items-start justify-between gap-4 rounded-md border border-border p-4" data-tour="w5-confidencial">
         <span>
           <span className="block text-sm font-medium">Confidencial</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
