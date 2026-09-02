@@ -109,7 +109,8 @@ function ReportForm({
         required
         rows={3}
         placeholder="¿Qué estabas intentando hacer?"
-        className="rounded-md border border-border bg-background p-3 text-sm"
+        aria-invalid={state?.field === "user_message"}
+        className={`rounded-md border bg-background p-3 text-sm ${state?.field === "user_message" ? "border-destructive" : "border-border"}`}
       />
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
       <ActionButton>Enviar</ActionButton>

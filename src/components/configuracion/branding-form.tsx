@@ -41,8 +41,10 @@ export function BrandingForm({
           defaultValue={platformName}
           maxLength={60}
           required
-          className="h-[42px] rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:border-accent"
+          aria-invalid={state?.field === "platform_name"}
+          className={`h-[42px] rounded-md border bg-background px-3 text-sm outline-none focus-visible:border-accent ${state?.field === "platform_name" ? "border-destructive" : "border-border"}`}
         />
+        {state?.field === "platform_name" && <p className="text-xs text-destructive">{state.error}</p>}
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -64,12 +66,17 @@ export function BrandingForm({
             onChange={(e) => setColor(e.target.value)}
             pattern="^#[0-9a-fA-F]{6}$"
             required
-            className="h-10 w-[116px] rounded-md border border-border bg-background px-3 font-mono text-sm uppercase outline-none"
+            aria-invalid={state?.field === "accent_color"}
+            className={`h-10 w-[116px] rounded-md border bg-background px-3 font-mono text-sm uppercase outline-none ${state?.field === "accent_color" ? "border-destructive" : "border-border"}`}
           />
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Se usa en botones primarios, enlaces y estados activos. Los colores de éxito, alerta y error no cambian.
-        </p>
+        {state?.field === "accent_color" ? (
+          <p className="text-xs text-destructive">{state.error}</p>
+        ) : (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Se usa en botones primarios, enlaces y estados activos. Los colores de éxito, alerta y error no cambian.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 border-t border-border pt-5">

@@ -8,6 +8,7 @@ import {
   rollbackIfNewCandidate,
 } from "@/lib/jobs/create-application";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { sendEmail } from "@/lib/email/send-email";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import { PostulacionRecibidaEmail } from "@/emails/postulacion-recibida";
@@ -58,24 +59,21 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const parsed = ApplySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Revisa los datos del formulario." },
-      { status: 400 },
-    );
+    return NextResponse.json(zodFieldError(parsed.error), { status: 400 });
   }
 
   const cv = formData.get("cv");
   if (!(cv instanceof File) || cv.size === 0) {
-    return NextResponse.json({ error: "Adjunta tu CV en PDF." }, { status: 400 });
+    return NextResponse.json({ error: "Adjunta tu CV en PDF.", field: "cv" }, { status: 400 });
   }
   if (cv.size > MAX_CV_BYTES) {
     return NextResponse.json(
-      { error: "El CV pesa más de 10 MB. Comprímelo e inténtalo de nuevo." },
+      { error: "El CV pesa más de 10 MB. Comprímelo e inténtalo de nuevo.", field: "cv" },
       { status: 400 },
     );
   }
   if (cv.type !== ALLOWED_CV_TYPE) {
-    return NextResponse.json({ error: "El CV debe ser un archivo PDF." }, { status: 400 });
+    return NextResponse.json({ error: "El CV debe ser un archivo PDF.", field: "cv" }, { status: 400 });
   }
 
   const admin = createAdminClient();

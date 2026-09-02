@@ -106,12 +106,27 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 Ver `.claude/napkin.md`, sección "Centro de errores (Fase 7)", para el bug real de `retry`/`reset` en `global-error.tsx` y el resto de hallazgos.
 
+## Mejoras post-Fase 7: invitaciones, avatar, video de login, tutorial
+
+Ocho migraciones (`35` a `42`) sobre el esquema que ya existía, para cuatro funcionalidades pedidas después de que Fase 7 quedó cerrada y desplegada:
+
+- **`35_seed_areas`** — sembró las 3 áreas pedidas (Comercial, Operaciones, Administración) como filas de `departments` para la organización `principal`.
+- **`36_profile_invites`** — tabla nueva `profile_invites (id, organization_id, email, role app_role default 'colaborador', invited_by, created_at, consumed_at)`, único por `(organization_id, lower(email))`, RLS `profile_invites_super_admin` (`FOR ALL`, solo super admin de la organización). Es la **lista de excepciones** al dominio corporativo: el usuario pidió restringir el login a correos de la empresa, pero el dominio real todavía no se conoce (`ALLOWED_EMAIL_DOMAIN`/`organizations.allowed_email_domain` quedan sin definir), así que el mecanismo de excepción no puede depender de que el dominio ya esté configurado — funciona igual antes y después de que se defina.
+- **`37_login_video_and_tutorial_flag`** — `organizations.login_video_url` (video de fondo del login, alternativa a `login_image_url`) y `profiles.has_seen_tutorial` (flag del tour guiado).
+- **`38_handle_new_user_invites`** — `handle_new_user()` ahora busca en `profile_invites` (por organización + correo en minúsculas) el rol a asignar antes de caer al default `colaborador`; el correo del super admin sigue siendo un caso aparte, hardcodeado.
+- **`39_avatares_bucket`** — bucket público `avatares` + 4 políticas de Storage con el path `{user_id}/{archivo}` (`(storage.foldername(name))[1] = auth.uid()::text`), para que cada quien solo pueda escribir/borrar su propio avatar.
+- **`40_profile_invites_consumed_at`** — agregó la columna `consumed_at` (ver napkin, "consumed_at, no DELETE"): la fila de invitación nunca se borra tras el primer uso porque el filtro de dominio corre en **cada** login, no solo el primero — borrarla habría expulsado al mismo invitado en su segundo intento.
+- **`41_marca_publico_allow_video`** / **`42_avatares_size_and_mime_limit`** — límites de tamaño/MIME a nivel de bucket (`storage.buckets.file_size_limit`/`allowed_mime_types`), la capa de aplicación real: `marca-publico` solo aceptaba imágenes de hasta 5 MB y bloqueaba cualquier subida de video sin importar la validación en el Server Action; `avatares` no tenía límites configurados en absoluto. Ver napkin, "El límite real está en el bucket, no en el código".
+
+Aplicación: `src/lib/users/invite-actions.ts` (crear/borrar invitación, RLS-scoped por `organization_id`), `src/lib/users/get-invites.ts` (lista de pendientes, `consumed_at is null`), `src/app/auth/callback/route.ts` (verifica dominio, consulta `profile_invites` con `createAdminClient()` porque la política es super-admin-only y el propio invitado nunca podría leer su fila con su cliente de sesión), `src/lib/profile/actions.ts` (subida/borrado de avatar), `src/lib/organizations/actions.ts` (subida directa del video de login vía URL firmada, sin pasar por el límite de tamaño de un Server Action de Vercel).
+
 ## Storage
 
 | Bucket | Público | Contenido |
 |---|---|---|
-| `marca-publico` | sí | Logos y la imagen de login, editables por el super admin |
+| `marca-publico` | sí | Logos, imagen y video de login, editables por el super admin (hasta 20 MB, `image/*` + `video/mp4`/`video/webm`) |
 | `cvs-privado` | no | CVs y adjuntos, servidos siempre por URL firmada de 60 s. Ruta: `candidates/{candidate_id}/{archivo}` |
+| `avatares` | sí | Foto de perfil de cada usuario, ruta `{user_id}/{archivo}` (hasta 3 MB, solo imágenes) |
 
 `V1-motoslam` tenía un bucket `archivos` del sistema anterior con 1 objeto huérfano. Los objetos y buckets de Storage no se pueden borrar por SQL directo (`Direct deletion from storage tables is not allowed`); requiere la API de Storage con la service role key, que no se expone por MCP. **Queda pendiente que el usuario lo borre manualmente** desde el Dashboard si quiere el proyecto completamente limpio — no interfiere con el ATS porque usa nombres de bucket distintos.
 

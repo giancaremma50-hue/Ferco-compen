@@ -10,13 +10,14 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getOrganization } from "@/lib/organizations/get-organization";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { buildFingerprint } from "./fingerprint";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { CreateReportSchema, PostMessageSchema } from "./report-schema";
 import { STATUS_OPTIONS, SEVERITY_OPTIONS } from "./status-labels";
 import { AppError } from "./app-error";
 import { ReporteErrorEmail } from "@/emails/reporte-error";
 import type { Database } from "@/lib/supabase/database.types";
 
-export type ReportActionResult = { error?: string; success?: string; code?: string };
+export type ReportActionResult = { error?: string; success?: string; code?: string; field?: string };
 
 /**
  * Best-effort: avisa a todos los super admin de la organización que hay
@@ -96,7 +97,7 @@ export async function createErrorReport(
 
   const parsed = CreateReportSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa el mensaje." };
+    return zodFieldError(parsed.error, "Revisa el mensaje.");
   }
 
   // Sin requireProfile(): un fallo de login puede llegar aquí sin fila en
@@ -173,7 +174,7 @@ export async function postErrorMessage(
 ): Promise<ReportActionResult> {
   const profile = await requireProfile();
   const parsed = PostMessageSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa el mensaje." };
+  if (!parsed.success) return zodFieldError(parsed.error, "Revisa el mensaje.");
 
   const supabase = await createClient();
 

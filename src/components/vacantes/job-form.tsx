@@ -2,8 +2,10 @@
 
 import { useActionState, useEffect } from "react";
 import { ActionButton } from "@/components/ui/action-button";
+import { Field } from "@/components/ui/field";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
+import { COUNTRIES } from "@/lib/geo/countries";
 import type { JobActionResult } from "@/lib/jobs/actions";
 import type { JobDetail } from "@/lib/jobs/get-jobs";
 
@@ -29,9 +31,8 @@ export function JobForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <Field id="title" label="Título del puesto">
+      <Field id="title" label="Título del puesto" error={state?.field === "title" ? state.error : undefined}>
         <input
-          id="title"
           name="title"
           required
           defaultValue={defaultValues?.title}
@@ -40,9 +41,12 @@ export function JobForm({
       </Field>
 
       {departments.length > 0 && (
-        <Field id="department_id" label="Departamento">
+        <Field
+          id="department_id"
+          label="Departamento"
+          error={state?.field === "department_id" ? state.error : undefined}
+        >
           <select
-            id="department_id"
             name="department_id"
             defaultValue={defaultValues?.department_id ?? ""}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
@@ -58,18 +62,38 @@ export function JobForm({
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Field id="country" label="País">
-          <input
-            id="country"
+        <Field id="country" label="País" error={state?.field === "country" ? state.error : undefined}>
+          <select
             name="country"
             required
             defaultValue={defaultValues?.country ?? ""}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-          />
+          >
+            <option value="" disabled>
+              Elige un país
+            </option>
+            {/* Una vacante creada antes de que "País" fuera un select fijo
+                puede traer un valor que ya no está en la lista — mostrarlo
+                (en vez de que el <select> caiga en el primer país de la
+                lista sin que nadie lo note) deja claro qué había antes,
+                pero no se puede volver a guardar tal cual: JobFormSchema
+                exige uno de los 4 países reales, así que guardar cualquier
+                otro cambio en este formulario obliga primero a elegir uno
+                de la lista aquí. */}
+            {defaultValues?.country && !(COUNTRIES as readonly string[]).includes(defaultValues.country) && (
+              <option value={defaultValues.country} disabled>
+                {defaultValues.country} (elige uno de la lista para guardar)
+              </option>
+            )}
+            {COUNTRIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </Field>
-        <Field id="location" label="Ubicación">
+        <Field id="location" label="Ubicación" error={state?.field === "location" ? state.error : undefined}>
           <input
-            id="location"
             name="location"
             required
             defaultValue={defaultValues?.location ?? ""}
@@ -79,9 +103,8 @@ export function JobForm({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field id="work_mode" label="Modalidad">
+        <Field id="work_mode" label="Modalidad" error={state?.field === "work_mode" ? state.error : undefined}>
           <select
-            id="work_mode"
             name="work_mode"
             required
             defaultValue={defaultValues?.work_mode ?? ""}
@@ -97,9 +120,12 @@ export function JobForm({
             ))}
           </select>
         </Field>
-        <Field id="employment_type" label="Tipo de contrato">
+        <Field
+          id="employment_type"
+          label="Tipo de contrato"
+          error={state?.field === "employment_type" ? state.error : undefined}
+        >
           <select
-            id="employment_type"
             name="employment_type"
             required
             defaultValue={defaultValues?.employment_type ?? ""}
@@ -117,9 +143,12 @@ export function JobForm({
         </Field>
       </div>
 
-      <Field id="description" label="Descripción del puesto">
+      <Field
+        id="description"
+        label="Descripción del puesto"
+        error={state?.field === "description" ? state.error : undefined}
+      >
         <textarea
-          id="description"
           name="description"
           required
           rows={5}
@@ -128,9 +157,12 @@ export function JobForm({
         />
       </Field>
 
-      <Field id="requirements" label="Requisitos">
+      <Field
+        id="requirements"
+        label="Requisitos"
+        error={state?.field === "requirements" ? state.error : undefined}
+      >
         <textarea
-          id="requirements"
           name="requirements"
           required
           rows={4}
@@ -140,9 +172,12 @@ export function JobForm({
       </Field>
 
       <div className="grid grid-cols-3 gap-4">
-        <Field id="salary_min" label="Salario mín. (opcional)">
+        <Field
+          id="salary_min"
+          label="Salario mín. (opcional)"
+          error={state?.field === "salary_min" ? state.error : undefined}
+        >
           <input
-            id="salary_min"
             name="salary_min"
             type="number"
             min={0}
@@ -150,9 +185,12 @@ export function JobForm({
             className="h-11 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
           />
         </Field>
-        <Field id="salary_max" label="Salario máx. (opcional)">
+        <Field
+          id="salary_max"
+          label="Salario máx. (opcional)"
+          error={state?.field === "salary_max" ? state.error : undefined}
+        >
           <input
-            id="salary_max"
             name="salary_max"
             type="number"
             min={0}
@@ -160,9 +198,8 @@ export function JobForm({
             className="h-11 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
           />
         </Field>
-        <Field id="headcount" label="Plazas">
+        <Field id="headcount" label="Plazas" error={state?.field === "headcount" ? state.error : undefined}>
           <input
-            id="headcount"
             name="headcount"
             type="number"
             min={1}
@@ -186,16 +223,5 @@ export function JobForm({
         <ActionButton>{submitLabel}</ActionButton>
       </div>
     </form>
-  );
-}
-
-function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-        {label}
-      </label>
-      {children}
-    </div>
   );
 }

@@ -99,6 +99,7 @@ export function NotificationBell({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Notificaciones"
+        data-tour="bell"
         className="relative flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
       >
         <Bell className="size-4" aria-hidden />

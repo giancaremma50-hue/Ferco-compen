@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireSuperAdmin } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { contrastRatio } from "@/lib/color-contrast";
+import { zodFieldError } from "@/lib/forms/zod-error";
 
 // El fondo claro de la app (--background en globals.css). El foco de
 // teclado se dibuja con este mismo acento (--ring: var(--accent)) — un
@@ -23,7 +24,7 @@ const BrandingSchema = z.object({
     }),
 });
 
-export type BrandingActionState = { error?: string; success?: string } | undefined;
+export type BrandingActionState = { error?: string; success?: string; field?: string } | undefined;
 
 export async function updateBranding(
   _prevState: BrandingActionState,
@@ -37,7 +38,7 @@ export async function updateBranding(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos del formulario." };
+    return zodFieldError(parsed.error);
   }
 
   const supabase = await createClient();
@@ -170,4 +171,90 @@ export async function removeBrandImage(fieldInput: BrandImageField) {
   await supabase.storage.from("marca-publico").remove(brandImagePaths(profile.organization_id, field));
 
   revalidatePath("/", "layout");
+}
+
+// El video de fondo del login puede pesar más de lo que una Server Action
+// admite como body en Vercel — por eso este flujo NO sube el archivo a
+// través de una acción: genera una URL firmada de Storage y el navegador
+// sube el archivo directo desde el cliente (uploadToSignedUrl), sin pasar
+// por el servidor de Next en absoluto.
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+const VIDEO_EXTENSION_BY_MIME: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+const ALLOWED_VIDEO_TYPES = new Set(Object.keys(VIDEO_EXTENSION_BY_MIME));
+
+function loginVideoPaths(organizationId: string) {
+  return Object.values(VIDEO_EXTENSION_BY_MIME).map((ext) => `${organizationId}/login_video.${ext}`);
+}
+
+export type CreateUploadUrlState =
+  | { ok: true; path: string; token: string }
+  | { ok: false; error: string };
+
+export async function createLoginVideoUploadUrl(mimeType: string, sizeBytes: number): Promise<CreateUploadUrlState> {
+  const profile = await requireSuperAdmin();
+
+  if (!ALLOWED_VIDEO_TYPES.has(mimeType)) {
+    return { ok: false, error: "Formato no admitido. Usa MP4 o WebM." };
+  }
+  if (sizeBytes > MAX_VIDEO_BYTES || sizeBytes <= 0) {
+    return { ok: false, error: "El video pesa más de 20 MB. Usa uno más corto o comprímelo." };
+  }
+
+  const extension = VIDEO_EXTENSION_BY_MIME[mimeType];
+  const path = `${profile.organization_id}/login_video.${extension}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage.from("marca-publico").createSignedUploadUrl(path, { upsert: true });
+  if (error || !data) return { ok: false, error: "No se pudo preparar la subida. Inténtalo de nuevo." };
+
+  return { ok: true, path: data.path, token: data.token };
+}
+
+export type ConfirmVideoState = { error?: string; success?: boolean } | undefined;
+
+export async function confirmLoginVideoUpload(path: string): Promise<ConfirmVideoState> {
+  const profile = await requireSuperAdmin();
+
+  // El path lo generó createLoginVideoUploadUrl() para esta misma
+  // organización — si no coincide con ese patrón, no hay nada que confirmar
+  // (una llamada fabricada a mano no debería poder apuntar la URL pública a
+  // una ruta arbitraria de otra organización).
+  if (!loginVideoPaths(profile.organization_id).includes(path)) {
+    return { error: "Ruta de video inválida." };
+  }
+
+  const supabase = await createClient();
+  const { data: publicUrl } = supabase.storage.from("marca-publico").getPublicUrl(path);
+  const cacheBusted = `${publicUrl.publicUrl}?v=${Date.now()}`;
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({ login_video_url: cacheBusted })
+    .eq("id", profile.organization_id);
+  if (error) return { error: "El video se subió pero no se pudo guardar. Inténtalo de nuevo." };
+
+  const stalePaths = loginVideoPaths(profile.organization_id).filter((p) => p !== path);
+  await supabase.storage.from("marca-publico").remove(stalePaths);
+
+  revalidatePath("/", "layout");
+  revalidatePath("/login");
+  return { success: true };
+}
+
+export async function removeLoginVideo(): Promise<void> {
+  const profile = await requireSuperAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({ login_video_url: null })
+    .eq("id", profile.organization_id);
+  if (error) throw new Error("No se pudo quitar el video.");
+
+  await supabase.storage.from("marca-publico").remove(loginVideoPaths(profile.organization_id));
+  revalidatePath("/", "layout");
+  revalidatePath("/login");
 }

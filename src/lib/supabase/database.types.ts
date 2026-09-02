@@ -17,6 +17,140 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_answers: {
+        Row: {
+          answer_text: string | null
+          application_id: string
+          created_at: string
+          id: string
+          job_id: string
+          job_question_id: string
+          organization_id: string
+          selected_option_id: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          application_id: string
+          created_at?: string
+          id?: string
+          job_id: string
+          job_question_id: string
+          organization_id: string
+          selected_option_id?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          application_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          job_question_id?: string
+          organization_id?: string
+          selected_option_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_answers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_answers_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_answers_job_question_id_fkey"
+            columns: ["job_question_id"]
+            isOneToOne: false
+            referencedRelation: "job_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_answers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_answers_selected_option_id_fkey"
+            columns: ["selected_option_id"]
+            isOneToOne: false
+            referencedRelation: "job_question_options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_competency_scores: {
+        Row: {
+          application_id: string
+          comment: string | null
+          competency_id: string
+          created_at: string
+          evaluator_id: string
+          id: string
+          organization_id: string
+          score: number
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          comment?: string | null
+          competency_id: string
+          created_at?: string
+          evaluator_id: string
+          id?: string
+          organization_id: string
+          score: number
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          comment?: string | null
+          competency_id?: string
+          created_at?: string
+          evaluator_id?: string
+          id?: string
+          organization_id?: string
+          score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_competency_scores_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "job_competencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_competency_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_events: {
         Row: {
           actor_id: string | null
@@ -73,10 +207,12 @@ export type Database = {
         Row: {
           applied_at: string
           candidate_id: string
+          cover_letter: string | null
           created_at: string
           id: string
           job_id: string
           organization_id: string
+          prequalified: boolean | null
           rating: number | null
           rejection_reason_id: string | null
           stage_changed_at: string
@@ -88,10 +224,12 @@ export type Database = {
         Insert: {
           applied_at?: string
           candidate_id: string
+          cover_letter?: string | null
           created_at?: string
           id?: string
           job_id: string
           organization_id: string
+          prequalified?: boolean | null
           rating?: number | null
           rejection_reason_id?: string | null
           stage_changed_at?: string
@@ -103,10 +241,12 @@ export type Database = {
         Update: {
           applied_at?: string
           candidate_id?: string
+          cover_letter?: string | null
           created_at?: string
           id?: string
           job_id?: string
           organization_id?: string
+          prequalified?: boolean | null
           rating?: number | null
           rejection_reason_id?: string | null
           stage_changed_at?: string
@@ -279,8 +419,119 @@ export type Database = {
           },
         ]
       }
+      candidate_segments: {
+        Row: {
+          created_at: string
+          created_by: string
+          filters: Json
+          id: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          filters?: Json
+          id?: string
+          name: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          filters?: Json
+          id?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_segments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_tasks: {
+        Row: {
+          application_id: string
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_done: boolean
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          id?: string
+          is_done?: boolean
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_done?: boolean
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_tasks_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
+          address: string | null
           country: string | null
           created_at: string
           created_by: string | null
@@ -301,6 +552,7 @@ export type Database = {
           years_experience: number | null
         }
         Insert: {
+          address?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -321,6 +573,7 @@ export type Database = {
           years_experience?: number | null
         }
         Update: {
+          address?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -440,6 +693,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employment_reasons: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employment_reasons_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -581,6 +863,80 @@ export type Database = {
           },
         ]
       }
+      interviews: {
+        Row: {
+          application_id: string
+          created_at: string
+          created_by: string
+          duration_minutes: number
+          id: string
+          interviewer_id: string
+          location: string | null
+          notes: string | null
+          organization_id: string
+          scheduled_at: string
+          status: Database["public"]["Enums"]["interview_status"]
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          created_by: string
+          duration_minutes?: number
+          id?: string
+          interviewer_id: string
+          location?: string | null
+          notes?: string | null
+          organization_id: string
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          created_by?: string
+          duration_minutes?: number
+          id?: string
+          interviewer_id?: string
+          location?: string | null
+          notes?: string | null
+          organization_id?: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_interviewer_id_fkey"
+            columns: ["interviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_collaborators: {
         Row: {
           created_at: string
@@ -630,6 +986,151 @@ export type Database = {
           },
         ]
       }
+      job_competencies: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          name: string
+          organization_id: string
+          position: number
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          name: string
+          organization_id: string
+          position?: number
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          name?: string
+          organization_id?: string
+          position?: number
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_competencies_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_competencies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_question_options: {
+        Row: {
+          created_at: string
+          id: string
+          is_expected: boolean
+          job_id: string
+          label: string
+          organization_id: string
+          position: number
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_expected?: boolean
+          job_id: string
+          label: string
+          organization_id: string
+          position?: number
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_expected?: boolean
+          job_id?: string
+          label?: string
+          organization_id?: string
+          position?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_question_options_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_question_options_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "job_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_questions: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          organization_id: string
+          position: number
+          prompt: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          organization_id: string
+          position?: number
+          prompt: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          organization_id?: string
+          position?: number
+          prompt?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_questions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_questions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_stages: {
         Row: {
           created_at: string
@@ -675,17 +1176,266 @@ export type Database = {
           },
         ]
       }
+      job_template_question_options: {
+        Row: {
+          created_at: string
+          id: string
+          is_expected: boolean
+          job_template_id: string
+          label: string
+          organization_id: string
+          position: number
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_expected?: boolean
+          job_template_id: string
+          label: string
+          organization_id: string
+          position?: number
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_expected?: boolean
+          job_template_id?: string
+          label?: string
+          organization_id?: string
+          position?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_template_question_options_job_template_id_fkey"
+            columns: ["job_template_id"]
+            isOneToOne: false
+            referencedRelation: "job_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_template_question_options_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_template_question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "job_template_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_template_questions: {
+        Row: {
+          created_at: string
+          id: string
+          job_template_id: string
+          organization_id: string
+          position: number
+          prompt: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_template_id: string
+          organization_id: string
+          position?: number
+          prompt: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_template_id?: string
+          organization_id?: string
+          position?: number
+          prompt?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_template_questions_job_template_id_fkey"
+            columns: ["job_template_id"]
+            isOneToOne: false
+            referencedRelation: "job_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_template_questions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_template_stages: {
+        Row: {
+          created_at: string
+          id: string
+          job_template_id: string
+          organization_id: string
+          position: number
+          title: string
+          type: Database["public"]["Enums"]["job_stage_type"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_template_id: string
+          organization_id: string
+          position?: number
+          title: string
+          type: Database["public"]["Enums"]["job_stage_type"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_template_id?: string
+          organization_id?: string
+          position?: number
+          title?: string
+          type?: Database["public"]["Enums"]["job_stage_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_template_stages_job_template_id_fkey"
+            columns: ["job_template_id"]
+            isOneToOne: false
+            referencedRelation: "job_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_template_stages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_templates: {
+        Row: {
+          candidacy_fields: Json
+          competencies: Json
+          country: string
+          created_at: string
+          created_by: string
+          department_id: string | null
+          description: string
+          employment_type: string
+          id: string
+          is_confidential: boolean
+          is_public: boolean
+          location: string
+          name: string
+          organization_id: string
+          pipeline_template_id: string | null
+          requirements: string
+          status: string
+          title: string
+          updated_at: string
+          wizard_step: number
+          work_mode: string
+        }
+        Insert: {
+          candidacy_fields?: Json
+          competencies?: Json
+          country: string
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          description: string
+          employment_type: string
+          id?: string
+          is_confidential?: boolean
+          is_public?: boolean
+          location: string
+          name: string
+          organization_id: string
+          pipeline_template_id?: string | null
+          requirements: string
+          status?: string
+          title: string
+          updated_at?: string
+          wizard_step?: number
+          work_mode: string
+        }
+        Update: {
+          candidacy_fields?: Json
+          competencies?: Json
+          country?: string
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          description?: string
+          employment_type?: string
+          id?: string
+          is_confidential?: boolean
+          is_public?: boolean
+          location?: string
+          name?: string
+          organization_id?: string
+          pipeline_template_id?: string | null
+          requirements?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          wizard_step?: number
+          work_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_templates_pipeline_template_id_fkey"
+            columns: ["pipeline_template_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
+          candidacy_fields: Json
           code: string
           country: string | null
           created_at: string
           department_id: string | null
           description: string
+          employment_reason_id: string | null
           employment_type: string | null
           headcount: number
           id: string
           is_public: boolean
+          job_template_id: string | null
           location: string | null
           organization_id: string
           owner_id: string | null
@@ -699,18 +1449,22 @@ export type Database = {
           status: Database["public"]["Enums"]["job_status"]
           title: string
           updated_at: string
+          vacancy_type: string | null
           work_mode: string | null
         }
         Insert: {
+          candidacy_fields?: Json
           code?: string
           country?: string | null
           created_at?: string
           department_id?: string | null
           description?: string
+          employment_reason_id?: string | null
           employment_type?: string | null
           headcount?: number
           id?: string
           is_public?: boolean
+          job_template_id?: string | null
           location?: string | null
           organization_id: string
           owner_id?: string | null
@@ -724,18 +1478,22 @@ export type Database = {
           status?: Database["public"]["Enums"]["job_status"]
           title: string
           updated_at?: string
+          vacancy_type?: string | null
           work_mode?: string | null
         }
         Update: {
+          candidacy_fields?: Json
           code?: string
           country?: string | null
           created_at?: string
           department_id?: string | null
           description?: string
+          employment_reason_id?: string | null
           employment_type?: string | null
           headcount?: number
           id?: string
           is_public?: boolean
+          job_template_id?: string | null
           location?: string | null
           organization_id?: string
           owner_id?: string | null
@@ -749,6 +1507,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["job_status"]
           title?: string
           updated_at?: string
+          vacancy_type?: string | null
           work_mode?: string | null
         }
         Relationships: [
@@ -757,6 +1516,20 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_employment_reason_id_fkey"
+            columns: ["employment_reason_id"]
+            isOneToOne: false
+            referencedRelation: "employment_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_job_template_id_fkey"
+            columns: ["job_template_id"]
+            isOneToOne: false
+            referencedRelation: "job_templates"
             referencedColumns: ["id"]
           },
           {
@@ -785,6 +1558,44 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -953,9 +1764,12 @@ export type Database = {
         Row: {
           accent_color: string
           allowed_email_domain: string | null
+          careers_headline: string | null
+          careers_intro: string | null
           created_at: string
           id: string
           login_image_url: string | null
+          login_video_url: string | null
           logo_dark_url: string | null
           logo_url: string | null
           name: string
@@ -966,9 +1780,12 @@ export type Database = {
         Insert: {
           accent_color?: string
           allowed_email_domain?: string | null
+          careers_headline?: string | null
+          careers_intro?: string | null
           created_at?: string
           id?: string
           login_image_url?: string | null
+          login_video_url?: string | null
           logo_dark_url?: string | null
           logo_url?: string | null
           name: string
@@ -979,9 +1796,12 @@ export type Database = {
         Update: {
           accent_color?: string
           allowed_email_domain?: string | null
+          careers_headline?: string | null
+          careers_intro?: string | null
           created_at?: string
           id?: string
           login_image_url?: string | null
+          login_video_url?: string | null
           logo_dark_url?: string | null
           logo_url?: string | null
           name?: string
@@ -1071,6 +1891,51 @@ export type Database = {
           },
         ]
       }
+      profile_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1079,6 +1944,7 @@ export type Database = {
           department_id: string | null
           display_name: string
           email: string
+          has_seen_tutorial: boolean
           id: string
           is_active: boolean
           last_login_at: string | null
@@ -1093,6 +1959,7 @@ export type Database = {
           department_id?: string | null
           display_name: string
           email: string
+          has_seen_tutorial?: boolean
           id: string
           is_active?: boolean
           last_login_at?: string | null
@@ -1107,6 +1974,7 @@ export type Database = {
           department_id?: string | null
           display_name?: string
           email?: string
+          has_seen_tutorial?: boolean
           id?: string
           is_active?: boolean
           last_login_at?: string | null
@@ -1193,6 +2061,7 @@ export type Database = {
         | "esperando_usuario"
         | "resuelto"
         | "descartado"
+      interview_status: "programada" | "completada" | "cancelada"
       job_collaborator_permission:
         | "viewer"
         | "interviewer"
@@ -1371,6 +2240,7 @@ export const Constants = {
         "resuelto",
         "descartado",
       ],
+      interview_status: ["programada", "completada", "cancelada"],
       job_collaborator_permission: [
         "viewer",
         "interviewer",

@@ -55,25 +55,37 @@ export function ReferCandidateDialog({ jobId }: { jobId: string }) {
 
           {open && (
             <form action={formAction} className="mt-5 flex flex-col gap-4">
-              <input
-                name="full_name"
-                required
-                placeholder="Nombre completo"
-                className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="Correo"
-                className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <input
-                name="phone"
-                required
-                placeholder="Teléfono"
-                className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-              />
+              <div className="flex flex-col gap-1.5">
+                <input
+                  name="full_name"
+                  required
+                  placeholder="Nombre completo"
+                  aria-invalid={state?.field === "full_name"}
+                  className={`h-11 rounded-md border bg-background px-3 text-sm ${state?.field === "full_name" ? "border-destructive" : "border-border"}`}
+                />
+                {state?.field === "full_name" && <p className="text-xs text-destructive">{state.error}</p>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="Correo"
+                  aria-invalid={state?.field === "email"}
+                  className={`h-11 rounded-md border bg-background px-3 text-sm ${state?.field === "email" ? "border-destructive" : "border-border"}`}
+                />
+                {state?.field === "email" && <p className="text-xs text-destructive">{state.error}</p>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <input
+                  name="phone"
+                  required
+                  placeholder="Teléfono"
+                  aria-invalid={state?.field === "phone"}
+                  className={`h-11 rounded-md border bg-background px-3 text-sm ${state?.field === "phone" ? "border-destructive" : "border-border"}`}
+                />
+                {state?.field === "phone" && <p className="text-xs text-destructive">{state.error}</p>}
+              </div>
               <ActionButton>Referir</ActionButton>
             </form>
           )}

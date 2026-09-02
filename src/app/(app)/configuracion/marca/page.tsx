@@ -1,8 +1,9 @@
-import Image from "next/image";
 import { requireSuperAdmin } from "@/lib/auth/dal";
 import { getOrganization } from "@/lib/organizations/get-organization";
 import { BrandingForm } from "@/components/configuracion/branding-form";
 import { BrandImageField } from "@/components/configuracion/brand-image-field";
+import { LoginVideoField } from "@/components/configuracion/login-video-field";
+import { LoginBackgroundMedia } from "@/components/layout/login-background-media";
 
 export default async function MarcaPage() {
   const [, organization] = await Promise.all([requireSuperAdmin(), getOrganization()]);
@@ -13,6 +14,7 @@ export default async function MarcaPage() {
     logo_url: null,
     logo_dark_url: null,
     login_image_url: null,
+    login_video_url: null,
   };
 
   return (
@@ -43,6 +45,7 @@ export default async function MarcaPage() {
             hint="Recomendado 1200 × 1600 px, vertical"
             currentUrl={org.login_image_url}
           />
+          <LoginVideoField currentUrl={org.login_video_url} />
 
           <div className="border-t border-border pt-5">
             <BrandingForm
@@ -66,9 +69,7 @@ export default async function MarcaPage() {
             className="relative flex items-end p-7"
             style={{ backgroundColor: org.accent_color }}
           >
-            {org.login_image_url && (
-              <Image src={org.login_image_url} alt="" fill className="object-cover" />
-            )}
+            <LoginBackgroundMedia videoUrl={org.login_video_url} imageUrl={org.login_image_url} />
             <p className="font-serif relative z-10 text-[19px] leading-snug text-white">
               Contratar bien es la decisión más cara que toma una empresa.
             </p>

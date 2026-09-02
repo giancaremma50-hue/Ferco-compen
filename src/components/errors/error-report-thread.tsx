@@ -53,7 +53,8 @@ export function ErrorReportThread({
           required
           rows={3}
           placeholder="Escribe un mensaje…"
-          className="rounded-md border border-border bg-background p-3 text-sm"
+          aria-invalid={state?.field === "body"}
+          className={`rounded-md border bg-background p-3 text-sm ${state?.field === "body" ? "border-destructive" : "border-border"}`}
         />
         <ActionButton className="self-start">Responder</ActionButton>
       </form>

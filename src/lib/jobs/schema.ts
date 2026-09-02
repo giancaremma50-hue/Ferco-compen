@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COUNTRIES } from "@/lib/geo/countries";
 
 export const JobStatusSchema = z.enum([
   "borrador",
@@ -39,7 +40,7 @@ export const JobFormSchema = z
   .object({
     title: z.string().trim().min(4, { error: "El título debe tener al menos 4 caracteres." }).max(120),
     department_id: optionalUuid,
-    country: z.string().trim().min(2, { error: "Indica el país." }).max(60),
+    country: z.enum(COUNTRIES, { error: "Elige un país." }),
     location: z.string().trim().min(2, { error: "Indica la ubicación." }).max(120),
     work_mode: z.enum(["presencial", "remoto", "hibrido"], { error: "Elige una modalidad." }),
     employment_type: z.enum(["indefinido", "temporal", "por_obra", "pasantia"], {

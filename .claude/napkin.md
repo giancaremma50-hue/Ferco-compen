@@ -1,10 +1,45 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-01 (Fase 7)_
+_Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, video de login, tutorial)_
 
 ## Reglas de Curación
 - Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
 - Es bitácora de registro: no solo trampas de sintaxis, también decisiones no obvias y errores reales con su corrección. Incluir fecha + "Do instead".
 - **Leer ANTES de tocar código.**
+
+---
+
+## Mejoras post-Fase 7 (invitaciones, avatar, video de login) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-02] BUG REAL, crítico: el límite real de tamaño/tipo de un bucket de Storage vive en `storage.buckets`, no en la Server Action.**
+   Causa: se agregó soporte para subir un video de fondo al login reusando el bucket `marca-publico`, pero ese bucket ya tenía `file_size_limit = 5MB` y `allowed_mime_types` restringido a imágenes desde su creación en Fase 3 — cualquier validación de tamaño/tipo en la Server Action (`createLoginVideoUploadUrl`) era pura decoración: Storage habría rechazado el video de todos modos, con o sin esa validación.
+   Do instead: antes de asumir que una Server Action "ya protege" un límite de subida, verificar `select file_size_limit, allowed_mime_types from storage.buckets where id = '...'` — si el límite real del bucket es más estricto (o no incluye el mime type nuevo), hay que actualizarlo con una migración, la validación de la app es solo la primera capa, no la única.
+
+2. **[2026-09-02] BUG REAL, crítico: una policy de RLS "solo super_admin" en una tabla de invitación bloquea al propio invitado leer su fila.**
+   Causa: `profile_invites_super_admin` exige `is_super_admin()` tanto en `USING` como en `WITH CHECK` — correcto para que solo un super admin cree/borre invitaciones, pero un `gestor`/`admin` recién invitado NUNCA podría ver su propia fila con el cliente de sesión. El primer intento de usar esto para eximir del filtro de dominio corporativo (`auth/callback/route.ts`) consultaba con el cliente de sesión y siempre devolvía 0 filas — el login de cualquier invitado que no fuera super_admin se rechazaba y su cuenta recién creada se borraba.
+   Do instead: cuando la verificación es "¿existe una excepción para ESTA persona?" y la tabla que la guarda solo es legible por un rol superior, la lectura tiene que hacerse con `createAdminClient()`, nunca con el cliente de sesión del propio afectado — el mismo patrón ya documentado para `pipeline_templates`/`job_stages` en Fase 4, aplicado aquí a auth.
+
+3. **[2026-09-02] BUG REAL: borrar un registro de "úsalo una vez" que también sostiene una verdad PERMANENTE rompe esa verdad en el segundo uso.**
+   Causa: al arreglar el punto 2, la primera corrección borraba la fila de `profile_invites` apenas se usaba para dejar entrar al invitado. Pero el filtro de dominio corre en CADA login, no solo el primero — sin la fila, el mismo invitado quedaba expulsado (y su cuenta borrada) en su SEGUNDO login.
+   Do instead: cuando un mismo registro sirve para dos cosas de vida distinta ("asignar un rol una vez" vs. "eximir del filtro de dominio para siempre"), no se borra — se marca con una columna `consumed_at` (o similar). La bandeja de "pendientes" filtra por `consumed_at is null`; la verificación de acceso ignora ese campo y solo mira si la fila existe.
+
+4. **[2026-09-02] Volver un campo de texto libre en un `z.enum()` sobre una tabla ya viva puede corromper datos existentes en el próximo `UPDATE`, no solo rechazar los nuevos.**
+   Causa: "País" pasó de `<input>` a `<select>` con 4 opciones fijas. Una vacante con un país que no esté en esas 4 opciones haría que el `<select>` cayera en la primera opción real sin que nadie lo notara, y esa vacante se guardaría con el país cambiado por accidente al editar cualquier otro campo.
+   Do instead: antes de cerrar un campo existente a una lista fija, correr `select distinct <columna> from <tabla>` contra la base real — si hay valores fuera de la lista, mostrarlos como opción aparte (deshabilitada) en el `<select>` para que se note y haya que elegir uno real, en vez de dejar que el navegador la reemplace en silencio. La validación del schema (Zod) debe seguir rechazando el valor viejo — la UI solo evita que se pierda sin que nadie lo vea, no reintroduce el valor viejo como válido.
+
+5. **`next.config.ts` → `images.remotePatterns` necesita CADA hostname externo real, no solo el de Storage.**
+   Causa: `profiles.avatar_url` se llena con la foto de Google desde Fase 3 (`handle_new_user()`), pero el header nunca la mostraba — ni siquiera se había notado que `next/image` la habría bloqueado igual, porque `remotePatterns` solo tenía `*.supabase.co`. Sin `*.googleusercontent.com`, la foto de Google jamás habría cargado aunque el código la usara.
+   Do instead: cada vez que se empieza a renderizar una URL externa nueva con `next/image` (no solo Storage — CDNs de terceros como Google, Gravatar, etc.), verificar `next.config.ts` antes de asumir que "ya está permitido porque otras imágenes cargan".
+
+6. **Subir un archivo grande (video) por una Server Action choca con el límite de tamaño de body de las funciones de Vercel — subir directo del navegador a Storage con una URL firmada lo evita.**
+   Do instead: `supabase.storage.from(bucket).createSignedUploadUrl(path, {upsert})` en el servidor (autoriza la ruta vía RLS de `storage.objects`, requiere permiso de INSERT) → el navegador sube con `supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, {contentType})` usando el cliente browser (el token ya autoriza esa subida puntual, no necesita sesión) → una segunda Server Action confirma y guarda la URL pública. Nada del archivo en sí pasa por Next.
+
+7. **Descartar el `error` de una consulta y tratar "no hay dato" como "la condición es falsa" es peligroso cuando la rama por defecto es destructiva.**
+   Causa: la primera versión de la excepción de dominio en `auth/callback` ignoraba `error` al leer `profile_invites` — un fallo transitorio de red se habría tratado igual que "no está invitado", y la rama de rechazo BORRA la cuenta recién creada. Un error de verdad no es lo mismo que "no existe".
+   Do instead: cuando la rama "no encontrado" de una consulta dispara una acción irreversible (borrar, expulsar), revisar `error` por separado y mandar a un estado reintentable (no destructivo) si la consulta en sí falló — nunca asumir "no" cuando en realidad es "no se pudo saber".
+
+8. **Límite pendiente, documentado a propósito: invitar a alguien directamente con rol `super_admin` deja su fila de `profile_invites` como "pendiente" para siempre.**
+   Causa: el chequeo de invitación solo corre dentro de `if (domainMismatch && profile.role !== "super_admin")` — cualquier super_admin ya está exento del filtro de dominio desde antes (Fase 3), así que ese bloque nunca se ejecuta para ellos y `consumed_at` nunca se marca.
+   Do instead: aceptado como límite conocido, no corregido — invitar directamente como super_admin es un caso raro (alguien de máxima confianza normalmente se promueve manualmente desde Usuarios después de su primer login normal, no por invitación). Si esto molesta en la práctica, la corrección sería sacar el chequeo/marcado de `consumed_at` del `if` de dominio y hacerlo siempre que exista una fila de invitación, aceptando una consulta extra en cada login de alguien invitado.
 
 ---
 

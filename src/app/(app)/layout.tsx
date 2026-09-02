@@ -3,6 +3,7 @@ import { getOrganization } from "@/lib/organizations/get-organization";
 import { getRecentNotifications, getUnreadCount } from "@/lib/notifications/get-notifications";
 import { AppHeader } from "@/components/layout/app-header";
 import { FloatingNav } from "@/components/layout/floating-nav";
+import { OnboardingTour } from "@/components/layout/onboarding-tour";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, organization, notifications, unreadCount] = await Promise.all([
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </main>
       <FloatingNav role={profile.role} />
+      <OnboardingTour hasSeenTutorial={profile.has_seen_tutorial} />
     </div>
   );
 }

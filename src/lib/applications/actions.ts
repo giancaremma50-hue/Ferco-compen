@@ -6,11 +6,12 @@ import { requireProfile } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
+import { zodFieldError } from "@/lib/forms/zod-error";
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
 import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
 
-export type ApplicationActionResult = { error?: string; success?: string };
+export type ApplicationActionResult = { error?: string; success?: string; field?: string };
 
 /**
  * Se invoca siempre envuelta en notifyBestEffort() — corre con after(),
@@ -165,7 +166,7 @@ export async function addNote(
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
   const parsed = NoteSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa la nota." };
+  if (!parsed.success) return zodFieldError(parsed.error, "Revisa la nota.");
 
   const supabase = await createClient();
   const { data: note, error } = await supabase
@@ -231,7 +232,7 @@ export async function rejectApplication(
   if (profile.role === "colaborador") return { error: "Tu perfil no puede rechazar postulaciones." };
 
   const parsed = RejectSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Elige un motivo." };
+  if (!parsed.success) return zodFieldError(parsed.error, "Elige un motivo.");
 
   const supabase = await createClient();
   const { data, error } = await supabase
