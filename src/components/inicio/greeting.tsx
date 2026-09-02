@@ -10,9 +10,9 @@ function greetingForHour(hour: number) {
 
 /**
  * Se calcula en el cliente, no en el servidor: el reloj del servidor no es
- * el del visitante (Vercel corre en UTC, la organización opera en
- * Centroamérica). Arranca neutro para no desajustar la hidratación y se
- * ajusta justo después de montar.
+ * el del visitante (Vercel corre en UTC; la organización puede operar en
+ * cualquier zona horaria). Arranca neutro para no desajustar la
+ * hidratación y se ajusta justo después de montar.
  */
 export function Greeting({ name }: { name: string }) {
   const [prefix, setPrefix] = useState("Hola");

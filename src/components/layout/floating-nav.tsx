@@ -76,7 +76,8 @@ export function FloatingNav({ role }: { role: Role }) {
                   key={item.href}
                   href={item.href}
                   data-tour={`nav-${item.href.slice(1)}`}
-                  className="relative flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium"
+                  aria-label={item.label}
+                  className="group relative flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium"
                 >
                   {active && (
                     <motion.span
@@ -91,6 +92,18 @@ export function FloatingNav({ role }: { role: Role }) {
                     <Icon className="size-[17px]" aria-hidden />
                     {active && <span>{item.label}</span>}
                   </span>
+                  {!active && (
+                    <span
+                      role="tooltip"
+                      // z-10: sin esto, el indicador activo (bg-background
+                      // opaco) de un ítem vecino puede pintarse encima y
+                      // recortar visualmente este tooltip cuando es más
+                      // ancho que su propio botón (ej. "Candidatos").
+                      className="pointer-events-none absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                    >
+                      {item.label}
+                    </span>
+                  )}
                 </Link>
               );
             })}

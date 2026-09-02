@@ -77,6 +77,10 @@ export async function rollbackIfNewCandidate(candidateId: string, isNewCandidate
  * público), según quién esté llamando. Si falla, revierte el candidato con
  * `rollbackIfNewCandidate` — el llamador debe usar la misma función si
  * necesita revertir en un paso previo (ej. la subida del CV en el portal).
+ *
+ * `extra` es exclusivo del portal público (carta de motivación,
+ * precalificación) — `referCandidate` (referido interno, Fase 4/6) no lo
+ * manda, esos dos campos se quedan `null` en ese camino.
  */
 export async function createApplicationForCandidate(
   supabase: SupabaseClient<Database>,
@@ -84,6 +88,7 @@ export async function createApplicationForCandidate(
   jobId: string,
   candidateId: string,
   isNewCandidate: boolean,
+  extra?: { cover_letter?: string | null; prequalified?: boolean | null },
 ): Promise<CreateApplicationResult> {
   const { data: firstStage } = await supabase
     .from("job_stages")
@@ -105,6 +110,8 @@ export async function createApplicationForCandidate(
       candidate_id: candidateId,
       organization_id: organizationId,
       stage_id: firstStage.id,
+      cover_letter: extra?.cover_letter ?? null,
+      prequalified: extra?.prequalified ?? null,
     })
     .select("id")
     .single();

@@ -7,43 +7,22 @@ import { requireProfile } from "@/lib/auth/dal";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { JobFormSchema } from "./schema";
+import { JobFormSchema, CreateJobFromTemplateSchema } from "./schema";
 import type { JobStatus, JobFormValues } from "./schema";
-import { materializeJobStages } from "./materialize-stages";
 import { generateJobSlug } from "./slug";
+import { assertBelongsToOrg } from "@/lib/assert-belongs-to-org";
 import { TERMINAL_JOB_STATUSES } from "./permissions";
 import { findOrCreateCandidate, createApplicationForCandidate } from "./create-application";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { zodFieldError } from "@/lib/forms/zod-error";
 import { VacantePendienteAprobacionEmail } from "@/emails/vacante-pendiente-aprobacion";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
+import type { CompetencyDraft } from "@/lib/job-templates/schema";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
 export type JobActionResult = { error?: string; success?: string; field?: string };
-
-/**
- * El <select> del formulario solo ofrece departamentos de la propia
- * organización, pero una Server Action es un endpoint de red: nada impide
- * una llamada fabricada a mano con el id de un departamento de otra
- * organización (la FK de la columna solo exige que la fila exista, no que
- * coincida con la organización del actor).
- */
-async function assertValidDepartment(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  organizationId: string,
-  departmentId: string | undefined,
-): Promise<string | null> {
-  if (!departmentId) return null;
-  const { data } = await supabase
-    .from("departments")
-    .select("id")
-    .eq("id", departmentId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  return data ? null : "Ese departamento no es válido.";
-}
 
 /**
  * Los campos opcionales llegan como `undefined` cuando el formulario los
@@ -62,6 +41,57 @@ function toJobRow(values: JobFormValues) {
   };
 }
 
+/**
+ * "Reclutador encargado" — mismo criterio que ya usaba `owner_id` antes de
+ * esta fase (`ADMIN_ROLES.has(profile.role) ? profile.id : null`), ahora
+ * elegido a mano en vez de autoasignado. Revalida rol+organización+activo,
+ * no solo que la fila exista — un <select> filtrado en el cliente no es
+ * una garantía server-side.
+ */
+async function assertValidOwner(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  ownerId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", ownerId)
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .in("role", ["admin", "super_admin"])
+    .maybeSingle();
+  return data ? null : "Esa persona no puede quedar como reclutador encargado.";
+}
+
+/** Colaboradores adicionales — mismo criterio que job_collaborators ya exige hoy (cualquier miembro activo de la org). */
+async function assertValidCollaborators(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  profileIds: string[],
+): Promise<string | null> {
+  if (profileIds.length === 0) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .in("id", profileIds);
+  const validIds = new Set((data ?? []).map((p) => p.id));
+  return profileIds.every((id) => validIds.has(id)) ? null : "Alguno de los colaboradores elegidos no es válido.";
+}
+
+/**
+ * Crea una vacante a partir de una plantilla — obligatoria desde esta fase
+ * (Fase 18), ya no existe "vacante en blanco". El cliente solo manda
+ * `template_id` y los campos que de verdad quedan editables (país,
+ * modalidad, salario, plazas, tipo/motivo de vacante, equipo) — título,
+ * descripción, requisitos, candidatura, preguntas y etapas se vuelven a
+ * leer server-side desde la plantilla, nunca del contenido que mande el
+ * formulario (mismo principio de seguridad que Fase 17 con
+ * pipeline_template_id/competencies: el cliente nunca manda el contenido
+ * que un rol sin acceso directo a esas tablas no podría escribir él mismo).
+ */
 export async function createJob(
   _prevState: JobActionResult | undefined,
   formData: FormData,
@@ -71,28 +101,57 @@ export async function createJob(
     return { error: "Tu perfil no puede solicitar vacantes." };
   }
 
-  const parsed = JobFormSchema.safeParse(Object.fromEntries(formData));
+  const parsed = CreateJobFromTemplateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return zodFieldError(parsed.error, "Revisa los datos del formulario.");
   }
 
   const supabase = await createClient();
 
-  const departmentError = await assertValidDepartment(supabase, profile.organization_id, parsed.data.department_id);
-  if (departmentError) return { error: departmentError, field: "department_id" };
+  const [reasonError, ownerError, collaboratorsError] = await Promise.all([
+    assertBelongsToOrg(supabase, "employment_reasons", parsed.data.employment_reason_id, profile.organization_id, "Ese motivo de vacante no es válido."),
+    assertValidOwner(supabase, profile.organization_id, parsed.data.owner_id),
+    assertValidCollaborators(supabase, profile.organization_id, parsed.data.collaborator_ids),
+  ]);
+  if (reasonError) return { error: reasonError };
+  if (ownerError) return { error: ownerError };
+  if (collaboratorsError) return { error: collaboratorsError };
 
-  // Toda vacante nace en "borrador" — RLS solo permite a quien no es admin
-  // editar su propia fila mientras está en ese estado; enviarla a aprobación
-  // es un paso explícito (submitForApproval), no algo que se decida aquí.
+  const { data: template } = await supabase
+    .from("job_templates")
+    .select(
+      "id, title, department_id, location, employment_type, description, requirements, competencies, candidacy_fields, is_public",
+    )
+    .eq("id", parsed.data.template_id)
+    .eq("organization_id", profile.organization_id)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!template) return { error: "Esa plantilla ya no está disponible." };
+
   const { data: job, error } = await supabase
     .from("jobs")
     .insert({
-      ...toJobRow(parsed.data),
       organization_id: profile.organization_id,
+      title: template.title,
+      department_id: template.department_id,
+      country: parsed.data.country,
+      location: template.location,
+      work_mode: parsed.data.work_mode,
+      employment_type: template.employment_type,
+      description: template.description,
+      requirements: template.requirements,
+      salary_min: parsed.data.salary_min ?? null,
+      salary_max: parsed.data.salary_max ?? null,
+      headcount: parsed.data.headcount,
+      is_public: template.is_public,
+      vacancy_type: parsed.data.vacancy_type,
+      employment_reason_id: parsed.data.employment_reason_id ?? null,
+      job_template_id: template.id,
+      candidacy_fields: template.candidacy_fields,
       requested_by: profile.id,
-      owner_id: ADMIN_ROLES.has(profile.role) ? profile.id : null,
+      owner_id: parsed.data.owner_id,
       status: "borrador",
-      slug: generateJobSlug(parsed.data.title),
+      slug: generateJobSlug(template.title),
     })
     .select("id")
     .single();
@@ -101,11 +160,114 @@ export async function createJob(
     return { error: "No se pudo crear la vacante. Inténtalo de nuevo." };
   }
 
-  const { error: stagesError } = await materializeJobStages(job.id, profile.organization_id);
+  // Todo lo que sigue exige admin+ para escribir (job_stages, job_questions,
+  // job_question_options, job_competencies, job_collaborators) — un gestor
+  // SÍ puede crear su propia vacante, pero no tiene RLS de escritura directa
+  // sobre esas tablas. Mismo motivo que materializeJobStages/job_competencies
+  // en Fase 4/17: cliente admin acá, con el contenido ya releído del
+  // servidor arriba (nunca del FormData) y el job.id que ACABAMOS de crear
+  // (nunca uno que mande el cliente).
+  const admin = createAdminClient();
+
+  const [{ data: templateStages }, { data: templateQuestions }] = await Promise.all([
+    admin.from("job_template_stages").select("title, type, position").eq("job_template_id", template.id).order("position"),
+    admin
+      .from("job_template_questions")
+      .select("prompt, type, position, job_template_question_options(label, is_expected, position)")
+      .eq("job_template_id", template.id)
+      .order("position")
+      .order("position", { referencedTable: "job_template_question_options" }),
+  ]);
+
+  if (!templateStages || templateStages.length === 0) {
+    // No debería pasar — publishTemplate exige al menos una etapa antes de
+    // publicar — pero si pasa, mejor una vacante visible sin pipeline (que
+    // un admin puede investigar) que fingir que se creó bien.
+    return { error: "Esta plantilla no tiene etapas configuradas. Avisa a quien la administra antes de usarla." };
+  }
+
+  const { error: stagesError } = await admin.from("job_stages").insert(
+    templateStages.map((s) => ({
+      organization_id: profile.organization_id,
+      job_id: job.id,
+      name: s.title,
+      type: s.type,
+      position: s.position,
+    })),
+  );
   if (stagesError) {
-    // La vacante ya existe pero sin pipeline — se deja visible para que un
-    // admin la revise en vez de deshacer el insert silenciosamente.
-    return { error: stagesError };
+    console.error("createJob: no se pudieron copiar las etapas de la plantilla", stagesError);
+    return { error: "No se pudo preparar el pipeline de esta vacante." };
+  }
+
+  if (templateQuestions && templateQuestions.length > 0) {
+    const questionRows = templateQuestions.map((q) => ({
+      id: crypto.randomUUID(),
+      organization_id: profile.organization_id,
+      job_id: job.id,
+      prompt: q.prompt,
+      type: q.type,
+      position: q.position,
+    }));
+    const { error: questionsError } = await admin.from("job_questions").insert(questionRows);
+    if (questionsError) {
+      console.error("createJob: no se pudieron copiar las preguntas de la plantilla", questionsError);
+    } else {
+      const optionRows = templateQuestions.flatMap((q, i) =>
+        (q.job_template_question_options ?? []).map((o) => ({
+          organization_id: profile.organization_id,
+          job_id: job.id,
+          question_id: questionRows[i].id,
+          label: o.label,
+          is_expected: o.is_expected,
+          position: o.position,
+        })),
+      );
+      if (optionRows.length > 0) {
+        const { error: optionsError } = await admin.from("job_question_options").insert(optionRows);
+        if (optionsError) console.error("createJob: no se pudieron copiar las opciones de las preguntas", optionsError);
+      }
+    }
+  }
+
+  const competencies = (template.competencies as CompetencyDraft[]) ?? [];
+  if (competencies.length > 0) {
+    const { error: competenciesError } = await admin.from("job_competencies").insert(
+      competencies.map((c, i) => ({
+        organization_id: profile.organization_id,
+        job_id: job.id,
+        name: c.name,
+        weight: c.weight,
+        position: i,
+      })),
+    );
+    // No bloquea la creación — la vacante ya existe y una rúbrica vacía es
+    // un estado normal (Fase 11), a diferencia de un pipeline vacío.
+    if (competenciesError) {
+      console.error("createJob: no se pudieron copiar las competencias de la plantilla", competenciesError);
+    }
+  }
+
+  // Reclutador encargado = owner de job_collaborators (mismo id que
+  // jobs.owner_id, ambos lados del mismo hecho); colaboradores adicionales
+  // = viewer, ajustable después desde el panel que ya existe. Se descarta
+  // cualquier id repetido con el owner — agregarlo dos veces violaría el
+  // UNIQUE(job_id, profile_id), y no es un error del usuario, es un caso
+  // esperable (eligió a la misma persona en los dos selectores).
+  const collaboratorRows = [
+    { organization_id: profile.organization_id, job_id: job.id, profile_id: parsed.data.owner_id, permission: "owner" as const },
+    ...parsed.data.collaborator_ids
+      .filter((id) => id !== parsed.data.owner_id)
+      .map((id) => ({
+        organization_id: profile.organization_id,
+        job_id: job.id,
+        profile_id: id,
+        permission: "viewer" as const,
+      })),
+  ];
+  const { error: collaboratorsInsertError } = await admin.from("job_collaborators").insert(collaboratorRows);
+  if (collaboratorsInsertError) {
+    console.error("createJob: no se pudo armar el equipo de reclutamiento", collaboratorsInsertError);
   }
 
   revalidatePath("/vacantes");
@@ -125,7 +287,7 @@ export async function updateJob(
 
   const supabase = await createClient();
 
-  const departmentError = await assertValidDepartment(supabase, profile.organization_id, parsed.data.department_id);
+  const departmentError = await assertBelongsToOrg(supabase, "departments", parsed.data.department_id, profile.organization_id, "Ese departamento no es válido.");
   if (departmentError) return { error: departmentError, field: "department_id" };
 
   // RLS decide si esta fila es editable para este actor (admin+, o el propio

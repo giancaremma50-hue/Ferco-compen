@@ -53,6 +53,15 @@ export type ApplicationNote = {
   isPrivate: boolean;
   createdAt: string;
 };
+export type ApplicationTask = {
+  id: string;
+  description: string;
+  isDone: boolean;
+  createdByName: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  createdAt: string;
+};
 export type ApplicationDetail = {
   id: string;
   status: Database["public"]["Enums"]["application_status"];
@@ -69,6 +78,7 @@ export type ApplicationDetail = {
   rejectionReasonLabel: string | null;
   events: ApplicationEvent[];
   notes: ApplicationNote[];
+  tasks: ApplicationTask[];
 };
 
 /**
@@ -93,7 +103,7 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
 
   if (!app) return null;
 
-  const [{ data: events }, { data: notes }] = await Promise.all([
+  const [{ data: events }, { data: notes }, { data: tasks }] = await Promise.all([
     supabase
       .from("application_events")
       .select("id, type, payload, created_at, actor_id, profiles(display_name)")
@@ -102,6 +112,13 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
     supabase
       .from("notes")
       .select("id, author_id, body, is_private, created_at, profiles(display_name)")
+      .eq("application_id", applicationId)
+      .order("created_at"),
+    supabase
+      .from("candidate_tasks")
+      .select(
+        "id, description, is_done, created_at, assigned_to, creator:profiles!candidate_tasks_created_by_fkey(display_name), assignee:profiles!candidate_tasks_assigned_to_fkey(display_name)",
+      )
       .eq("application_id", applicationId)
       .order("created_at"),
   ]);
@@ -135,5 +152,59 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
       isPrivate: n.is_private,
       createdAt: n.created_at,
     })),
+    tasks: (tasks ?? []).map((t) => ({
+      id: t.id,
+      description: t.description,
+      isDone: t.is_done,
+      createdByName: t.creator?.display_name ?? "Alguien",
+      assignedToId: t.assigned_to,
+      assignedToName: t.assignee?.display_name ?? null,
+      createdAt: t.created_at,
+    })),
   };
+}
+
+export type AssignableProfile = { id: string; display_name: string };
+
+/**
+ * Gente a quien tiene sentido asignar una tarea de esta postulación: admin+
+ * de la organización (siempre pueden actuar) o colaboradores ACTIVOS de
+ * ESTA vacante. No se usa la lista genérica de "toda la org" — asignar a
+ * alguien sin acceso a la vacante dejaría una tarea que ni el propio
+ * asignado puede ver (candidate_tasks_select exige can_access_job, no solo
+ * ser el asignado). `!inner` en el join fuerza el filtro is_active como
+ * WHERE real — con un join normal (left) solo dejaría el embed en null,
+ * sin excluir la fila del colaborador inactivo.
+ */
+export async function getAssignableProfiles(jobId: string, organizationId: string): Promise<AssignableProfile[]> {
+  const supabase = await createClient();
+  const [{ data: admins }, { data: collaborators }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .in("role", ["admin", "super_admin"]),
+    supabase
+      .from("job_collaborators")
+      .select("profile_id, profile:profiles!job_collaborators_profile_id_fkey!inner(display_name)")
+      .eq("job_id", jobId)
+      .eq("profile.is_active", true),
+  ]);
+
+  const byId = new Map<string, string>();
+  (admins ?? []).forEach((p) => byId.set(p.id, p.display_name));
+  (collaborators ?? []).forEach((c) => {
+    if (c.profile) byId.set(c.profile_id, c.profile.display_name);
+  });
+
+  return Array.from(byId, ([id, display_name]) => ({ id, display_name })).sort((a, b) =>
+    a.display_name.localeCompare(b.display_name),
+  );
+}
+
+/** true si `profileId` está en la lista de gente asignable de esta vacante — usado por addTask para no confiar en el <select> del cliente. */
+export async function isProfileAssignable(profileId: string, jobId: string, organizationId: string): Promise<boolean> {
+  const assignable = await getAssignableProfiles(jobId, organizationId);
+  return assignable.some((p) => p.id === profileId);
 }

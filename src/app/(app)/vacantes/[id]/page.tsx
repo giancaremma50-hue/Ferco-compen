@@ -2,11 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth/dal";
 import { getJobById } from "@/lib/jobs/get-jobs";
+import { getJobCollaborators, getAddableProfiles } from "@/lib/jobs/get-collaborators";
 import { canEditJob, TERMINAL_JOB_STATUSES } from "@/lib/jobs/permissions";
+import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { JobStatusBadge } from "@/components/vacantes/job-status-badge";
 import { ApprovalActions } from "@/components/vacantes/approval-actions";
 import { ReferCandidateDialog } from "@/components/vacantes/refer-candidate-dialog";
+import { CollaboratorsPanel } from "@/components/vacantes/collaborators-panel";
+import { CompetenciesPanel } from "@/components/vacantes/competencies-panel";
+import { getJobCompetencies } from "@/lib/competencies/get-competencies";
 import { NotifyOnMount } from "@/components/ui/notify-on-mount";
+import { CopyJobLink } from "@/components/vacantes/copy-job-link";
+import { JobAuditLog } from "@/components/vacantes/job-audit-log";
+import { getJobAuditLog } from "@/lib/audit/get-job-audit-log";
+import { getEmailContext } from "@/lib/notifications/notify";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
 
@@ -24,9 +33,24 @@ export default async function VacanteDetailPage({
 
   if (!job) notFound();
 
+  // Vale la pena solo si el link de verdad funciona hoy — /api/postular
+  // exige exactamente esta misma combinación (status "abierta" + is_public).
+  const showPublicLink = job.status === "abierta" && job.is_public && job.slug;
+  const publicUrl = showPublicLink ? `${(await getEmailContext()).siteUrl}/empleos/${job.slug}` : null;
+
   const isOpenForCandidates = !TERMINAL_JOB_STATUSES.has(job.status);
   const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
   const canEdit = canEditJob(profile.role, profile.id, job);
+  const canManageCollaborators = ADMIN_ROLES.has(profile.role);
+  const [collaborators, addable, competencies, auditEntries] = await Promise.all([
+    canManageCollaborators ? getJobCollaborators(job.id) : Promise.resolve([]),
+    canManageCollaborators ? getAddableProfiles(job.id, job.organization_id) : Promise.resolve([]),
+    canManageCollaborators ? getJobCompetencies(job.id) : Promise.resolve([]),
+    // RLS (audit_log_select) ya filtra a quien tenga acceso real a esta
+    // vacante — un colaborador sin ese acceso recibe [] directo de la
+    // base, no hace falta acotar por rol acá también.
+    getJobAuditLog(job.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -45,6 +69,16 @@ export default async function VacanteDetailPage({
           )}
         </div>
       </div>
+
+      {publicUrl && (
+        <div className="mt-6">
+          <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Link público</p>
+          <p className="mt-1 mb-2 text-xs text-muted-foreground">
+            Para publicar donde ya publiquen hoy — LinkedIn, Computrabajo, u otra bolsa.
+          </p>
+          <CopyJobLink url={publicUrl} />
+        </div>
+      )}
 
       <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-border py-6 text-sm sm:grid-cols-3">
         <Item label="País" value={job.country ?? "—"} />
@@ -84,6 +118,15 @@ export default async function VacanteDetailPage({
           </Link>
         )}
       </div>
+
+      {canManageCollaborators && (
+        <>
+          <CollaboratorsPanel jobId={job.id} collaborators={collaborators} addable={addable} />
+          <CompetenciesPanel jobId={job.id} competencies={competencies} />
+        </>
+      )}
+
+      <JobAuditLog entries={auditEntries} />
     </div>
   );
 }

@@ -23,7 +23,7 @@ export default async function LoginPage({
   const { proximo } = await searchParams;
   const organization = await getOrganization();
 
-  const platformName = organization?.platform_name ?? "Reclutamiento";
+  const platformName = organization?.platform_name ?? "Atrio";
   const signIn = signInWithGoogle.bind(null, proximo);
 
   return (

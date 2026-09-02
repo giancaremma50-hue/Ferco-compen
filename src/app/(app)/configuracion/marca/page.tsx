@@ -9,12 +9,14 @@ export default async function MarcaPage() {
   const [, organization] = await Promise.all([requireSuperAdmin(), getOrganization()]);
 
   const org = organization ?? {
-    platform_name: "Reclutamiento",
+    platform_name: "Atrio",
     accent_color: "#1f4d3d",
     logo_url: null,
     logo_dark_url: null,
     login_image_url: null,
     login_video_url: null,
+    careers_headline: null,
+    careers_intro: null,
   };
 
   return (
@@ -49,9 +51,11 @@ export default async function MarcaPage() {
 
           <div className="border-t border-border pt-5">
             <BrandingForm
-              key={`${org.platform_name}-${org.accent_color}`}
+              key={`${org.platform_name}-${org.accent_color}-${org.careers_headline}-${org.careers_intro}`}
               platformName={org.platform_name}
               accentColor={org.accent_color}
+              careersHeadline={org.careers_headline}
+              careersIntro={org.careers_intro}
             />
           </div>
         </div>

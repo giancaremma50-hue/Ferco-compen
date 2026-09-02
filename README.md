@@ -55,8 +55,19 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 5 — Pipeline kanban y perfil de candidato | ✅ |
 | 6 — Notificaciones in-app y correo | ✅ |
 | 7 — Centro de errores | ✅ |
+| 8 — Bitácora de auditoría + colaboradores por vacante | ✅ |
+| 9 — Configurador: departamentos, pipelines, motivos de rechazo | ✅ |
+| 10 — Tareas del candidato | ✅ |
+| 11 — Evaluación por competencias | ✅ |
+| 12 — Plantillas de mensaje y correo directo al candidato | ✅ |
+| 13 — Entrevistas y enlaces de Google Calendar | ✅ |
+| 14 — Segmentos y filtros de candidatos | ✅ |
+| 15 — Motor de plantillas de vacante | ✅ |
+| 16 — Configurador de bolsa pública | ✅ |
+| 17 — Fusión de plantilla de vacante + pipeline/competencias | ✅ |
+| 18 — Wizard de plantillas de vacante, creación desde plantilla, portal público dinámico, bitácora en vacante, tooltips | ✅ |
 | Mejoras post-Fase 7 (invitaciones, avatar, video de login, tutorial) | ✅ |
-| 8 — Endurecimiento y despliegue | Pendiente |
+| 19 — Endurecimiento y despliegue | Pendiente |
 
 **Antes de que el login funcione**, hay dos pasos manuales en el Dashboard de Supabase que ningún agente puede hacer por API — ver `.claude/napkin.md` sección "Pasos manuales pendientes":
 1. Activar el custom access token hook (Authentication → Hooks).

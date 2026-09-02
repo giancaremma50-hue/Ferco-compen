@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { forwardRef, useActionState, useEffect } from "react";
 import { ActionButton } from "@/components/ui/action-button";
 import { Field } from "@/components/ui/field";
+import { LabelSelect } from "@/components/ui/label-select";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import { COUNTRIES } from "@/lib/geo/countries";
@@ -11,17 +12,25 @@ import type { JobDetail } from "@/lib/jobs/get-jobs";
 
 type Department = { id: string; name: string };
 
-export function JobForm({
-  action,
-  departments,
-  defaultValues,
-  submitLabel,
-}: {
-  action: (prevState: JobActionResult | undefined, formData: FormData) => Promise<JobActionResult>;
-  departments: Department[];
-  defaultValues?: JobDetail;
-  submitLabel: string;
-}) {
+/**
+ * `ref` expone el <form> — lo usa NuevaVacanteForm para fusionar los datos
+ * de una plantilla de vacante campo por campo (solo los que están vacíos),
+ * sin pasar por `defaultValues` (que un formulario no controlado solo lee
+ * al montar, nunca al recibir props nuevas).
+ */
+export const JobForm = forwardRef<
+  HTMLFormElement,
+  {
+    action: (prevState: JobActionResult | undefined, formData: FormData) => Promise<JobActionResult>;
+    departments: Department[];
+    defaultValues?: Partial<JobDetail>;
+    submitLabel: string;
+    // Solo NuevaVacanteForm lo usa (un <input type="hidden" name="template_id">
+    // que va dentro del <form> real) — editar/page.tsx no lo necesita y no
+    // debe cargar con marcado de un flujo del que no participa.
+    children?: React.ReactNode;
+  }
+>(function JobForm({ action, departments, defaultValues, submitLabel, children }, ref) {
   const [state, formAction] = useActionState(action, undefined);
 
   useEffect(() => {
@@ -30,7 +39,9 @@ export function JobForm({
   }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form ref={ref} action={formAction} className="flex flex-col gap-5">
+      {children}
+
       <Field id="title" label="Título del puesto" error={state?.field === "title" ? state.error : undefined}>
         <input
           name="title"
@@ -104,42 +115,28 @@ export function JobForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field id="work_mode" label="Modalidad" error={state?.field === "work_mode" ? state.error : undefined}>
-          <select
+          <LabelSelect
+            id="work_mode"
             name="work_mode"
             required
-            defaultValue={defaultValues?.work_mode ?? ""}
+            labels={WORK_MODE_LABEL}
+            defaultValue={defaultValues?.work_mode ?? undefined}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="" disabled>
-              Elige una opción
-            </option>
-            {Object.entries(WORK_MODE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
         <Field
           id="employment_type"
           label="Tipo de contrato"
           error={state?.field === "employment_type" ? state.error : undefined}
         >
-          <select
+          <LabelSelect
+            id="employment_type"
             name="employment_type"
             required
-            defaultValue={defaultValues?.employment_type ?? ""}
+            labels={EMPLOYMENT_TYPE_LABEL}
+            defaultValue={defaultValues?.employment_type ?? undefined}
             className="h-11 rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="" disabled>
-              Elige una opción
-            </option>
-            {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
       </div>
 
@@ -224,4 +221,4 @@ export function JobForm({
       </div>
     </form>
   );
-}
+});

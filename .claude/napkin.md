@@ -1,12 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, video de login, tutorial)_
-
-## Reglas de Curación
-- Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
-- Es bitácora de registro: no solo trampas de sintaxis, también decisiones no obvias y errores reales con su corrección. Incluir fecha + "Do instead".
-- **Leer ANTES de tocar código.**
-
----
+_Última actualización: 2026-09-02 (fusión de las dos líneas de desarrollo — Fases 8-18 + mejoras post-Fase 7)_
 
 ## Mejoras post-Fase 7 (invitaciones, avatar, video de login) — MÁXIMA PRIORIDAD
 
@@ -43,11 +36,414 @@ _Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, 
 
 ---
 
+---
+
+
+## Lista de plantillas nunca se conectó al wizard nuevo (post-Fase 18) — MÁXIMA PRIORIDAD
+
+Reporte real del usuario: "el configurador de plantillas no quedó como lo pedí". Causa
+real: `/configuracion/plantillas-vacante` (el listado) seguía usando el modal plano de
+Fase 15 (`JobTemplateDialog`) para "Nueva plantilla" y "Editar" — el wizard de 6 pasos
+de Fase 18 solo era alcanzable desde "Continuar" (solo plantillas en borrador) o desde
+"Crear vacante" cuando no había ninguna plantilla todavía. El spec
+(`docs/superpowers/specs/2026-09-01-plantillas-vacante-wizard-design.md:3`) decía
+literal "Reemplaza el flujo actual" — nunca se hizo, el modal viejo quedó viviendo en
+paralelo sin que nadie lo notara porque seguía "funcionando".
+
+1. **[2026-09-01] Lección de proceso, no bug de código: un spec que dice "reemplaza X" no confirma solo con que lo nuevo compile y funcione — hay que verificar que lo viejo de verdad se desconectó de la UI.** El modal de Fase 15 se mantuvo deliberadamente actualizado durante Fase 18 (`createJobTemplate` ya insertaba con `status: 'published'`, tenía su propio helper `syncTemplateStagesFromPipeline` para no dejar `job_template_stages` vacío) — alguien SÍ pensó en mantenerlo compatible con el nuevo esquema, pero nadie volvió a la pantalla que lo dispara para apagarlo. Do instead: al cerrar cualquier fase que dice "reemplaza" un flujo viejo, grep del componente/acción vieja para confirmar 0 referencias reales en `src/app` — no alcanza con que el flujo nuevo exista y pase build.
+2. **[2026-09-01] Borrado, no bug: `JobTemplateDialog`, `createJobTemplate`/`updateJobTemplate`, `JobTemplateSchema` y `sync-stages-from-pipeline.ts` completos.** `job-template-row.tsx` ahora manda "Continuar" (borrador, a `paso-{wizard_step}`) o "Editar" (publicada, a `paso-1`) al wizard; `plantillas-vacante/page.tsx` manda "Nueva plantilla" a `/nueva`. Verificado con 2 revisores en paralelo: el paso 6 (`publishTemplate`) bloquea publicar sin etapas (mismo gate que tenía el helper borrado), ningún `update*Step` toca `status` salvo `publishTemplate` (reabrir una plantilla publicada no la revierte a borrador), pasos 3/4 son borra-e-inserta (reabrir no duplica preguntas/etapas), y `createJob` copia las filas de la plantilla a tablas propias de la vacante al crearla — nada queda con referencia viva a lo que se edite después en la plantilla.
+3. **[2026-09-01] Cascada de código muerto: borrar el punto de entrada de un flujo puede dejar huérfano lo que solo ÉL consumía, no solo lo que consume directamente.** `getPipelineTemplateOptions`/`PipelineTemplateOption` (`pipeline-templates/get-pipeline-templates.ts`) solo existían para alimentar el selector de pipeline del modal viejo — al borrar el modal, quedaron sin ningún llamador. Encontrado por el review (angle "removed-behavior"), no por grep manual inicial. Do instead: tras borrar un componente/acción, grep también los HELPERS que ese componente importaba — no solo confirmar que el componente en sí ya no se usa.
+
+---
+
+## Auditoría de buckets de Storage (post-Fase 18) — MÁXIMA PRIORIDAD
+
+Disparada por un reporte real del usuario: falló subir la "imagen del inicio
+de sesión" desde `/configuracion/marca`. Se verificó `storage.buckets` y las
+políticas de `storage.objects` en vivo (`execute_sql` contra el proyecto,
+simulación de rol con `request.jwt.claims`) — RLS de `marca-publico`/`cvs-privado`
+está bien, los 2 bugs reales estaban en otro lado.
+
+1. **[2026-09-01] BUG REAL: Next.js limita a 1 MB el body de toda Server Action por defecto — `next.config.ts` nunca lo overrideaba, aunque el configurador de marca admite imágenes de hasta 5 MB.**
+   `uploadBrandImage` (`src/lib/organizations/actions.ts`) valida tamaño/tipo con Zod después de recibir el `FormData`, pero Next.js corta la solicitud ANTES de que ese código corra si el body pasa de 1 MB — la "imagen del inicio de sesión" (recomendada 1200x1600 vertical) fácilmente pesa más que eso. El candidato ve un error crudo de Next, no el mensaje en español del catálogo. Do instead: `experimental.serverActions.bodySizeLimit` en `next.config.ts` SIEMPRE tiene que ser ≥ el límite más grande que valide cualquier Server Action del código (+ margen por overhead de `multipart/form-data`, la doc de Next recomienda 10-20 KB) — un límite de archivo en Zod que nunca se compara contra este config es una validación que puede no alcanzar a ejecutarse nunca.
+
+2. **[2026-09-01] BUG REAL, silencioso: el bucket `cvs-privado` tenía `allowed_mime_types` configurado solo para CVs (PDF/DOC/DOCX) — nunca se actualizó cuando Fase 18 agregó "archivos adicionales" (PDF/JPG/PNG) a `/api/postular`.**
+   El código de la app sí permite JPG/PNG (`ALLOWED_ADDITIONAL_TYPES` en `src/app/api/postular/route.ts`), pero Supabase Storage rechaza la subida a nivel de bucket antes de que la RLS o el código importen — y ese error se trata como "best-effort" (`continue`, sin avisar al candidato). Resultado: TODO archivo adicional que fuera imagen se perdía en silencio, en cada postulación, desde el primer commit de Fase 18 — la postulación seguía viéndose exitosa. Corregido con `update storage.buckets set allowed_mime_types = array[...] where id='cvs-privado'` agregando `image/jpeg`/`image/png`. Do instead: **el tipo MIME permitido vive en 2 lugares que tienen que coincidir** — el `Set` de la app y `storage.buckets.allowed_mime_types` — cambiar solo uno dos dejarlo pasar en un lado y morir en silencio en el otro. Verificar ambos con `select allowed_mime_types from storage.buckets` cada vez que se agregue un tipo de archivo nuevo a cualquier flujo de subida.
+
+3. **[2026-09-01] Aviso, no bug: el proyecto Supabase de este ATS tiene 2 buckets que el código de este repo nunca referencia — `archivos` (público, sin límite de tipo/tamaño) y `archivos_planes`/`firmas` (política de solo-lectura para `authenticated`).** Ninguno aparece en `docs/database.md` ni en ningún `storage.from(...)` de `src/`. Probablemente resto de otro proyecto compartiendo el mismo proyecto Supabase — no se tocaron, solo se deja constancia por si el usuario no esperaba que estuvieran ahí.
+
+---
+
+## Pestaña Pipelines eliminada + "guardar como set reutilizable" (Fase 18)
+
+Cierra la pieza que quedó pendiente tras portal público: con el wizard ya
+pudiendo crear `pipeline_templates` nuevos desde su propio paso "Etapas"
+(checkbox "Guardar estas etapas intermedias como un set reutilizable"),
+se cumple la condición para quitar `/configuracion/pipelines` — pantalla,
+componentes (`pipeline-stages-editor.tsx`, `pipeline-template-form.tsx`,
+`pipeline-template-row.tsx`) y `pipeline-templates/actions.ts` completo,
+borrados.
+
+1. **[2026-09-01] BUG REAL: `createPipelineTemplate` (Fase 15, ya borrado) manejaba `error.code === "23505"` para un nombre repetido — pero nunca existió un índice único que hiciera posible ese código de error. Confirmado consultando `pg_indexes` directo: solo estaba el índice único parcial de `is_default`, ninguno sobre `name`.**
+   El pre-check de la nueva función (`.ilike` antes de insertar) tenía la misma falsa sensación de seguridad — sin restricción real, dos guardados casi simultáneos con el mismo nombre nuevo pasaban los dos. Agregado `pipeline_templates_org_name_key` (índice único en `(organization_id, lower(name))`), mismo patrón que `employment_reasons_org_label_key` (Fase 18, 1/7). Do instead: un `catch` de `error.code === "23505"` en código viejo NO es evidencia de que la restricción real existe — confirmarlo consultando `pg_indexes`/`pg_constraint` directo antes de asumir que "ya está cubierto en otro lado".
+
+2. **[2026-09-01] BUG REAL: crear una fila padre y luego una fila hija dependiente en dos pasos separados, sin revertir la primera si la segunda falla, deja un registro fantasma (nombre sin contenido) que la UI sigue ofreciendo como opción válida.**
+   Si `pipeline_templates` se insertaba bien pero `pipeline_template_stages` fallaba, quedaba un set con nombre y 0 etapas — "Empezar desde un set guardado" lo seguía listando, y elegirlo vaciaba la plantilla de quien lo intentara, sin ningún beneficio. Corregido: si el segundo insert falla, se borra la fila padre recién creada. Do instead: cualquier "crear padre, luego hijo" en dos pasos sin transacción real necesita el rollback manual del padre si el hijo falla — no dejarlo mudo esperando a que alguien lo note en la lista.
+
+3. **[2026-09-01] Decisión, aceptada y no corregida: ya no hay forma de RE-designar qué `pipeline_templates` es la "predeterminada" de la organización — `setDefaultPipelineTemplate` se borró junto con la pantalla, y nada la reemplaza.**
+   Solo importa para el diálogo plano viejo (Fase 15) cuando no se elige ningún pipeline al crear una plantilla — cada vez más un camino secundario ahora que el wizard es el principal. Construir una UI nueva solo para esto era alcance no pedido; se documenta como límite conocido, no se inventó una pantalla nueva para un caso que hoy casi no se usa.
+
+---
+
+## Portal público dinámico (Fase 18) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado ANTES de que llegara a producción (se probó con simulación de rol antes de dar la migración por buena): una tabla nueva con SELECT solo para `can_access_job()` es invisible para el portal público sin autenticar — `can_access_job()` nunca contempla el rol `anon`.**
+   `job_questions`/`job_question_options` (Fase 18, esquema) se diseñaron pensando en el uso INTERNO (RH viendo las preguntas de una vacante) y se les olvidó el otro consumidor real: el visitante anónimo del portal, que necesita ver esas mismas preguntas para responderlas. Sin la política `to anon` agregada acá, el portal público habría mostrado un formulario sin preguntas para SIEMPRE, sin ningún error visible — simplemente `[]`. Do instead: toda tabla nueva que un flujo público (sin sesión) necesita leer necesita su PROPIA política con `to anon` — no alcanza con que la tabla "ya tenga RLS", cada rol que de verdad la va a consultar necesita su propia condición explícita. Mismo patrón que `jobs_select_public` (ya existía) — buscarlo como referencia antes de escribir la política nueva, no reinventar el criterio.
+
+2. **[2026-09-01] Decisión: `parseCandidacyFields()` normaliza cualquier `jsonb` no válido a "required" (el default más estricto), no a "hidden" ni a un error 500.**
+   `candidacy_fields` es `Json` sin forma garantizada por TypeScript — un `as CandidacyFields` confía ciegamente. Ante una fila malformada, la opción seguía siendo mostrar el portal público (no romperlo), pero pedir DE MÁS es más seguro que pedir de menos — un campo que aparece de más es una molestia, un campo que debería pedirse y no aparece es un hueco de datos silencioso.
+
+---
+
+## Tooltips del menú flotante (Fase 18) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL: un tooltip `absolute` sin `z-index` propio puede quedar tapado por un elemento hermano opaco que sí tiene su propio contexto de apilamiento — incluso sin que ninguno declare `z-index` explícito, el orden del DOM decide, y un vecino "activo" puede pintar encima.**
+   El indicador del ítem activo del menú flotante (`bg-background`, opaco) y el tooltip nuevo de un ítem vecino podían superponerse visualmente (tooltips más anchos que su propio botón, gap chico entre ítems) — sin `z-index`, gana quien esté después en el DOM, no necesariamente el tooltip. Corregido con `z-10` explícito en el tooltip. Do instead: cualquier tooltip/popover `absolute` que pueda superponerse con un elemento hermano opaco necesita `z-index` explícito, no asumir que "está encima en el árbol visual" alcanza.
+
+2. **[2026-09-01] No se pudo probar en navegador — limitación ya documentada del sandbox, no un bug de la app.** El menú flotante vive dentro del layout autenticado (requiere `requireProfile()` con datos reales de Supabase) y este entorno no tiene salida de red hacia `*.supabase.co` (ver la entrada de Fase 17/entorno de desarrollo remoto). Verificado por inspección de código + `typecheck`/`lint`/`build`, no por interacción real en un navegador — pendiente de confirmación visual del usuario o en producción (Vercel sí tiene salida a internet real).
+
+---
+
+## Creación de vacante basada en plantilla (Fase 18, 7/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL DE TYPO, encontrado por revisión propia antes de que llegara a review: una variable con caracteres corruptos (cirílico/CJK mezclados en el mismo nombre, dos variantes distintas) compiló porque JS/TS no valida que un identificador "se vea bien", solo que sea consistente.**
+   `sync-stages-from-pipeline.ts` tenía `source櫲PipelineId` en la declaración y `sourceпPipelineId` en el uso — dos identificadores DISTINTOS pero visualmente casi idénticos, típico de un artefacto de generación/autocompletado. TypeScript no lo marcó como error de sintaxis inmediatamente reconocible en el diff porque cada uno de los dos nombres corruptos SÍ era válido como identificador aislado. Do instead: después de escribir cualquier archivo con contenido generado de una sola pasada larga, correr `grep -nP "[^\x00-\x7F]"` sobre el archivo y revisar cada match a mano — no asumir que un identificador "raro" se habría marcado solo.
+
+2. **[2026-09-01] BUG REAL: un input de texto dentro de un `<form>` dispara el envío IMPLÍCITO de ese form al presionar Enter — incluso si el botón "propio" del widget es `type="button"` y nunca se toca.**
+   `EmploymentReasonSelect` vive dentro del `<form>` de "Crear vacante" (no puede tener su propio `<form>`, HTML no permite anidarlos). El input de "nuevo motivo" no tenía `onKeyDown`, así que Enter usaba el ÚNICO botón `type="submit"` real del DOM — el de crear la vacante, no el de agregar el motivo. Do instead: cualquier `<input type="text">` dentro de un `<form>` ajeno (un widget que vive dentro de un form más grande, sin ser su propio form) necesita `onKeyDown` que intercepte Enter (`preventDefault()` + la acción propia del widget) — no asumir que un botón `type="button"` cercano alcanza para evitar el envío implícito.
+
+3. **[2026-09-01] Patrón nuevo: `<ActionButton>` fuera de un `<form>` (o dentro de uno ajeno) sigue funcionando pasándole `pending` explícito — no hace falta que viva dentro de SU PROPIO `<form action={...}>` para tener el spinner/disabled consistente.**
+   `pending ?? formStatus.pending` en `action-button.tsx`: si se pasa `pending={isPending}` (de un `useTransition` propio), gana sobre el `useFormStatus()` ambiente del form que lo rodee (que ni siquiera es el que le importa a este botón). Do instead: cuando un botón que muta datos no puede vivir en su propio `<form>` (widget anidado dentro de un form más grande), usar `<ActionButton type="button" pending={isPendingPropio}>` en vez de inventar un botón crudo con estado manual — sigue siendo la regla no negociable, solo cambia de dónde sale el estado de carga.
+
+---
+
+## Wizard de plantillas — pasos 5-6, cierre (Fase 18, 6/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, el más sutil de la sesión: un UPDATE que cambia si el propio actor va a seguir cumpliendo la política de SELECT de esa misma fila no puede confiar en el RETURNING de ese UPDATE para saber si "se guardó".**
+   `updateTemplateStep5` dejaba activar `is_confidential` a cualquier admin+ (la política de escritura no mira quién es `created_by`), pero la política de lectura sí — un admin que no es el creador, al activar el switch, deja de cumplir esa política desde el mismo `UPDATE`. El código pedía `.select("id")` sobre ese UPDATE para confirmar éxito: como el RETURNING se filtra por la política de SELECT DESPUÉS de escribir, volvía vacío — `data.length === 0` se leía como "no se guardó", cuando en realidad sí se había guardado. El siguiente paso (redirigir al paso 6) además le daba un 404 real, sin ninguna pista de que su cambio sí había funcionado.
+   Do instead: cuando un UPDATE puede cambiar si el actor sigue teniendo SELECT sobre la fila que acaba de tocar, la confirmación de éxito no puede depender del RETURNING de ese mismo UPDATE — confirmar existencia con un SELECT aparte ANTES de escribir, y decidir el resultado del `UPDATE` solo por su `error`, no por si el actor todavía puede leer la fila después.
+
+2. **[2026-09-01] Decisión, consecuencia del bug de arriba: si el guardado del paso 5 deja al actor sin poder ver su propia plantilla, no se lo manda al paso siguiente — se lo manda al listado con un mensaje que explica por qué.**
+   Mandarlo al paso 6 de todos modos le habría dado un 404 sin contexto (ya no cumple `can_view_job_template`). En vez de "arreglar" el síntoma escondiendo el 404, se cambia el destino del redirect según si el actor va a poder seguir viendo la fila o no — la excepción a la regla "todo paso avanza al siguiente" está documentada en el propio código, no es un caso suelto.
+
+---
+
+## Wizard de plantillas — paso 4 "Etapas" (Fase 18, 5/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] `job_template_stages` nació en la 1/7 con un enum propio (`kind`) que resultó redundante en cuanto se llegó a construir el paso que la usa — reemplazado por el `job_stage_type` que ya usan `pipeline_template_stages`/`job_stages` antes de que nadie hubiera guardado una fila.**
+   Se diseñó pensando solo en la UX del wizard (qué posiciones quedan fijas), sin considerar que esta tabla eventualmente se materializa en `job_stages` — que sí necesita el tipo semántico real (`postulado`/`preseleccion`/`entrevista`/`oferta`/`contratado`/`descartado`) para que el resto de la app (filtros de candidatos, kanban) la entienda. Corregido a tiempo porque la tabla seguía vacía (nadie había usado el paso 4 todavía) — sin backfill necesario.
+   Do instead: antes de diseñar el esquema de una tabla nueva "solo para la UI de este paso", preguntar si esos datos eventualmente alimentan o se materializan en OTRA tabla que ya tiene su propio tipo/enum establecido — si sí, reusar ese enum desde el principio en vez de inventar uno paralelo que después hay que reconciliar.
+
+2. **[RESUELTO, ver la sección de arriba] Decisión original: "Guardar este set como reutilizable" se recortó de este paso mientras la pestaña Pipelines siguiera existiendo.**
+   Ya no aplica — el checkbox se construyó y la pestaña Pipelines se quitó en la misma entrega que cierra esta fase. Se deja el ítem para el historial, no como pendiente real.
+
+---
+
+## Wizard de plantillas — paso 3 "Preguntas" (Fase 18, 4/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado por 2 agentes de `/code-review` independientes con el mismo hallazgo: cambiar el `<select>` de tipo de una pregunta sin limpiar su lista de opciones asociada deja filas huérfanas permanentes.**
+   Al pasar una pregunta de "Opción múltiple" a "Abierta" en `QuestionListEditor`, el `onChange` solo parcheaba `type`, no `options` — el bloque de opciones deja de RENDERIZARSE (gateado a `type === "multiple_choice"`) pero sigue vivo en el estado de React, y el input oculto las sigue serializando en cada submit. El servidor las insertaba igual (sin filtro por tipo) — el usuario nunca puede volver a verlas ni borrarlas desde la UI una vez ocurre.
+   Do instead: en cualquier editor de lista anidada donde un campo "tipo" decide si un sub-campo aplica o no (acá: `type` decide si `options` tiene sentido), el `onChange` de ese campo tipo tiene que limpiar el sub-campo explícitamente, Y la Server Action tiene que filtrar por ese mismo tipo antes de escribir — las dos capas, no solo una (el cliente puede tener el mismo bug de nuevo mañana).
+
+2. **[2026-09-01] Decisión de arquitectura: los `id` de un INSERT en lote que necesita después un segundo INSERT dependiente (preguntas → opciones) se generan en el cliente/servidor de la app con `crypto.randomUUID()` antes de insertar, nunca se leen del `RETURNING`.**
+   Postgres no garantiza que las filas de un `RETURNING` de un `INSERT` multi-fila vuelvan en el mismo orden que los valores insertados — emparejar `insertedRows[i].id` con el índice `i` del array original es una apuesta, no una garantía. Generar los `id` de antemano (`crypto.randomUUID()`, disponible como global en el runtime de Node de este proyecto sin import) elimina el problema por completo. Do instead: cualquier INSERT en lote cuyo resultado alimenta un segundo INSERT relacionado (padre-hijo) genera los ids de antemano, no confía en el orden de vuelta del primero.
+
+---
+
+## Wizard de plantillas — pasos 1-2 (Fase 18, 2/7 y 3/7) — MÁXIMA PRIORIDAD
+
+3. **[2026-09-01] Toda Server Action nueva que muta y redirige necesita `revalidatePath` del listado y de cualquier página propia a la que se pueda volver — se me olvidó en las 3 acciones del wizard, encontrado en `/code-review` antes de commitear.**
+   `createTemplateDraftStep1`/`updateTemplateStep1`/`updateTemplateStep2` redirigían sin revalidar nada, rompiendo la convención que sigue cada Server Action de este proyecto (`job-templates/actions.ts`, `departments/actions.ts`, `jobs/actions.ts`, todas la llaman). Do instead: al escribir una Server Action nueva que hace `redirect()` tras mutar, copiar el bloque `revalidatePath(...)` de la acción hermana más parecida ANTES de considerarla terminada — no es opcional solo porque el destino "parece" dinámico.
+
+## Wizard de plantillas — paso 1 "Detalles" (Fase 18, 2/7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL DE REGRESIÓN: agregar una columna `status` con `DEFAULT 'draft'` a una tabla que ya tenía un flujo de creación existente puede volver invisibles filas que antes eran normales, sin tocar ese flujo para nada.**
+   `job_templates.status` se agregó en la 1/7 pensando en el wizard nuevo (progresivo). `createJobTemplate()` (Fase 15, diálogo de un solo paso, nunca supo de `status`) seguía insertando bien — pero cada plantilla nueva nacía en `'draft'` por el default, y el nuevo `getPublishedJobTemplates()` (filtra `published`) las excluía todas del selector de "Solicitar vacante". Se encontró en `/code-review` antes de commitear, no en producción.
+   Do instead: cuando una migración agrega una columna con estado (`status`, `draft/published`, `activo/inactivo`) a una tabla con un flujo de creación YA EXISTENTE, revisar ese flujo explícitamente — ¿debería seguir produciendo el equivalente de "listo para usar" de siempre, o heredar el nuevo estado por defecto? No asumir que un default de columna es inocuo solo porque no rompe el `INSERT` en sí.
+
+2. **[2026-09-01] Entorno: un archivo que Bash puede leer bajo `~/.claude/projects/.../tool-results/` puede ser invisible para el tool de PowerShell en la misma sesión (`Test-Path` da `False`), sin patrón claro de cuándo pasa.**
+   Encontrado al intentar extraer el resultado de `generate_typescript_types` (guardado como archivo grande fuera del contexto) — Bash lo leía sin problema (`head -c` funcionaba), PowerShell no lo encontraba ni con la ruta exacta copiada de `Get-ChildItem`. Do instead: si PowerShell no encuentra un archivo bajo `tool-results` que Bash sí ve, copiarlo primero al working directory del proyecto con Bash (`cp`) y operar sobre la copia — no perder tiempo reintentando la ruta original.
+
+---
+
+## Esquema del wizard de plantillas de vacante (Fase 18, 1/7) — MÁXIMA PRIORIDAD
+
+Origen: rediseño grande pedido por el usuario (wizard de plantillas de vacante paso a paso, candidatura dinámica, preguntas con precalificación, confidencialidad). Esta entrega es solo esquema y RLS — las fases 2-7 construyen la UI encima, cada una con su propio plan.
+
+1. **[2026-09-01] BUG DE SEGURIDAD REAL: una política `FOR ALL` también gobierna `SELECT`, y se combina en OR con la política de lectura — puede dejar ver una fila que la política de SELECT explícitamente esconde.**
+   `job_templates_write_admin` (Fase 15, ya existía) es `FOR ALL`. Al agregar `is_confidential` y una `job_templates_select` más estricta (`can_view_job_template`, esconde una plantilla confidencial de quien no es su creador), la plantilla confidencial SEGUÍA siendo visible para cualquier admin+ de la organización — la política de escritura, al cubrir también SELECT, la dejaba pasar sin pasar por la función nueva. Se detectó simulando el rol real (insertar una confidencial de otro creador, `select count(*)` como un admin distinto) — leer el SQL de la política no lo hubiera mostrado, hacía falta correrlo. Corregido partiendo `job_templates_write_admin` (y las 3 políticas de escritura de sus hijas nuevas) en `INSERT`/`UPDATE`/`DELETE` por separado, ninguna declarada `FOR ALL`.
+   Do instead: en cuanto una tabla tenga una política de SELECT con una condición más estricta que "cualquiera del rol X" (confidencialidad, visibilidad parcial), auditar TODAS las demás políticas de esa tabla — si alguna es `FOR ALL`, hay que partirla o la condición estricta queda de adorno. No alcanza con revisar la política que se acaba de escribir.
+
+2. **[2026-09-01] `auth.uid()` como `DEFAULT` de columna no sirve en el momento de una migración (sin contexto de request, evalúa `null`), pero SÍ sirve para cada INSERT real de la app de ahí en adelante.**
+   `job_templates.created_by` se agregó `NOT NULL` sin default, con un backfill (`UPDATE ... SET created_by = <super_admin de la org>`) para las filas ya existentes, y RECIÉN DESPUÉS `ALTER COLUMN created_by SET DEFAULT auth.uid()`. Sin ese paso separado, `createJobTemplate()` (Fase 15, nunca mandó `created_by`) hubiera roto en el primer POST real después de esta migración — confirmado porque `typecheck` lo señaló de inmediato (el tipo `Insert` generado exige la columna cuando no ve un default en `information_schema`).
+   Do instead: cuando una columna `NOT NULL` nueva necesita quedar poblada por el actor real (no un valor fijo), backfill con un `UPDATE` explícito primero, `SET NOT NULL` después, y recién ahí agregar `DEFAULT auth.uid()` — hacerlo en un solo paso (columna con default volátil desde el `ADD COLUMN`) rompe el backfill de las filas existentes.
+
+3. **[2026-09-01] Decisión: `job_questions`/`job_question_options` (copia por vacante) sí quedaron con política de escritura `FOR ALL`, a diferencia de sus pares de plantilla — verificado que es seguro, no un descuido.**
+   `private.can_access_job()` empieza con `is_admin_or_above() OR ...` — un admin+ ya tiene acceso incondicional a toda vacante de su organización, así que una política `FOR ALL` no le regala ningún `SELECT` que `can_access_job` no le diera igual (a diferencia de `job_templates`, que sí tiene una condición de confidencialidad que un admin+ no cumple automáticamente). Confirmado leyendo `prosrc` de `can_access_job` antes de decidir, no asumido por analogía.
+
+4. **[2026-09-01] El JWT de prueba en simulación de rol necesita `app_metadata.app_role`, no `app_metadata.role` — mismo error de sintaxis ya anotado en Fase 13, repetido de nuevo antes de recordarlo.**
+   Costó dos intentos fallidos (parecían RLS negando de más) antes de volver a `select prosrc from pg_proc where proname = 'auth_role'` y confirmar el nombre exacto. Do instead: la próxima vez, empezar por ahí, no por adivinar.
+
+---
+
+## Fusión de plantilla de vacante + conexión a pipeline/competencias (Fase 17) — MÁXIMA PRIORIDAD
+
+Origen: comparación contra un documento de referencia del sistema real (RH-Suite) que el usuario pidió revisar. El documento mostró que "elegir plantilla" en el sistema real FUSIONA campos (no pisa lo ya escrito) y que la plantilla trae su propio pipeline + rúbrica de evaluación — ninguna de las dos cosas existía en la Fase 15 original.
+
+1. **[2026-09-01] BUG DE SEGURIDAD REAL, el más serio de la sesión: el primer diseño de "aplicar plantilla" mandaba el CONTENIDO de la rúbrica (nombre/peso de cada competencia) del cliente al servidor, y `createJob` lo insertaba tal cual usando el cliente admin (que bypasea RLS).**
+   `job_competencies` exige `admin+` para escribir (`job_competencies_write_admin`) — pero `createJob` deja crear vacantes a cualquier `gestor`. La primera versión de este fix insertaba las competencias que llegaban en un campo oculto del formulario usando `createAdminClient()` (mismo motivo que `materializeJobStages`: un gestor no tiene SELECT sobre las tablas admin-only que arman el pipeline). El problema: a diferencia de `materializeJobStages` (que solo recibe un ID de plantilla del cliente y vuelve a consultar el CONTENIDO real en el servidor), esta primera versión insertaba el contenido que el cliente mandó, sin volver a verificarlo contra nada. Un gestor podía fabricar un POST directo a `createJob` con nombres/pesos de competencia inventados y se insertaban igual, evitando por completo el gate admin+ que protege esa tabla en cualquier otro flujo. Corregido: el cliente solo manda `template_id` (una referencia); `createJob` vuelve a leer `job_templates.competencies` desde la base con el cliente de SESIÓN (no el admin — `job_templates_select` ya permite leer a cualquier miembro de la organización) antes de decidir qué insertar. Do instead: cuando el cliente admin (`createAdminClient()`) bypasea RLS para que un rol sin acceso directo pueda completar una acción legítima, **el cliente nunca debe mandar el contenido que se va a escribir — solo un id que el servidor vuelve a resolver.** Si el servidor confía en el contenido en vez de en el id, el bypass de RLS se convierte en un bypass de la regla de negocio completa (aquí, "solo admin+ decide la rúbrica de evaluación").
+
+2. **[2026-09-01] Un formulario no controlado (`defaultValue`) no puede "fusionar" datos nuevos vía props — la fusión real necesita manipular el DOM a mano.**
+   El primer intento de "fusionar en vez de reemplazar" seguía usando el mecanismo de `key`+remount de Fase 15 (que por diseño REEMPLAZA todo el formulario). Eso no es fusión, es "reemplazar con un candado si ya hay algo" — no cumple lo que pedía el documento de referencia (RH-Suite solo llena los campos VACÍOS). La solución real: `JobForm` expone su `<form>` vía `ref` (con `forwardRef`), y quien elige la plantilla (`NuevaVacanteForm`) recorre `form.elements.namedItem(nombre)` campo por campo, escribiendo el valor SOLO si el campo actual está vacío (`fillIfEmpty`). Nada de `key`, nada de remount — el mismo `<form>` sigue vivo, solo se le tocan los campos que el usuario no había tocado.
+
+3. **[2026-09-01] Reabrir "Nueva plantilla" tras crear una mostraba la rúbrica de la plantilla recién creada — `formRef.current.reset()` (nativo) no toca estado de React.**
+   `CompetencyListEditor` guarda sus filas en `useState`, no en `defaultValue` de inputs — un `reset()` nativo del formulario no lo alcanza. Se corrigió exponiendo un `ref` imperativo (`useImperativeHandle`) con un método `clear()`, llamado junto al `reset()` nativo. Do instead: cualquier editor de lista tipo `PipelineStagesEditor`/`CompetencyListEditor` (estado de React serializado a un input oculto) necesita su PROPIO mecanismo de limpieza — el `reset()` de un `<form>` nativo solo alcanza inputs/textareas/selects no controlados.
+
+4. **[2026-09-01] `react-hooks/set-state-in-effect` bloquea `setState` dentro de un `useEffect` incluso llamado a través de un ref imperativo indirecto si el linter lo puede rastrear — pero SÍ permite llamar un método imperativo expuesto por OTRO componente (`ref.current?.clear()`), porque no puede ver dentro de él.**
+   Confirma el mismo patrón ya documentado en Fase 12 (`message-form.tsx`): cuando ESLint bloquea un `setState` directo dentro de un efecto, la salida no es "sacar la lógica del efecto" — es mover el `setState` a un componente hijo y exponerlo como un método imperativo (`useImperativeHandle`) en vez de una prop de estado (`key`).
+
+---
+
+## Configurador de bolsa pública (Fase 16) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Alcance recortado a propósito: 2 columnas nuevas en `organizations` (`careers_headline`, `careers_intro`) reusando el formulario de Marca ya existente, no una página ni tabla nueva.**
+   El ítem del roadmap decía "configurador de bolsa pública (editor de contenido multi-página)" — sonaba a mucho más de lo que en realidad hace falta para una demo. Lo real: el portal público (`/empleos`) solo necesitaba un título y un texto de bienvenida configurables; no hace falta una tabla nueva, RLS nueva, ni una página de configuración nueva — son 2 campos más en la fila de `organizations` que ya existe, guardados por la misma acción que ya guarda logo/color/nombre. Do instead: antes de diseñar una tabla/página nueva para un ítem de roadmap que "suena grande", preguntar qué tan grande es el contenido real — a veces son 2 columnas en una tabla que ya existe.
+
+2. **[2026-09-01] Decisión de permiso: el contenido de la bolsa pública quedó gateado a `super_admin` (mismo nivel que logo/color), no a `admin` como el resto de la configuración de reclutamiento — decisión deliberada, no un descuido.**
+   `admin` (RH) sería el dueño natural de este copy, pero la política RLS de `UPDATE` en `organizations` (`organizations_update_super_admin`) es a nivel de FILA, no de columna — Postgres RLS no puede decir "admin puede tocar `careers_headline` pero no `accent_color`" sobre la misma fila sin un trigger o una tabla aparte. Bajar el gate a `admin+` en la acción compartida (`updateBranding`) le daría a cualquier `admin` la capacidad de cambiar también el logo, el color de acento y el nombre de la plataforma — una escalación de permiso real. Se dejó en `super_admin` (más estricto, consistente con Marca) en vez de resolver esto ahora. Si se necesita de verdad que `admin` edite el copy de la bolsa sin tocar la identidad visual, la solución correcta es sacar `careers_headline`/`careers_intro` a una tabla aparte con su propia política — no relajar la política de `organizations`.
+
+3. **[2026-09-01] BUG REAL: `?? null` no captura un valor de solo espacios porque `optionalText()` solo convierte a `undefined` el valor CRUDO antes de recortar, no el resultado ya recortado.**
+   `optionalText("   ").safeParse(...)` → el preprocess ve `"   "` (no es `""` ni `null`), lo deja pasar; luego el `.trim()` interno del schema lo reduce a `""` — el resultado final en `parsed.data` es `""`, no `undefined`. `"" ?? null` da `""`, no `null`. Corregido con `|| null` en vez de `?? null` (trata `""` igual que `null`/`undefined`). Do instead: cuando se necesite "vacío o solo espacios → null" después de un `optionalText()`, usar `|| null`, no `?? null` — el operador `??` solo mira nullish, no falsy, y un string recortado a `""` no es nullish.
+
+---
+
+## Motor de plantillas de vacante (Fase 15) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL (recurrente, 3ª vez que aparece en la sesión): un diálogo de editar con inputs no controlados (`defaultValue`) no se entera cuando sus props cambian — solo aplica el valor al montar.**
+   `JobTemplateDialog` no se remontaba entre aperturas: tras guardar una edición y reabrir "Editar" sobre la MISMA fila sin recargar la página, los campos mostraban el valor de ANTES de guardar, no el recién guardado. Mismo patrón ya sospechado en `DepartmentDialog`/`MessageTemplateDialog` (no confirmado ahí, pero comparten la exacta misma estructura — probablemente el mismo bug). Corregido acá con `key={template.updated_at}` en el uso del diálogo — cambia cada vez que la fila realmente cambió, forzando un remount con datos frescos. Do instead: cualquier diálogo de "editar" con inputs `defaultValue` necesita una `key` atada a algo que cambie cuando el dato subyacente cambia (`updated_at` es ideal, ya viene gratis en casi toda tabla) — no asumir que basta con que el diálogo cierre y vuelva a abrir.
+
+2. **[2026-09-01] Bug del mismo síntoma, causa distinta: el formulario de CREAR (sin `template`, sin id que cambie entre aperturas) no se limpiaba solo — necesitó `formRef.current?.reset()`, no una `key`.**
+   Una `key` no ayuda acá porque no hay ningún valor que cambie entre "crear la primera plantilla" y "crear la segunda" — el fix es imperativo (`reset()` del form nativo), no declarativo. Do instead: distinguir el síntoma "reabrir muestra datos viejos" en dos causas — edición (usar `key` atada a un campo que cambia) vs. creación (usar `formRef.reset()`), no aplicar la misma solución a ambas.
+
+3. **[2026-09-01] Reuso: `JobTemplateSchema` se derivó de `JobFormSchema` con `.pick()` en vez de retipar los mismos 5 campos — requirió separar `JobBaseSchema` (sin `.refine()`) de `JobFormSchema` (con `.refine()`) en `src/lib/jobs/schema.ts`, porque Zod v4 no permite `.pick()` sobre un schema que ya tiene un refinamiento encima.**
+   `z.object({...}).refine(...).pick({...})` lanza `.pick() cannot be used on object schemas containing refinements` en tiempo de ejecución, no es un error de tipos — se descubre corriendo el código, no compilando. Do instead: si un schema necesita `.refine()` Y otro schema necesita reusar un subconjunto de sus campos con `.pick()`, separar el objeto base (sin refine) del schema final (`base.refine(...)`) desde el principio — no agregar el refine directo al `z.object()` inicial si ya se sabe que otro lugar va a necesitar sus campos sueltos.
+
+4. **[2026-09-01] Reuso: `LabelSelect` extraído a `src/components/ui/` tras la 2ª aparición del mismo `Object.entries(WORK_MODE_LABEL).map(...)` (job-form.tsx ya lo tenía, job-template-dialog.tsx lo iba a repetir).**
+   Distinto del criterio "esperar a la 3ª copia" de Fases 12/14 — acá se extrajo en la 2ª porque dos revisores independientes convergieron en el mismo hallazgo con el mismo fix sugerido, señal más fuerte que "se parece a algo" a secas.
+
+---
+
+## Segmentos y filtros de candidatos (Fase 14) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, el más serio de esta fase: forzar `!inner` sobre un embed de Supabase para poder filtrar por su columna reintrodujo un bug ya documentado y corregido en Fase 5 — pero esta vez borraba la fila COMPLETA en silencio, no solo lanzaba un error de acceso nulo.**
+   `job_stages`/`jobs` tienen RLS más estricta que `applications` (un colaborador sigue viendo la postulación de su referido aunque la vacante ya no le sea visible). `job_stages!inner(name, type)` sin condición — puesto ahí solo para poder hacer `.eq("job_stages.type", ...)` — hace que PostgREST exija una fila de `job_stages` unible para devolver la fila padre, así que cualquier candidato cuya etapa dejó de ser visible desaparecía por completo de `/candidatos`, sin filtro de etapa activo siquiera. Corregido quitando el `!inner` (vuelve a ser `job_stages(name, type)`, nullable) y filtrando por tipo de etapa en JS después de traer las filas. Do instead: cuando se necesite filtrar por una columna de un embed, preguntar primero si la tabla embebida tiene RLS más estricta que la tabla principal — si sí, **nunca** usar `!inner` sin condición; o se filtra en JS después de un left join normal, o se hace `!inner` solo cuando ese filtro específico está realmente activo.
+
+2. **[2026-09-01] BUG REAL: validar un valor de la URL con `valor in objetoDeEtiquetas` es vulnerable a la cadena de prototipos de JavaScript.**
+   `"constructor" in STAGE_TYPE_LABEL` da `true` (existe en `Object.prototype`), aunque `STAGE_TYPE_LABEL` nunca declaró esa clave — `/candidatos?stage_type=constructor` pasaba la validación y el string `"constructor"` llegaba como literal de enum a Postgres. Corregido reemplazando el chequeo `in` por un parseo real con Zod (`CandidateFiltersSchema.safeParse`), que ya existía para el formulario de guardar segmento — una sola fuente de verdad para ambos casos. Do instead: nunca validar un valor externo contra las claves de un objeto plano con el operador `in` — usar `Object.prototype.hasOwnProperty.call(obj, key)`, un `Set`, o (mejor, si ya existe) el schema de Zod correspondiente.
+
+3. **[2026-09-01] Reuso perdido: `STAGE_TYPE_LABEL` y la lista de 6 valores de `job_stage_type` ya existían en `src/lib/pipeline-templates/schema.ts` (Fase 9) — se reescribieron desde cero sin buscar primero si ya existían.**
+   Corregido reexportando `STAGE_TYPE_LABEL` desde `pipeline-templates/schema.ts` en `src/lib/candidates/labels.ts`, y reusando `StageSchema.shape.type` (el enum de Zod ya construido) en vez de una lista literal nueva. Do instead: antes de escribir un mapa de etiquetas o un enum de Zod para un valor de la base de datos, grep del nombre del enum (`job_stage_type`, `application_status`, etc.) en todo `src/lib/` — es muy probable que una fase anterior ya lo haya necesitado.
+
+4. **[2026-09-01] Decisión: sin paginación real todavía — `.limit(100)` con un aviso honesto ("mostrando los N más recientes") en vez de fingir que la lista está completa.**
+   Un segmento guardado ahora persiste un filtro como vista reusable — antes el límite era un detalle menor de una búsqueda de texto efímera, ahora puede esconder resultados de forma indefinida cada vez que alguien abre ese segmento. Paginación completa es un desarrollo aparte (mismo tipo de decisión que "no bulk actions esta fase", ver abajo); el mínimo honesto es no fingir que 100 es "todos".
+
+5. **[2026-09-01] Alcance recortado a propósito: sin acciones masivas (bulk reject/mover etapa) esta fase.**
+   El ítem del roadmap "Segmentos/columnas de Candidatos" incluía acciones masivas como sub-ítem. Se construyó la tabla densa + filtros + segmentos guardados (el núcleo del ítem); acciones masivas queda pendiente, documentado aquí para no perderlo, no implementado.
+
+---
+
+## Entrevistas + Google Calendar (Fase 13) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Decisión: integración con Google Calendar sin OAuth ni API — solo enlaces "TEMPLATE" (`calendar.google.com/calendar/render?...`).**
+   Requiere pedir el scope `calendar.events` en el login de Google (hoy solo se pide perfil/email), guardar refresh token, y renovar credenciales — todo eso es configuración manual en Google Cloud Console (mismo tipo de paso que el hook de custom access token o el proveedor de Google en Supabase, ningún agente puede hacerlo por API). Se optó por el enlace "agregar a mi calendario" de un clic: cero credenciales nuevas, funciona igual de bien para una demo, y cada quien agrega el evento a SU PROPIO calendario. Si se necesita sincronización real (auto-invitar, detectar cambios, cancelar desde Calendar), ahí sí hace falta OAuth completo — anotado como alcance futuro, no implementado.
+
+2. **[2026-09-01] BUG REAL: la hora del correo al candidato se formateaba con la zona horaria del SERVIDOR, no la de la organización ni la del candidato — podía contradecir el enlace de Google Calendar del mismo correo.**
+   `toLocaleString()` sin `timeZone` explícito, evaluado en un React Email renderizado server-side (dentro de `after()`), usa la zona del proceso Node (típicamente UTC en producción), no la del navegador de quien lo lee. El enlace "TEMPLATE" de Google Calendar sí es correcto siempre (manda el instante en UTC, Google lo convierte en el navegador de quien lo abre) — el texto y el enlace del mismo correo podían decir horas distintas. No existe una columna de zona horaria en `organizations`, así que la corrección no fue "adivinar la zona correcta" sino ser honesto: mostrar la hora en UTC explícito y remitir al enlace para la hora local real. Do instead: cualquier fecha/hora renderizada en un correo (server-side, sin `after()` corriendo en el navegador de nadie) necesita `timeZone` explícito en `toLocaleString`/`Intl.DateTimeFormat` — nunca asumir que el servidor y el destinatario comparten zona horaria.
+
+3. **[2026-09-01] Decisión de nivel de permiso: agendar/cancelar/eliminar una entrevista exige `canDecideApplication` (mismo nivel que rechazar/contratar/mandar mensaje), NO el nivel más permisivo de Tareas — con una excepción de auto-servicio.**
+   El primer diseño copió el nivel de autorización de `candidate_tasks` (cualquier colaborador con acceso a la vacante) porque la tabla es RLS-gemela de `candidate_tasks`. Un review encontró el error: agendar dispara un correo al candidato a nombre de la plataforma — mismo tipo de efecto hacia afuera que `sendCandidateMessage`, no el efecto puramente interno de una tarea. Se corrigió para exigir `canDecideApplication` en `scheduleInterview`/`deleteInterview`, con una excepción: `updateInterviewStatus` deja que la persona asignada como `interviewer_id` marque su propia entrevista sin ser approver/owner (mismo auto-servicio que ya permite la política RLS `interviews_update` vía `interviewer_id = auth.uid()`). Do instead: la forma de la tabla (mismo shape RLS que otra tabla) NO determina el nivel de permiso de la Server Action — eso lo decide si la acción tiene un efecto visible hacia el candidato o hacia afuera de la organización, sin importar qué tan parecida sea la tabla a una ya construida.
+
+4. **[2026-09-01] El JWT de prueba en simulación de rol necesita `app_metadata.app_role`, no `app_metadata.role` — error de sintaxis repetido al armar el primer test de esta fase, ya cometido antes en Fase 8-11 pero no anotado hasta ahora.**
+   `private.auth_role()` lee `auth.jwt() -> 'app_metadata' ->> 'app_role'` (ver `private.is_admin_or_above()`); un test con `app_metadata: { role: 'admin' }` (sin el prefijo `app_`) falla la política silenciosamente — el INSERT de prueba se rechaza y parece un bug de RLS cuando en realidad es un JWT de prueba mal armado. Do instead: antes de escribir un test de simulación de rol nuevo, confirmar el nombre exacto de la claim corriendo `select pg_get_functiondef(oid) from pg_proc where proname = 'auth_role'` — no asumir el nombre por analogía con `organization_id`.
+
+5. **[2026-09-01] Tercera vez que el mismo preprocesador zod ("cadena vacía → undefined") se copia a mano en un archivo nuevo — recién extraído a `src/lib/zod-helpers.ts` en esta fase.**
+   Ya estaba duplicado en `departments/schema.ts` y `api/postular/route.ts` desde antes; esta fase iba a agregar una cuarta copia. Mismo patrón que `ConfigListSkeleton` en Fase 12: la señal real de extraer no es "esto se parece a algo", es "esto YA se duplicó una vez antes de que yo llegara".
+
+---
+
+## Plantillas de mensaje + correo directo al candidato (Fase 12) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] `application_event_type` ya tenía el valor `correo_enviado` desde el diseño original del esquema, sin ningún código que lo insertara — confirmado por grep antes de escribir la Server Action.**
+   El schema fue diseñado anticipando esta feature (Fase 6 dejó el enum listo) pero nunca se cableó hasta ahora. Do instead: antes de decidir que un enum "no se usa" o está muerto, comprobar con grep si de verdad no hay ningún productor — puede ser una feature futura ya prevista, no basura.
+
+2. **[2026-09-01] El destinatario del correo sale SIEMPRE de la fila (`applications.candidates.email`), nunca de un campo del formulario — variante nueva del patrón IDOR de esta sesión.**
+   A diferencia de los 5 casos anteriores (un id de OTRA fila que no se revalida), acá el riesgo es distinto: si el "to" viniera del cliente, cualquiera con acceso de escritura a la acción podría mandar un correo con remitente de esta plataforma a una dirección arbitraria (vector de phishing), no solo leer/escribir datos ajenos. Do instead: en cualquier acción que envía correo a un tercero (no un perfil interno), el destinatario se resuelve siempre server-side desde la fila que la acción ya tiene permiso de leer — jamás se acepta como parámetro, ni siquiera oculto en un campo hidden.
+
+3. **[2026-09-01] Un `<textarea>` manda saltos de línea como `\r\n` en el FormData — `body.split("\n")` sin normalizar deja un `\r` colgando en cada línea salvo la última.**
+   Encontrado por revisión línea-por-línea antes de llegar a producción. Do instead: cualquier código que haga `split("\n")` sobre texto que vino de un `<textarea>` (o cualquier input HTML multilínea) debe normalizar con `.replace(/\r\n/g, "\n")` primero — no asumir que el navegador manda `\n` puro.
+
+4. **[2026-09-01] Precedente confirmado (no bug): reusar un permiso "de decisión" (`canDecideApplication`) para una acción nueva (enviar mensaje) puede dar a un `colaborador` con tier `approver`/`owner` una capacidad que la UI no expone a su rol — pero esto ya era así para Contratar/Rechazar/Tareas, no es una regresión nueva.**
+   El gate de UI (`profile.role !== "colaborador"`) y el permiso real de servidor (`canDecideApplication`, que sí deja pasar a un colaborador con tier alto en `job_collaborators`) llevan divergiendo desde Fase 5 — es el modelo de acceso fino documentado en AGENTS.md ("el acceso fino se resuelve con `job_collaborators`, no subiendo el rol global"), no un hueco. Do instead: antes de "corregir" una discrepancia UI-vs-servidor en este proyecto, comprobar si YA es el patrón aceptado en pantallas hermanas (Contratar/Rechazar) antes de tratarla como bug nuevo.
+
+5. **[2026-09-01] Tres páginas de configuración con lista simple (`motivos-rechazo`, `pipelines`, ahora `plantillas-mensaje`) habían llegado a tener el mismo `loading.tsx` copiado a mano — extraído a `<ConfigListSkeleton />` recién en la 3ª repetición.**
+   Do instead: la regla "tres líneas similares > abstracción prematura" aplica a *código nuevo* que se parece a algo existente — pero si el código NUEVO sería la 3ª copia casi idéntica de algo que YA se duplicó una vez antes, esa es la señal real de extraer, no de aceptar una 3ª duplicación.
+
+---
+
+## Evaluación por competencias (Fase 11) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] BUG REAL, encontrado por un agente con acceso directo a Supabase (no solo lectura de código): `UPDATE`/`DELETE` de `application_competency_scores` no revalidaban acceso a la vacante, solo `evaluator_id = auth.uid()`.**
+   A diferencia de `SELECT`/`INSERT` (que sí exigen `can_access_job`), un evaluador al que se le quita el acceso (deja de ser `job_collaborator`) podía seguir tocando su calificación vieja. Corregido con una migración que agrega el mismo `EXISTS(...can_access_job...)` a ambas políticas. Verificado con simulación de rol real: se quita el `job_collaborator`, se intenta `UPDATE`, 0 filas afectadas.
+   Do instead: cuando una tabla nueva tiene SELECT/INSERT con un chequeo (ej. `can_access_job`) y UPDATE/DELETE con otro más simple (ej. solo "soy el dueño de la fila"), preguntarse explícitamente si ese chequeo más simple debería incluir también el primero — no asumir que "ya es mi fila" es suficiente si el permiso subyacente (acceso a la vacante) pudo cambiar después de crearla.
+
+2. **[2026-09-01] BUG REAL (4ª vez esta sesión, variante nueva): `submitScore` nunca validaba que `competencyId` perteneciera a la MISMA vacante que `applicationId`.**
+   A diferencia de las 3 veces anteriores (un id de OTRA fila del mismo tipo, ej. otro perfil), acá son dos ids de tablas DISTINTAS que deben coincidir en un campo compartido (`job_id`) sin que ninguna FK lo obligue — ninguna restricción de base de datos liga `application_competency_scores.application_id` con `.competency_id` a través de un `job_id` común. Do instead: cuando dos columnas de una misma fila referencian tablas distintas que a su vez comparten un campo "padre" (aquí, `job_id`), y no hay una FK compuesta que lo fuerce, la Server Action tiene que leer y comparar ese campo compartido a mano antes de escribir — mismo principio que "un id hijo no prueba pertenencia al padre correcto" (Fase 5), pero entre dos hijos del mismo padre, no un hijo y su padre.
+
+3. **[2026-09-01] BUG REAL, encontrado por línea-por-línea: una `key` de React compartida entre postulaciones distintas puede filtrar estado de un candidato a otro.**
+   `CompetencyRow` se keyeaba solo por `competencyId` (pertenece a la VACANTE, no a la postulación) — dos candidatos de la misma vacante comparten esa key. Al navegar de un candidato a otro (misma vacante), React podía reciclar la instancia del componente y su estado local (la calificación en progreso), dejando que se guardara la nota de un candidato sobre otro.
+   Do instead: cuando un componente de cliente muestra datos de una entidad (aquí, competencia) que en realidad pertenece a un padre compartido (la vacante) pero se renderiza en el contexto de un hijo específico (la postulación/candidato), la `key` de React tiene que incluir el id del hijo, no solo el de la entidad compartida — aunque la entidad compartida ya tenga su propio id único.
+
+4. **[2026-09-01] Decisión: `position` de `job_competencies` se simplificó a un valor fijo (0), ordenando por `created_at`.**
+   El primer intento calculaba `position` con un `COUNT` antes de cada insert — sin constraint de unicidad, esto colisiona de forma determinística después de un borrar+agregar (no hace falta concurrencia para reproducirlo). Como no existe todavía un reordenamiento manual de competencias, no hay ninguna razón para mantener un valor calculado que nadie lee de forma ordenada — se resuelve solo con orden de creación. Si se agrega reordenamiento después, ahí sí vale la pena un `position` real mantenido (con el mismo patrón "reemplazar todo" que `pipeline_templates`).
+
+5. **[2026-09-01] Pendiente, documentado a propósito: el peso (`weight`) de cada competencia se captura y se muestra, pero no se usa todavía para calcular un puntaje global ponderado de la postulación.**
+   Hoy cada competencia solo muestra su propio promedio simple entre evaluadores; no existe un "puntaje total" que combine las competencias usando su peso. Es una limitación conocida, no un bug — construirlo bien necesita decidir dónde mostrarlo y qué hacer cuando faltan calificaciones en algunas competencias, y no se improvisó en esta fase.
+
+---
+
+## Tareas del candidato (Fase 10) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Primera tabla nueva desde Fase 2 — `candidate_tasks`, migrada con `apply_migration` sin bloqueo del clasificador de auto-modo.**
+   A diferencia del `ALTER TYPE ADD VALUE` bloqueado en Fase 7, un `CREATE TABLE` + RLS completo pasó sin pedir aprobación extra. No hay un patrón claro de qué bloquea el clasificador — no asumir que DDL "grande" se bloquea más que DDL "chico"; cada intento es su propio caso.
+
+2. **[2026-09-01] Verificación de RLS con simulación de rol encontró un falso positivo por mal diseño de la prueba, no un bug real — anotar el error para no repetirlo.**
+   Primera prueba: reutilicé el mismo perfil real (el único que existe en esta demo) como `requested_by` de la vacante Y como el "colaborador ajeno" que se probaba — `can_access_job` daba `true` correctamente (sí era el requester), pero yo esperaba `false`. Parecía un hueco de seguridad grave ("cualquiera puede insertar tareas").
+   Do instead: para probar "colaborador sin ninguna relación", la vacante de prueba necesita `owner_id`/`requested_by` en `null` explícito (bypasear RLS con el rol default de la conexión SQL para el setup, no con `set role authenticated`) — nunca reusar el único perfil real disponible como "el ajeno" a la vez que como dueño de los datos de prueba.
+
+3. **[2026-09-01] BUG REAL (mismo patrón, 3ª vez esta sesión): `assigned_to` de una tarea no se validaba contra la gente con acceso real a la vacante antes de insertar.**
+   El `<select>` del formulario (`task-form.tsx`) ya solo ofrece gente con `can_access_job` (admin+ o colaborador de esa vacante) — la Server Action `addTask` confiaba en eso sin revalidar. Mismo hueco que `job_collaborators` (Fase 8) y `head_profile_id` de departamentos (Fase 9).
+   Do instead: **cualquier id que salga de un `<select>` filtrado en el cliente se re-valida server-side, siempre, sin excepción** — a estas alturas esto debería ser un reflejo antes de escribir la Server Action, no un hallazgo de `/code-review`. Ver `isProfileAssignable()` en `src/lib/applications/get-applications.ts`.
+
+4. **[2026-09-01] Las secciones nuevas de una página deben heredar el mismo gate de rol que las secciones vecinas, no asumir "RLS ya lo esconde".**
+   La sección de Tareas se agregó sin la misma condición `profile.role !== "colaborador"` que ya protege Contratar/Rechazar en la misma página — un colaborador que ve la postulación solo por haber referido al candidato (no por `can_access_job`) habría visto un formulario que RLS le bloquea en silencio, sin explicación. Do instead: cuando una pantalla ya tiene un gate de visibilidad para un rol, cualquier sección nueva en esa misma pantalla hereda el mismo gate por defecto, salvo razón explícita para no hacerlo.
+
+5. **[2026-09-01] Una consulta nueva y menos probada nunca debe compartir `Promise.all` con datos ya estables de los que depende el resto de la página.**
+   `getAssignableProfiles` (recién escrita) se metió en el mismo `Promise.all` que la consulta de `rejection_reasons` (ya estable) — si la nueva fallaba, tumbaba toda la página (CV, notas, calificación, todo). Do instead: envolver la consulta nueva en `.catch(() => valorDeRespaldo)` cuando su fallo no debería impedir que el resto de la página cargue.
+
+---
+
+## Configurador simple: Departamentos, Pipelines, Motivos de rechazo (Fase 9)
+
+1. **[2026-09-01] `email_templates` quedó fuera de Fase 9 a propósito — no se construyó su CRUD.**
+   Motivo: nada en el código lee esa tabla todavía (los correos siguen hardcodeados en React Email desde Fase 6). Un CRUD para una tabla que nadie consume es peor que no construirlo — miente sobre tener efecto. Do instead: cuando se aborde, hacerlo junto con wirear `notify()`/`sendEmail()` para leer de ahí, no antes.
+
+2. **[2026-09-01] El patrón "diálogo repetido" cruzó el umbral de 3 a 4 copias — esta vez sí se extrajo `<DialogShell>` (`src/components/ui/dialog-shell.tsx`).**
+   Antes: `report-error-dialog.tsx` (Fase 7) y `reject-dialog.tsx` (Fase 5) ya lo tenían flagueado en reviews previos como "no urgente, 2-3 copias". Al aparecer una 4ª (`department-dialog.tsx`), el propio agente de reuso lo marcó como punto de quiebre. Do instead: 2-3 copias del mismo chrome se documentan y se dejan; a la 4ª, extraer — no hay una regla numérica mágica, pero repetirlo un review tras otro sin actuar es la señal real.
+
+3. **[2026-09-01] BUG REAL (mismo patrón de Fase 8): `head_profile_id` de un departamento no se validaba contra la organización del actor antes de escribir.**
+   El `<select>` del formulario ya solo lista gente de la org, pero la Server Action confiaba en el valor del cliente. Ver `assertProfileInOrg()` en `src/lib/departments/actions.ts` — mismo helper conceptual que Fase 8 para `job_collaborators`. Do instead: cualquier id que el cliente eligió de un `<select>` filtrado por organización se revalida server-side igual, sin excepción — ya es la segunda vez que aparece este mismo hueco en fases consecutivas.
+
+4. **[2026-09-01] Aceptado, no corregido: `updatePipelineTemplate`/`createPipelineTemplate` borran+reinsertan las etapas sin transacción — ventana real de "plantilla con 0 etapas" si el insert falla justo después del delete.**
+   Mismo patrón ya usado en el proyecto para listas anidadas (preguntas/etapas de vacante) — se acepta el mismo trade-off aquí. Corregirlo de verdad requiere una función RPC en Postgres que envuelva ambas operaciones en una transacción real (el cliente de Supabase JS no hace transacciones multi-statement). No se atacó esta sesión — bajo tráfico de escritura en esta pantalla, y cualquier fallo deja un estado detectable (plantilla con 0 etapas, mensaje de error visible), no uno silencioso.
+
+5. **[2026-09-01] Aceptado, no corregido: `setDefaultPipelineTemplate` hace 2 UPDATEs secuenciales (quitar default viejo, poner default nuevo) sin transacción — ventana de "cero plantillas default" si el proceso se interrumpe entre los dos.**
+   Mismo motivo que el punto anterior (necesita RPC/transacción real). Si `materializeJobStages()` corre justo en esa ventana, el `.single()` no encuentra fila y el gestor ve "No hay una plantilla de pipeline configurada" — mensaje amigable ya existente, no un crash. Riesgo real bajísimo: un solo admin activo hoy, acción rara.
+
+6. **[2026-09-01] `deletePipelineTemplate` sí se corrigió con compare-and-swap: el chequeo `is_default=false` va en el propio `.eq()` del DELETE, no en un SELECT previo.**
+   Mismo patrón que las transiciones de estado de vacantes/postulaciones — evita la carrera "SELECT ve false, otro admin lo marca default, DELETE de todos modos" sin necesitar ninguna migración nueva.
+
+---
+
+## Colaboradores por vacante + Bitácora (Fase 8) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Todo el mecanismo RLS de `job_collaborators` ya existía completo desde Fase 2 — `can_access_job()` ya lo usa en `jobs`/`job_stages`/`applications`. Fase 8 fue 100% UI + capa de app, cero migración.**
+   `private.can_access_job(job_id)` = admin+ OR owner/requested_by OR fila en `job_collaborators`. Ya estaba wireado en `jobs_select_internal`, `job_stages_select`, `applications_select/insert/update`. Lo único que faltaba: pantalla para agregar/quitar colaboradores (gateada a admin+ por `job_collaborators_write_admin`).
+
+2. **[2026-09-01] BUG REAL encontrado en `/code-review`: un atajo "sin cambios" antes del chequeo de permiso deja pasar sin autorizar.**
+   `moveApplicationStage` tenía `if (fromStageId === toStageId) return {success}` ANTES de validar `canDecideApplication`. No mutaba nada, pero el invariante "toda la función valida permiso" se rompía por ese único camino.
+   Do instead: el chequeo de permiso/autorización va SIEMPRE antes de cualquier atajo de "no-op", nunca después — un atajo de conveniencia es fácil de escribir arriba del todo sin pensar que también hay que autorizarlo.
+
+3. **[2026-09-01] BUG REAL (IDOR), encontrado en `/code-review`: agregar un colaborador no validaba que la persona elegida fuera de la misma organización.**
+   El `<select>` del panel ya solo lista gente de la org, pero la Server Action confiaba en el `profile_id` que llegara en el FormData sin comparar organización — el cliente nunca es fuente de verdad, ni siquiera cuando la UI ya filtra.
+   Do instead: antes de cualquier INSERT con un id que el cliente eligió de un `<select>`, revalidar server-side que esa fila (aquí, el perfil) pertenece a la misma organización que el actor — el mismo patrón que "un id hijo no prueba pertenencia al padre" de Fase 5.
+
+4. **[2026-09-01] RESUELTO (con permiso explícito del usuario): los niveles de `job_collaborators.permission` ahora se hacen cumplir también en Postgres, no solo en la Server Action.**
+   RLS (`can_access_job`) sigue sin distinguir nivel — a propósito, sigue gobernando visibilidad. Lo nuevo es un **trigger** `enforce_application_permission_tiers` (`BEFORE UPDATE` en `applications`) que llama a `private.can_decide_application(job_id)`/`private.can_rate_application(job_id)` — espejo exacto (mismo `auth_role() <> 'colaborador' OR EXISTS(...)`) de `canDecideApplication`/`canRateApplication` en `src/lib/applications/permissions.ts`. Si cambian los umbrales en TypeScript, hay que replicar el cambio en las dos funciones SQL o quedan desincronizadas — no hay una sola fuente de verdad todavía (aceptado por ahora, es demo).
+   Verificado con simulación real de rol (`set_config('request.jwt.claims',...)` + `set role authenticated`, transacción con rollback, patrón ya documentado arriba): viewer bloqueado en decidir Y calificar, interviewer puede calificar pero no decidir, approver puede ambas — los 3 casos junto con el trigger disparando de verdad (no solo la función aislada).
+   Do instead (si se toca de nuevo): correr la misma simulación de rol antes de dar por buena cualquier política/trigger nuevo — no alcanza con leer el SQL.
+
+5. **[2026-09-01] `audit_log` tiene el mismo hueco de organización que `error_reports` (Fase 7) — mismo mitigante.**
+   `audit_log_select_super_admin` es solo `is_super_admin()`, sin `organization_id`. `getAuditLog()` filtra en la app. Ver el ítem de Fase 7/Supabase-RLS arriba — es el mismo patrón repetido, no una fuga nueva.
+
+---
+
+## Demo genérica — sin marca real (2026-09-01)
+
+Por indicación del usuario, el repo y los datos de demo NO deben identificar a
+ninguna empresa real.
+
+- **Nombre de producto**: `organizations.platform_name = 'Atrio'` (ya usado en
+  los mockups de `design/*.dc.html` — solo faltaba escribirlo en la fila real).
+  `organizations.name = 'Mi Empresa'` (genérico, sin cambios). `accent_color`
+  y `allowed_email_domain` ya eran genéricos/`null`.
+- **Logo**: no se sube ningún archivo. El fallback ya existente (cuadro con
+  borde + primera letra de `platform_name`, en `login/page.tsx`,
+  `app-header.tsx`) hace de "logo genérico" con cero assets nuevos — no
+  inventar un logo de imagen, ese fallback YA es el logo.
+- Se borraron `public/logo-blanca.png`/`logo-negro.png` — eran el logo real de
+  un cliente (Ferco Cerámica), commiteados sin uso en el código (`grep` no
+  encontró ningún import). **Siguen en el historial de git** de commits
+  anteriores a esta limpieza — borrar eso de verdad requiere reescribir
+  historia (`git filter-repo`/BFG + force-push), una operación destructiva que
+  no se hizo sin pedirla explícita.
+- Se cambió `es-GT`/"Guatemala"/"Centroamérica" por `es`/genérico en 4 sitios
+  de formateo de fecha y 2 comentarios (`today-label.tsx`, `greeting.tsx`,
+  `application-timeline.tsx`, `note-list.tsx`, `configuracion/errores/page.tsx`)
+  — no había ninguna dependencia real de esa configuración regional, solo texto
+  de ejemplo/locale hardcodeado.
+- `docs/database.md`/napkin mencionan `V1-motoslam` como nombre del proyecto de
+  Supabase — es un codename interno de OTRO proyecto reutilizado, no tiene
+  relación con ninguna empresa real; no hace falta cambiarlo.
+- El repositorio de GitHub ya se renombró a `demo-ats` (antes `Ferco-compen`) —
+  hecho fuera de esta sesión, confirmado al hacer push.
+- No tocado sin permiso explícito: `context-ats-reclutamiento.md` (fuera de
+  este repo, en el directorio padre, describe un sistema legado distinto).
+
+---
+
+## Reglas de Curación
+- Re-priorizar en cada lectura. Máximo 10 ítems por categoría.
+- Es bitácora de registro: no solo trampas de sintaxis, también decisiones no obvias y errores reales con su corrección. Incluir fecha + "Do instead".
+- **Leer ANTES de tocar código.**
+
+---
+
 ## Límite del entorno de desarrollo remoto (no es un bug)
 
 1. **[2026-08-31] `npm run dev` en este sandbox NO puede llamar a `*.supabase.co` directo — solo el MCP de Supabase tiene canal permitido.**
    Síntoma: cualquier página que dependa de datos de Supabase (branding, sesión) los recibe como `null` al probar con curl/Playwright contra el dev server local, aunque el código y la política RLS estén correctos (verificado por separado con SQL directo vía MCP). El error real es `"Host not in allowlist: <ref>.supabase.co"`.
    Do instead: verificar la lógica por inspección + typecheck/build + SQL directo contra la base (vía MCP), no por curl/Playwright al dev server para nada que dependa de red hacia Supabase. En producción (Vercel) esto no aplica — tiene salida a internet real. No perder tiempo intentando arreglarlo como si fuera un bug de la app.
+
+2. **[2026-09-01] Puede haber DOS conectores MCP de Supabase a la vez, uno de ellos apuntando a un proyecto que NO es este.**
+   Síntoma real: el conector `mcp__supabase__*` (sin `project_id` como parámetro, pinneado a un solo proyecto) resolvió a `cihcimdzwlmhedpprmhf` — un proyecto legado ajeno (nombres de política en español, `is_administrador()`) — mientras el proyecto real de este repo es `cgudnnlcwcotovcslgzu` ("V1-motoslam", ver `docs/database.md`). El conector correcto para este repo es el que SÍ acepta `project_id` en cada tool (`list_projects`/`execute_sql`/`apply_migration` con ese parámetro) — permite elegir el proyecto explícito por `list_projects()` en vez de confiar en cuál quedó pineado por la cuenta.
+   Do instead: antes de la PRIMERA query o migración de una sesión nueva, correr `get_project_url()` (o `list_projects()` + comparar el `ref`) y confirmarlo contra `cgudnnlcwcotovcslgzu` — nunca asumir que "el MCP de supabase" conectado es el de este repo solo porque el nombre de la tool coincide.
+
+3. **[2026-09-01] `apply_migration` (DDL) contra este proyecto es bloqueado por el clasificador de auto-modo, incluso para un cambio aditivo y trivial (`ALTER TYPE ... ADD VALUE`).**
+   Do instead: no asumir que cualquier feature nueva necesita su propia migración — reutilizar un enum/columna ya existente si el caso de uso lo permite (ver Fase 7 abajo). Si de verdad hace falta DDL, ese paso queda pendiente de aprobación explícita del usuario en el chat, no se reintenta con otra forma de saltarlo.
+
+4. **[2026-09-01] Este worktree no trae su propio `node_modules` — un git worktree nuevo necesita `npm install` propio antes de poder correr `next build`.**
+   Síntoma engañoso: `npm run typecheck`/`npm run lint` corren bien SIN `node_modules` local porque Node resuelve `tsc`/`eslint` subiendo a un `node_modules` ancestro (otro worktree/repo principal) — pero `next build` (Turbopack) restringe la resolución de paquetes a la raíz del workspace detectado y falla con "Could not find the Next.js package" aunque el resto compile.
+   Do instead: si typecheck/lint pasan "sospechosamente rápido" en un worktree recién creado, no dar por bueno el build sin correrlo — `npm install` primero si no hay `node_modules` local.
 
 ---
 
@@ -93,6 +489,10 @@ _Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, 
    Causa: `handle_new_user` es un trigger `AFTER INSERT` en `auth.users` — solo se dispara una vez, al crear la cuenta. Si el callback rechaza esa sesión sin borrar la cuenta, un reintento de login reutiliza la misma fila de `auth.users` (no hay INSERT nuevo) y el trigger nunca vuelve a correr.
    Do instead: en **todo** camino de rechazo post-login (perfil faltante, dominio no permitido, inactivo no cuenta porque ahí sí hay perfil válido) llamar `createAdminClient().auth.admin.deleteUser(user.id)` antes de redirigir a la página de error — no solo en el caso que se te ocurrió primero. Se encontró porque un review notó que solo la rama de dominio-rechazado borraba la cuenta.
 
+10. **[2026-09-01] BUG REAL (pendiente, no corregido): `error_reports_select`/`error_report_messages_select` no validan `organization_id` en la rama `is_super_admin()`.**
+    Causa: la política es `reporter_id = auth.uid() OR is_super_admin()` — `private.is_super_admin()` solo mira el rol del JWT, nunca la organización. Hoy sin impacto real (un solo tenant), pero es el mismo patrón de fuga cross-tenant que la regla de AGENTS.md pide evitar.
+    Do instead (cuando se apruebe una migración): agregar `organization_id = (select private.auth_org_id())` a ambas políticas. Mientras tanto, Fase 7 lo mitiga filtrando `organization_id` explícito en cada función de `src/lib/errors/get-error-reports.ts` y `src/lib/errors/actions.ts` — mitigación de capa de app, no reemplaza el fix real en la política.
+
 ---
 
 ## Vacantes y postulación (Fase 4) — MÁXIMA PRIORIDAD
@@ -128,6 +528,25 @@ _Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, 
 
 ---
 
+## Centro de errores (Fase 7) — MÁXIMA PRIORIDAD
+
+1. **[2026-09-01] Ya existía infraestructura de bitácora genérica antes de Fase 7 — buscarla antes de inventar una nueva.**
+   `private.audit_row_change(org_id, action, entity_type, entity_id, diff jsonb)` (SECURITY DEFINER) ya estaba escrita y ya hay un trigger real usándola (`audit_error_report_status` en `error_reports`, dispara en cada cambio de `status`). Fase 8 (bitácora) probablemente es solo la pantalla de lectura sobre `audit_log`, no construir el mecanismo de escritura desde cero.
+   Do instead: antes de agregar logging/auditoría nueva a cualquier tabla, `select proname from pg_proc where prosrc ilike '%audit_log%'` primero.
+
+2. **[2026-09-01] Contexto auto-capturado del navegador (mensaje de excepción, URL, user agent) se trunca ANTES de pasar por Zod, nunca después.**
+   Causa: el límite de `ReportErrorSchema` está pensado para lo que escribe una persona (2000 caracteres es generoso para texto humano, corto para un `error.message` con causas anidadas o un stack serializado). Si se valida primero, el reporte del error real que se quiere reportar es exactamente el que falla el schema.
+   Do instead: `truncate()` en `src/lib/errors/actions.ts` antes del `safeParse` — cualquier campo que venga de `window`/`navigator`/una excepción real, no de un `<input>` del usuario, se recorta antes de validar.
+
+3. **[2026-09-01] Decisión consciente: un solo valor de enum `notification_type` (`respuesta_reporte_error`) cubre 3 direcciones distintas (reporte nuevo, respuesta de soporte, respuesta del reportante).**
+   Motivo: agregar un segundo valor de enum es DDL, y el clasificador de auto-modo bloqueó incluso un `ALTER TYPE ... ADD VALUE` aditivo (ver categoría de arriba). Costo real: la preferencia de notificación es todo-o-nada para las 3 direcciones — un super admin no puede separar "avísame de reportes nuevos" de "avísame de respuestas en hilos que ya sigo".
+   Do instead (si se aprueba una migración más adelante): dividir en 2-3 valores de enum reales y migrar `PREFERENCE_TYPES`/`NOTIFICATION_TYPE_LABEL` — no urgente mientras la organización tenga pocos super admin.
+
+4. **[2026-09-01] Fase 7 no manda correo — solo notificación in-app.** Los `notify()` de `src/lib/errors/actions.ts` no pasan el campo `email`, a propósito: escribir las plantillas de React Email para "nuevo reporte"/"te respondieron" queda pendiente. El toggle de correo en Mis Preferencias para este tipo no hace nada todavía — no es un bug, pero si un review lo marca, la respuesta es "diseño, no falta terminar el campo".
+   Do instead: si se pide correo real para esto, seguir el patrón de Fase 6 (`emails/`, `getEmailContext()`), no inventar uno nuevo.
+
+---
+
 ## Notificaciones in-app y correo (Fase 6) — MÁXIMA PRIORIDAD
 
 1. **[2026-09-01] BUG REAL, rompe el build: instanciar el SDK de un servicio externo a nivel de módulo revienta CUALQUIER página que lo importe, aunque sea indirecto.**
@@ -160,40 +579,6 @@ _Última actualización: 2026-09-02 (mejoras post-Fase 7: invitaciones, avatar, 
 9. **Pendiente para Fase 8 (hardening), no bloqueante ahora: `getSiteUrl()` cae al header `Host` del request si falta `NEXT_PUBLIC_SITE_URL`, y Fase 6 empezó a usarlo desde `/api/postular` (ruta pública, sin sesión) para armar el link de "Ver la postulación" en el correo que le llega a RH.**
    Riesgo: si en producción se olvida configurar `NEXT_PUBLIC_SITE_URL`, un solicitante malicioso podría mandar un `Host` falso y que el correo interno de "nueva postulación" incluya un link de phishing. `getSiteUrl()` documenta que su único uso sensible conocido era `signInWithGoogle()` (protegido por la lista de Redirect URLs de Supabase) — ya no es cierto, revisar ese comentario al tocar Fase 8.
    Do instead en Fase 8: verificar que `NEXT_PUBLIC_SITE_URL` esté seteado en Vercel antes de desplegar, y considerar que `getSiteUrl()` rechace el fallback a `Host` para cualquier link que salga en un correo (no solo para el OAuth redirect).
-
----
-
-## Centro de errores (Fase 7) — MÁXIMA PRIORIDAD
-
-1. **[2026-09-01] Next 16.3 sanea el error antes de que cruce a `error.tsx`/`global-error.tsx` en producción — no se puede mostrar un catálogo distinto según el error real.**
-   Causa: `error.message` que llega al cliente es genérico en Server Components/Server Functions; solo `error.digest` es correlacionable con logs del servidor. Verificado en `node_modules/next/dist/docs/.../error.md` antes de diseñar el flujo (regla de AGENTS.md sobre este Next).
-   Do instead: `error.tsx`/`global-error.tsx` siempre muestran `ERROR_CATALOG.desconocido` — ES lo correcto, no una limitación a resolver. `AppError` (clase tipada) sirve para correlacionar el `console.error` del SERVIDOR con un código de catálogo, nunca para diferenciar la UI del cliente.
-
-2. **BUG REAL: `retry`/`reset` — el rename de prop en Next 16.3 dejó una referencia rota a `reset` en `global-error.tsx` que habría lanzado `ReferenceError` al hacer clic en "Reintentar".**
-   Causa: al actualizar la firma de la función de `{ reset }` a `{ error, retry }` (Next 16.3 estabilizó `retry`, que sí re-ejecuta el fetch del segmento en vez de solo limpiar estado), quedó una línea vieja `onClick={reset}` sin actualizar — justo en el boundary más crítico (fallo del root layout), donde un segundo bug sería invisible hasta que alguien lo dispare en producción.
-   Do instead: al renombrar un parámetro destructurado, `grep` el nombre viejo en TODO el archivo antes de dar el cambio por terminado — el compilador de TS no lo marca porque `reset` seguía existiendo como identificador libre hasta el build/lint (en este caso sí lo hubiera atrapado `no-undef`, pero no confiar solo en eso).
-
-3. **BUG REAL: el fingerprint de agrupación usaba el texto libre del usuario ("qué intentabas hacer") en vez de la firma técnica del error.**
-   Causa: `buildFingerprint(code, user_message)` — dos personas con el mismo bug casi nunca describen su intención con las mismas palabras, así que nunca iban a agrupar aunque fuera literalmente el mismo error.
-   Do instead: hashear `code + technical_detail (o stack)`, nunca el mensaje del usuario — la única señal que representa el error EN SÍ, no la experiencia de quien lo reportó. Encontrado en `/code-review`, no al escribir la función.
-
-4. **Un formulario de reporte alcanzable sin sesión (por diseño: falla de login, error genérico) es una superficie pública — necesita el mismo rate limit que `/api/postular`.**
-   Do instead: `checkRateLimit` con la misma IP del último salto confiable (`x-forwarded-for` recortado), aunque el disparador sea una Server Action y no un Route Handler — `headers()` funciona igual en ambos contextos.
-
-5. **Reutilizar un solo `notification_type` para dos audiencias distintas ("nuevo reporte" al super admin, "respuesta" al reportero) rompe la promesa de la preferencia si el label no lo dice.**
-   Causa: `respuesta_reporte_error` etiquetado como "Respuestas del soporte" — un super admin que apaga eso pensando "ya no quiero que me avisen cuando responden a MIS reportes" también se queda ciego a reportes NUEVOS sin triar, porque `notify()` lee la misma preferencia para ambos casos.
-   Do instead: si se reutiliza un tipo de notificación para direcciones distintas de un mismo hilo (evitar una migración de enum), el label en `NOTIFICATION_TYPE_LABEL` tiene que describir el alcance real ("Actividad en reportes de error"), no la mitad más obvia del caso de uso. Alternativa correcta pero más cara: un segundo valor de enum si algún día hace falta separar las preferencias de verdad.
-
-6. **Reportero anónimo (login fallido) es representable: `error_reports.reporter_id` es nullable — verificado en el schema antes de escribir la Server Action, no asumido.**
-   Do instead: `getProfile()` (no `requireProfile()`) en `createErrorReport` — si no hay perfil, usar `createAdminClient()` + `organization_id` de `getOrganization()` (única org, lectura pública) y `reporter_id: null`. Sin esto, el único caso donde de verdad urge poder reportar ("no puedo ni iniciar sesión") sería el único que fallaría al reportarlo.
-
-7. **`useActionState` en un componente que NO se desmonta (un diálogo que solo se oculta con `open && ...` en el padre) arrastra el estado `success` entre aperturas.**
-   Causa: el hook vivía en el componente que envuelve el `<dialog>`, cuyo `open` es un simple booleano — cerrar el diálogo no desmonta nada, así que un segundo intento de reportar mostraba directo la pantalla de éxito del primero.
-   Do instead: mover el `useActionState` a un componente hijo que solo se monta `{open && <Hijo/>}` — al cerrar y reabrir, React lo desmonta/remonta de cero y el estado vuelve a `undefined`. Más simple que manejar un `key` manual.
-
-8. **Filtros de URL con "limpiar este filtro" vs "no tocar este filtro" no se pueden mezclar con `??` sobre un solo objeto parcial.**
-   Causa: `filterHref({status: undefined})` con `next.status ?? validStatus` no distingue "quiero limpiarlo" de "no lo mandé" — ambos casos son `undefined` en el input, así que el pill "Todos" nunca lograba limpiar el filtro activo.
-   Do instead: cuando una función arma una URL a partir de dos filtros independientes, que reciba SIEMPRE los dos valores explícitos (nunca un merge parcial con `??`) — cada pill pasa el estado completo que quiere, no un parche.
 
 ---
 

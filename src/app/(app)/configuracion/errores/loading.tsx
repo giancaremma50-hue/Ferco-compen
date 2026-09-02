@@ -1,14 +1,16 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function ErroresLoading() {
+export default function Loading() {
   return (
-    <div>
-      <Skeleton className="h-6 w-72" />
-      <Skeleton className="mt-2.5 h-6 w-72" />
-      <div className="mt-6 grid gap-px">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
+    <div className="grid grid-cols-[380px_1fr] gap-6">
+      <div className="border border-border bg-card p-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="mb-3 h-20 w-full" />
         ))}
+      </div>
+      <div className="border border-border bg-card p-6">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="mt-4 h-24 w-full" />
       </div>
     </div>
   );

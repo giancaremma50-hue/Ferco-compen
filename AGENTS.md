@@ -134,6 +134,6 @@ El error no es un callejón sin salida: es el canal de soporte entre el usuario 
 | `colaborador` | Empleado. Ve vacantes publicadas, refiere candidatos, sigue a *sus* referidos, entrevista cuando lo asignan. |
 | `gestor` | Jefe de área. Solicita plazas de su área, aprueba candidatos y ve el pipeline **solo de sus vacantes**. |
 | `admin` | RH. Opera todo el reclutamiento y la configuración de la organización. |
-| `super_admin` | Control total + centro de errores + marca + bitácora de auditoría. |
+| `super_admin` | Control total + centro de errores + marca. |
 
 El acceso fino se resuelve con `job_collaborators` (permiso por vacante), no subiendo el rol global.

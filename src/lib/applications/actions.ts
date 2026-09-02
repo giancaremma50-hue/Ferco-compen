@@ -7,11 +7,24 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { zodFieldError } from "@/lib/forms/zod-error";
+import { sendEmail } from "@/lib/email/send-email";
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
-import { NoteSchema, RejectSchema, RATING_MAX } from "./schema";
+import { MensajeCandidatoEmail } from "@/emails/mensaje-candidato";
+import { canDecideApplication, canRateApplication } from "./permissions";
+import { isProfileAssignable } from "./get-applications";
+import { NoteSchema, RejectSchema, RATING_MAX, TaskSchema, SendMessageSchema } from "./schema";
 
 export type ApplicationActionResult = { error?: string; success?: string; field?: string };
+
+/** Repetido en setRating/rejectApplication/hireApplication/reopenApplication — un solo lugar para no desincronizar el shape de la query. */
+async function requireApplicationJobId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  applicationId: string,
+): Promise<string | null> {
+  const { data } = await supabase.from("applications").select("job_id").eq("id", applicationId).single();
+  return data?.job_id ?? null;
+}
 
 /**
  * Se invoca siempre envuelta en notifyBestEffort() — corre con after(),
@@ -97,8 +110,6 @@ export async function moveApplicationStage(
   toStageId: string,
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede mover postulaciones." };
-  if (fromStageId === toStageId) return { success: "Sin cambios" };
 
   const supabase = await createClient();
 
@@ -113,6 +124,16 @@ export async function moveApplicationStage(
     .eq("id", applicationId)
     .single();
   if (!application) return { error: "No se encontró la postulación." };
+
+  // Acceso fino por job_collaborators (AGENTS.md) — un `colaborador` solo
+  // mueve etapa si es approver/owner de ESTA vacante, no por rol global.
+  // ANTES del atajo "misma etapa": si no, un actor sin permiso alguno
+  // recibe "Sin cambios" sin que este chequeo llegue a correr nunca.
+  if (!(await canDecideApplication(profile.role, profile.id, application.job_id))) {
+    return { error: "Tu perfil no puede mover postulaciones en esta vacante." };
+  }
+
+  if (fromStageId === toStageId) return { success: "Sin cambios" };
 
   const { data: validStages } = await supabase
     .from("job_stages")
@@ -201,6 +222,13 @@ export async function setRating(applicationId: string, rating: number): Promise<
   if (!parsed.success) return { error: "Calificación inválida." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canRateApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede calificar en esta vacante." };
+  }
+
   const value = parsed.data === 0 ? null : parsed.data;
   const { data, error } = await supabase
     .from("applications")
@@ -229,12 +257,18 @@ export async function rejectApplication(
   formData: FormData,
 ): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede rechazar postulaciones." };
 
   const parsed = RejectSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return zodFieldError(parsed.error, "Elige un motivo.");
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede rechazar postulaciones en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "rechazada", rejection_reason_id: parsed.data.rejection_reason_id })
@@ -259,9 +293,15 @@ export async function rejectApplication(
 
 export async function hireApplication(applicationId: string): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede contratar." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede contratar en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "contratada" })
@@ -278,9 +318,15 @@ export async function hireApplication(applicationId: string): Promise<Applicatio
 
 export async function reopenApplication(applicationId: string): Promise<ApplicationActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede reabrir postulaciones." };
 
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil no puede reabrir postulaciones en esta vacante." };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .update({ status: "activa", rejection_reason_id: null })
@@ -293,4 +339,117 @@ export async function reopenApplication(applicationId: string): Promise<Applicat
 
   revalidatePath(`/postulaciones/${applicationId}`);
   return { success: "Postulación reabierta" };
+}
+
+export async function addTask(
+  applicationId: string,
+  _prevState: ApplicationActionResult | undefined,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  const profile = await requireProfile();
+  const parsed = TaskSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa la tarea." };
+
+  const supabase = await createClient();
+
+  // El <select> del formulario ya solo lista gente con acceso a la
+  // vacante, pero eso es solo la UI — el cliente nunca es fuente de
+  // verdad. Sin esto, un POST directo podría asignar la tarea a alguien
+  // sin ninguna relación con la vacante (ni siquiera podría verla luego,
+  // candidate_tasks_select exige can_access_job).
+  if (parsed.data.assigned_to) {
+    const jobId = await requireApplicationJobId(supabase, applicationId);
+    if (!jobId) return { error: "No se encontró la postulación." };
+    if (!(await isProfileAssignable(parsed.data.assigned_to, jobId, profile.organization_id))) {
+      return { error: "Esa persona no tiene acceso a esta vacante." };
+    }
+  }
+
+  const { error } = await supabase.from("candidate_tasks").insert({
+    organization_id: profile.organization_id,
+    application_id: applicationId,
+    description: parsed.data.description,
+    assigned_to: parsed.data.assigned_to ?? null,
+    created_by: profile.id,
+  });
+  if (error) return { error: "No se pudo agregar la tarea." };
+
+  revalidatePath(`/postulaciones/${applicationId}`);
+  return { success: "Tarea agregada" };
+}
+
+export async function toggleTask(taskId: string, applicationId: string, isDone: boolean): Promise<ApplicationActionResult> {
+  await requireProfile();
+  const supabase = await createClient();
+  // applicationId además de taskId en el WHERE: taskId ya es suficiente
+  // para que RLS decida el permiso real, pero así un id desincronizado no
+  // revalida silenciosamente la página de OTRA postulación por error.
+  const { error } = await supabase
+    .from("candidate_tasks")
+    .update({ is_done: isDone, completed_at: isDone ? new Date().toISOString() : null })
+    .eq("id", taskId)
+    .eq("application_id", applicationId);
+  if (error) return { error: "No se pudo actualizar la tarea." };
+
+  revalidatePath(`/postulaciones/${applicationId}`);
+  return { success: isDone ? "Tarea completada" : "Tarea reabierta" };
+}
+
+export async function sendCandidateMessage(
+  applicationId: string,
+  _prevState: ApplicationActionResult | undefined,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  const profile = await requireProfile();
+  const parsed = SendMessageSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa el mensaje." };
+
+  const supabase = await createClient();
+
+  // El destinatario sale de la fila, nunca de un campo del formulario — si
+  // el "to" viniera del cliente, cualquiera con acceso a la vacante podría
+  // mandar un correo con remitente de esta plataforma a cualquier dirección.
+  // getEmailContext() no depende de esta fila ni del permiso — va en
+  // paralelo en vez de esperar a que ambos terminen en serie.
+  const [{ data: application }, { platformName }] = await Promise.all([
+    supabase
+      .from("applications")
+      .select("job_id, organization_id, candidates(full_name, email)")
+      .eq("id", applicationId)
+      .single(),
+    getEmailContext(),
+  ]);
+  if (!application) return { error: "No se encontró la postulación." };
+  if (!(await canDecideApplication(profile.role, profile.id, application.job_id))) {
+    return { error: "Tu perfil no puede enviar mensajes en esta vacante." };
+  }
+  const { error: sendError } = await sendEmail({
+    to: application.candidates!.email,
+    subject: parsed.data.subject,
+    react: MensajeCandidatoEmail({
+      platformName,
+      candidateName: application.candidates!.full_name,
+      body: parsed.data.body,
+    }),
+  });
+  if (sendError) return { error: sendError };
+
+  await supabase.from("application_events").insert({
+    organization_id: application.organization_id,
+    application_id: applicationId,
+    type: "correo_enviado",
+    actor_id: profile.id,
+    payload: { subject: parsed.data.subject },
+  });
+
+  revalidatePath(`/postulaciones/${applicationId}`);
+  return { success: "Mensaje enviado" };
+}
+
+export async function deleteTask(taskId: string, applicationId: string): Promise<void> {
+  await requireProfile();
+  const supabase = await createClient();
+  const { error } = await supabase.from("candidate_tasks").delete().eq("id", taskId).eq("application_id", applicationId);
+  if (error) throw new Error("No se pudo eliminar la tarea.");
+  revalidatePath(`/postulaciones/${applicationId}`);
 }

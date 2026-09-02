@@ -6,7 +6,11 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/configuracion/marca", label: "Marca", roles: ["super_admin"] },
   { href: "/configuracion/usuarios", label: "Usuarios y roles", roles: ["admin", "super_admin"] },
-  { href: "/configuracion/errores", label: "Errores", roles: ["super_admin"] },
+  { href: "/configuracion/departamentos", label: "Departamentos", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/motivos-rechazo", label: "Motivos de rechazo", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/plantillas-mensaje", label: "Plantillas de mensaje", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/plantillas-vacante", label: "Plantillas de vacante", roles: ["admin", "super_admin"] },
+  { href: "/configuracion/errores", label: "Centro de errores", roles: ["super_admin"] },
 ];
 
 export function ConfigTabs({ role }: { role: string }) {
@@ -16,7 +20,7 @@ export function ConfigTabs({ role }: { role: string }) {
   return (
     <nav className="flex gap-6 border-b border-border">
       {visible.map((tab) => {
-        const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+        const active = pathname === tab.href;
         return (
           <Link
             key={tab.href}

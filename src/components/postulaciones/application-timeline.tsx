@@ -4,7 +4,7 @@ const EVENT_LABEL: Record<ApplicationEvent["type"], (e: ApplicationEvent) => str
   postulacion_creada: () => "Postulación recibida",
   etapa_cambiada: () => "Cambió de etapa",
   nota_agregada: (e) => (e.payload.is_private ? "Agregó una nota privada" : "Agregó una nota"),
-  correo_enviado: () => "Se envió un correo",
+  correo_enviado: (e) => (e.payload.subject ? `Se envió un correo: "${e.payload.subject}"` : "Se envió un correo"),
   adjunto_agregado: () => "Se agregó un adjunto",
   calificacion_cambiada: (e) => `Calificación: ${e.payload.rating ?? "sin calificar"}`,
   rechazada: () => "Postulación rechazada",
@@ -18,7 +18,7 @@ export function ApplicationTimeline({ events }: { events: ApplicationEvent[] }) 
         <li key={e.id} className="border-l-2 border-border pl-3 text-sm">
           <p>{EVENT_LABEL[e.type](e)}</p>
           <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-            {e.actorName ?? "Sistema"} · {new Date(e.createdAt).toLocaleString("es-GT")}
+            {e.actorName ?? "Sistema"} · {new Date(e.createdAt).toLocaleString("es")}
           </p>
         </li>
       ))}

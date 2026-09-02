@@ -1,6 +1,6 @@
-// Generado desde el esquema real de Supabase con generate_typescript_types.
-// No editar a mano — se regenera cada vez que cambie el esquema (Fase 2 en
-// adelante) y se commitea junto con la migración que lo provocó.
+// Generado con mcp__Supabase__generate_typescript_types — no editar a mano.
+// Se regenera cada vez que cambia el esquema (ver docs/database.md).
+
 export type Json =
   | string
   | number
