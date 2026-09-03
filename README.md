@@ -28,12 +28,21 @@ npm run dev
 
 | Rol | Alcance |
 |---|---|
-| `colaborador` | Empleado: ve vacantes publicadas, refiere candidatos, sigue a sus referidos |
 | `gestor` | Jefe de área: solicita plazas y opera el pipeline **de sus vacantes** |
 | `admin` | RH: opera todo el reclutamiento y la configuración |
 | `super_admin` | Control total + centro de errores + marca + bitácora |
 
-El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no subiendo el rol global.
+El rol `colaborador` se eliminó: quien necesita ver una vacante se **suma como
+miembro de esa vacante**, con uno de dos permisos.
+
+| Permiso del miembro | Puede |
+|---|---|
+| `lectura_escritura` | Ve todo, escribe seguimientos, sube archivos, deja tareas y califica. **No** mueve etapas ni edita la vacante. |
+| `solo_lectura` | Ve todo el registro —archivos, seguimientos, tareas—. No escribe nada. |
+
+Mover etapas, contratar, descartar, agendar una reunión y escribirle al candidato
+son decisiones del **reclutador asignado** de la vacante, `admin` o `super_admin`
+— nadie más, por más permisos de miembro que tenga.
 
 ## Seguridad
 
@@ -59,7 +68,7 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | 8 — Bitácora de auditoría + colaboradores por vacante | ✅ |
 | 9 — Configurador: departamentos, pipelines, motivos de rechazo | ✅ |
 | 10 — Tareas del candidato | ✅ |
-| 11 — Evaluación por competencias | ✅ |
+| 11 — Evaluación por competencias | ❌ eliminada (2026-09-03) |
 | 12 — Plantillas de mensaje y correo directo al candidato | ✅ |
 | 13 — Entrevistas y enlaces de Google Calendar | ✅ |
 | 14 — Segmentos y filtros de candidatos | ✅ |
@@ -70,6 +79,9 @@ El acceso fino se resuelve con permisos por vacante (`job_collaborators`), no su
 | Mejoras post-Fase 7 (invitaciones, avatar, video de login, tutorial) | ✅ |
 | Bolsa de empleo aspiracional (portada foto/video, cifras, filtros) | ✅ |
 | 19 — Endurecimiento y despliegue | ✅ |
+| Flujo de solicitud: plantilla general, estado `aceptada`, visibilidad de 3 niveles | ✅ |
+| Inicio: agenda protagonista, buzón de solicitudes, embudo, informe por reclutador | ✅ |
+| Permisos de 2 niveles por vacante + notificaciones en cada cambio de estado | ✅ |
 
 Los dos pasos manuales que bloqueaban el login en el Dashboard de Supabase (activar el custom access token hook, configurar el proveedor de Google) **ya están hechos** — confirmado en el Dashboard el 2026-09-02.
 

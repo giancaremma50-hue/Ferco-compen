@@ -129,11 +129,23 @@ El error no es un callejón sin salida: es el canal de soporte entre el usuario 
 
 ## Roles
 
+**Tres roles.** El rol `colaborador` se eliminó (2026-09-03) — su valor sigue en el enum `app_role` porque Postgres no permite borrarlo, pero no se asigna a nadie.
+
 | Rol | Alcance |
 |---|---|
-| `colaborador` | Empleado. Ve vacantes publicadas, refiere candidatos, sigue a *sus* referidos, entrevista cuando lo asignan. |
-| `gestor` | Jefe de área. Solicita plazas de su área, aprueba candidatos y ve el pipeline **solo de sus vacantes**. |
+| `gestor` | Jefe de área. Solicita plazas de su área y ve el pipeline **solo de sus vacantes**. |
 | `admin` | RH. Opera todo el reclutamiento y la configuración de la organización. |
 | `super_admin` | Control total + centro de errores + marca. |
 
-El acceso fino se resuelve con `job_collaborators` (permiso por vacante), no subiendo el rol global.
+Quien necesita ver una vacante se suma como **miembro de esa vacante**, con uno de **dos permisos, nunca más**:
+
+| Permiso | Puede |
+|---|---|
+| `lectura_escritura` | Ve todo, escribe seguimientos, sube archivos, deja tareas y califica. **No** mueve etapas ni edita la vacante. |
+| `solo_lectura` | Ve todo el registro (archivos, seguimientos, tareas). No escribe nada. |
+
+**Las 5 decisiones de una vacante** —mover etapa, contratar, descartar, agendar reunión, escribirle al candidato— son del **reclutador asignado** (`jobs.owner_id`), `admin` o `super_admin`. Ningún permiso de miembro las habilita.
+
+**Dos fuentes de permiso, nunca tres.** Decidir = `is_admin_or_above() OR jobs.owner_id = actor`. Escribir = eso, más `jobs.requested_by`, más miembro con `lectura_escritura`. El reclutador manda porque es `owner_id`, no por su fila en `job_collaborators`.
+
+**Regla de permisos, no negociable:** las funciones `private.can_decide_application` / `can_write_application` de Postgres son el **espejo** de `src/lib/applications/permissions.ts`. Todo cambio de umbral se aplica en **ambos lados, en la misma sesión** — el SQL es la última línea, la que ve quien se salta la interfaz. Y se escriben como **lista blanca** (`WRITE_PERMISSIONS = new Set([...])`), nunca como "todo lo que no sea solo lectura": un valor nuevo del enum no nace con permiso por accidente.

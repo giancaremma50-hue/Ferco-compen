@@ -2,6 +2,107 @@
 
 **Proyecto**: `V1-motoslam` (ref `cgudnnlcwcotovcslgzu`), reutilizado y limpiado por indicación del usuario — tenía un sistema de vacaciones "PCG" sin uso que se eliminó por completo (tablas, tipos, función y políticas de storage) antes de montar el esquema del ATS.
 
+## Permisos de 2 niveles + sin competencias + notificaciones por estado (post-Fase 19, sin número de fase)
+
+Plan completo en `docs/superpowers/specs/2026-09-03-ajustes-permisos-agenda-notificaciones-design.md`.
+Cierra los dos pendientes que el bloque de abajo dejó abiertos (rewire de
+`canDecideApplication`, niveles reales de `job_collaborators`).
+
+**3 migraciones aplicadas, en orden:**
+1. `add_enum_values_permisos_y_notificacion` — agrega `lectura_escritura` y
+   `solo_lectura` a `job_collaborator_permission`, y `vacante_cambio_estado` a
+   `notification_type`. Va sola a propósito: `ALTER TYPE ... ADD VALUE` no puede
+   compartir migración con nada que **use** el valor nuevo (Postgres no lo ve
+   confirmado dentro de la misma transacción).
+2. `permisos_2_niveles_vencimiento_motivo_y_borrar_competencias` — migra las 9
+   filas existentes (`viewer → solo_lectura`, `interviewer`/`approver`/`owner →
+   lectura_escritura`), cambia el default de la columna a `lectura_escritura`,
+   agrega `candidate_tasks.due_date date` y `jobs.return_reason text`, y borra
+   `application_competency_scores`, `job_competencies` y
+   `job_templates.competencies`.
+3. `sincronizar_permisos_sql_con_2_niveles` — **el arreglo de seguridad de este
+   tramo**, ver abajo.
+
+**Solo 2 niveles para miembros añadidos.** `lectura_escritura` (escribe
+seguimientos, sube archivos, deja tareas, califica — no mueve etapas ni edita la
+vacante) y `solo_lectura` (ve todo el registro, no escribe nada). Los 4 valores
+viejos (`viewer`/`interviewer`/`approver`/`owner`) quedan **huérfanos en el
+enum**, no borrados: Postgres no permite quitar un valor de un enum, así que se
+migran los datos, se deja de ofrecerlos en la interfaz y `PERMISSION_LABEL` los
+sigue mapeando por si aparece una fila vieja.
+
+**El poder del reclutador no viene de la tabla de miembros.** Son dos fuentes,
+no tres: *decidir* = `is_admin_or_above() OR jobs.owner_id = actor`; *escribir* =
+eso, más `jobs.requested_by`, más un miembro con `lectura_escritura`. Por eso los
+2 niveles describen solo a quien se **añade**: el reclutador asignado manda
+porque es `owner_id`, no por su fila en `job_collaborators`.
+
+**El agujero real que se encontró y se cerró.** `private.can_decide_application`
+y `private.can_rate_application` seguían probando `auth_role() <> 'colaborador'`.
+Con ese rol ya extinto (migración `remove_colaborador_role`, bloque de abajo) la
+condición era **verdadera siempre**: el trigger `enforce_application_permission_tiers`
+dejó de aplicar cualquier restricción, y un miembro `solo_lectura` podía hacer
+`PATCH /rest/v1/applications` (cambiar `stage_id`, `status`, `rating`) o insertar
+notas y tareas directo por PostgREST con su propia sesión, sin pasar por ninguna
+Server Action. Confirmado en vivo, no teórico.
+Arreglo: `can_decide_application` redefinida como `is_admin_or_above() OR
+jobs.owner_id = auth.uid()`; nueva `can_write_application` (decidir, o ser
+`requested_by`, o tener `permission = 'lectura_escritura'`); el trigger ahora usa
+`can_write_application` para `rating`; `can_rate_application` borrada; y las
+políticas `notes_insert` y `candidate_tasks_insert` exigen
+`can_write_application` (antes bastaba con `can_access_job`, es decir cualquier
+miembro, incluido uno de solo lectura).
+Verificado con simulación de JWT dentro de una transacción con rollback y un
+`job_id` fijo: `solo_lectura → false/false`, gestor dueño → `true/true`.
+
+**La lección, la más importante de este tramo:** el SQL es un espejo de
+`src/lib/applications/permissions.ts`, y un espejo no se actualiza solo. Si
+cambia un umbral en TypeScript hay que cambiar las funciones `private.*` en la
+misma sesión, o quedan desincronizadas y la que gobierna de verdad es la de SQL
+(es la última línea, la que ve el atacante que se salta la interfaz).
+Corolario: los permisos se escriben como **lista blanca**, nunca como lista
+negra — `WRITE_PERMISSIONS = new Set([...])`, no "cualquiera que no sea solo
+lectura". Deny-by-default también en TypeScript, no solo en RLS.
+
+**Competencias borradas de verdad**, no ocultadas: 2 tablas, 1 columna y 5
+archivos (`src/lib/competencies/*`, `competency-row.tsx`,
+`competencies-panel.tsx`, `competency-list-editor.tsx`). Decisión del usuario;
+la rúbrica nunca alimentó un puntaje ponderado (ver la sección de Fase 11 abajo,
+que queda como historia).
+
+**Devolver una solicitud exige justificación.** `returnJobRequest(jobId, reason)`
+valida ≥10 caracteres con Zod y la guarda en `jobs.return_reason`; el solicitante
+la ve al abrir su solicitud. `submitForApproval` la limpia (`return_reason: null`)
+al reenviar — si no, la nota vieja quedaría pegada a una solicitud ya corregida.
+
+**Quitar al reclutador obliga a reasignar.** `removeJobCollaborator` se niega a
+borrar la fila de quien es `owner_id` (dejaría la vacante sin nadie que pueda
+decidir); en su lugar la interfaz ofrece "Reasignar" →
+`reassignJobRecruiter(jobId, profileId)`, que valida que el destino sea admin+
+activo, actualiza `jobs.owner_id` y hace upsert de su membresía con
+`ignoreDuplicates: true`.
+
+**Las tareas y reuniones solo ofrecen gente de la vacante.**
+`getAssignableProfiles` devuelve encargado + solicitante + miembros activos, y
+excluye `solo_lectura`/`viewer` — asignarle una tarea a quien no puede escribir
+es una tarea que nunca se va a poder cerrar.
+
+**`candidate_tasks.due_date`** (opcional) es lo que le permite a la agenda de
+Inicio decir "vencida"; antes el copy evitaba esa palabra a propósito porque la
+columna no existía. "Hoy" se compara con la fecha de la organización (UTC-6), no
+la del servidor ni la del navegador: en Vercel (UTC) una tarea que vence hoy se
+habría marcado vencida 6 horas antes. La constante vive en `src/lib/org-today.ts`
+(sin `server-only`, la usan un componente de servidor y uno de cliente) y
+`src/lib/dashboard/org-clock.ts` la importa de ahí en vez de tener su copia.
+
+**Notificaciones en cada cambio de estado** (`vacante_cambio_estado`), no solo al
+aceptar: `notifyJobStatusChange` calcula los destinatarios según el estado
+(solicitante, reclutador asignado, admins de la organización), excluye a quien
+ejecutó la acción, deduplica y va siempre dentro de `notifyBestEffort` — una
+notificación que falla no puede tumbar la transición. Usa el cliente admin
+**acotado por `organization_id`**; sin ese filtro habría notificado a los admins
+de otras organizaciones (hallazgo de review).
+
 ## Flujo de solicitud de vacante: plantilla general + estado `aceptada` + visibilidad de 3 niveles (post-Fase 19, sin número de fase)
 
 Plan completo en `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-design.md`. Este bloque documenta lo que YA se construyó (pasos 1-3 del plan); lo que falta queda al final.
@@ -9,27 +110,26 @@ Plan completo en `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-desi
 **3 migraciones aplicadas, en orden:**
 1. `job_visibility_and_general_templates` — tipo `job_visibility` (`publica`/`interna`/`confidencial`) + columna `jobs.visibility` (default `confidencial`, migrado desde `is_public`: `true → publica`, `false → confidencial`); `jobs.is_public` se deja de leer (no se borra); `job_templates.country/location/work_mode/employment_type` pasan a nullable; RLS: `jobs_select_public` reescrita para leer `visibility`, nueva `jobs_select_interna` para que empleados autenticados vean también el nivel `interna`.
 2. `job_status_add_aceptada` — nuevo valor `aceptada` en el enum, entre `pendiente_aprobacion` y `abierta`.
-3. `remove_colaborador_role` — los 2 perfiles con `role='colaborador'` pasan a `gestor`; se reescribe `employment_reasons_insert` (única política que nombraba ese rol). **Solo la migración de datos** — el código que trata `colaborador` como especial (`hasCollaboratorPermission` en `src/lib/applications/permissions.ts`) NO se tocó todavía, es un paso aparte pendiente (ver abajo). El rol sigue siendo invitable hoy (`invite-form.tsx` lo ofrece por defecto), así que `createJob` y `/vacantes/nueva` siguen bloqueándolo explícitamente — se probó quitar esas guardias asumiendo que el rol ya no existía y era un error real, encontrado en review.
+3. `remove_colaborador_role` — los 2 perfiles con `role='colaborador'` pasan a `gestor`; se reescribe `employment_reasons_insert` (única política que nombraba ese rol). **Solo la migración de datos**: el código que trataba `colaborador` como especial se reescribió después, en el bloque de arriba — y esa desincronización entre el rol extinto y el SQL que todavía lo nombraba abrió un agujero real, ver "El agujero real que se encontró y se cerró". El rol sigue siendo invitable hoy (`invite-form.tsx` lo ofrece por defecto), así que `createJob` y `/vacantes/nueva` siguen bloqueándolo explícitamente — se probó quitar esas guardias asumiendo que el rol ya no existía y era un error real, encontrado en review.
 
 **Plantilla de puesto general, solicitud específica.** `country`/`location`/`work_mode`/`employment_type` se movieron del wizard de plantilla (`WizardStep1Schema`) al formulario de solicitud (`CreateJobFromTemplateSchema`) — un mismo puesto puede abrirse en más de un país o modalidad sin duplicar la plantilla. Arregla de paso un bug real que ya existía: `job_templates.is_public` nunca se preguntaba ni se escribía, así que toda vacante creada desde plantilla nacía invisible en el portal — ahora la visibilidad ni siquiera vive en la plantilla, se elige al publicar.
 
 **Visibilidad de 3 niveles reemplaza `is_public`.** `publica` (portal + empleados) / `interna` (solo empleados, no sale al portal — el nivel que el manual de uso ya prometía y no existía) / `confidencial` (solo el equipo de la vacante). Se elige recién al publicar (`publishJob`), nunca antes — una vacante `aceptada` sigue siendo `confidencial` hasta ese momento, fijado explícitamente en el insert de `createJob` (no se deja al default de la columna, aunque hoy coincida).
 
 **Aceptar y publicar son dos pasos separados**, ya no un solo "aprobar y publicar":
-- `pendiente_aprobacion → aceptada` (`acceptJobRequest`): RH asigna encargado (`owner_id`), admin-only. Encargado y solicitante quedan con acceso operativo real (`job_collaborators`: `owner`/`approver`) — sin esto, ninguno de los dos podría decidir sobre sus propias postulaciones el día que `canDecideApplication` deje de tener excepción por rol.
+- `pendiente_aprobacion → aceptada` (`acceptJobRequest`): RH asigna encargado (`owner_id`), admin-only. Encargado y solicitante quedan con acceso operativo real (`job_collaborators`: `lectura_escritura`; los valores `owner`/`approver` de la versión original de este bloque se migraron después) — sin esto, ninguno de los dos podría escribir sobre sus propias postulaciones. El poder de *decidir* del encargado no viene de esa fila sino de `jobs.owner_id`, ver el bloque de arriba.
 - `aceptada → abierta` (`publishJob`): exige elegir visibilidad explícita, admin-only.
 - Se quitó el atajo `borrador → abierta` ("Publicar directamente") — todo camino a `abierta` pasa por `aceptada`, una sola forma de publicar.
 - El buzón de Inicio (`getPendingApprovals`) muestra las dos bandejas por separado: "Por aceptar" y "Aceptadas, por publicar" — un hallazgo real de review encontró que solo mostraba la primera, dejando vacantes aceptadas invisibles hasta que alguien las buscara a mano.
 
 **Admin puede crear la solicitud directamente.** Si quien crea (`createJob`) es admin/super_admin, la vacante nace ya en `aceptada` (se salta borrador y pendiente_aprobacion) y se autoasigna como encargado. Puede elegir en nombre de qué persona se solicita (`requester_id`, opcional, por defecto él mismo) y sumar más admins al equipo (`extra_admin_ids`) — ambos campos se ignoran server-side si quien manda el formulario no es admin+ de verdad (revalidado por rol real, nunca por lo que declare el cliente).
 
-**`job_collaborators` en `createJob`**: se arma con un `Map<profileId, permission>` insertado de menor a mayor nivel (colaboradores adicionales = viewer, solicitante = approver, admins extra = approver, encargado = owner) — así, si una misma persona cae en más de un balde, gana el nivel más alto, sin violar el `UNIQUE(job_id, profile_id)`.
+**`job_collaborators` en `createJob`**: se arma con un `Map<profileId, permission>` insertado de menor a mayor nivel (miembros añadidos = `solo_lectura` salvo que se elija otro, solicitante/admins extra/encargado = `lectura_escritura`) — así, si una misma persona cae en más de un balde, gana el nivel más alto, sin violar el `UNIQUE(job_id, profile_id)`.
 
 **Pendiente, explícitamente fuera de este bloque:**
-- Rewire de `canDecideApplication`/`canRateApplication` (hoy: cualquier rol que no sea `colaborador` pasa de largo; con `colaborador` vacío, la excepción es universal — no rompe nada nuevo hoy, pero tampoco aplica los niveles de `job_collaborators` a `gestor` como decidió el usuario).
-- Eliminar de verdad el rol `colaborador` (quitarlo de `invite-form.tsx`, limpiar los ~11 puntos de la interfaz que preguntan "¿es colaborador?").
+- ~~Rewire de `canDecideApplication`/`canRateApplication`~~ — hecho en el bloque de arriba.
+- Terminar de sacar el rol `colaborador`: quitarlo de `invite-form.tsx` y limpiar los puntos de la interfaz que todavía preguntan "¿es colaborador?". Mientras siga invitable, las guardias de `createJob` y `/vacantes/nueva` se quedan.
 - Filtro de plantillas por área del solicitante (paso 5 del plan) — bloqueado en datos reales del cliente (`profiles.department_id`/`job_templates.department_id` sin poblar).
-- Actualizar el manual de uso (`AtrioManualdeuso.docx`) con el flujo nuevo.
 
 ## Inicio: buzón + embudo + agenda + informe por encargado (post-Fase 19, sin número de fase)
 
@@ -45,7 +145,7 @@ Reemplaza el placeholder de `/inicio` ("El tablero llega en la siguiente fase").
 
 **`avgDaysToHire`/`hiresThisMonth` son una aproximación.** `applications` no guarda cuándo pasó a `contratada` (sin columna ni evento para eso) — se usa `updated_at` como sustituto. Preciso casi siempre, no garantizado; la fecha exacta necesita una columna nueva o un evento `contratada` en `application_events`, pendiente junto con el resto de las migraciones del flujo de solicitud.
 
-**`candidate_tasks` no tiene fecha de vencimiento.** La agenda muestra tareas pendientes (`is_done = false`) más antiguas primero, nunca "vencidas" — esa palabra prometería un límite que el esquema no guarda.
+**`candidate_tasks` no tenía fecha de vencimiento** cuando se escribió esta sección; la columna `due_date` se agregó después (ver el bloque de arriba) y la agenda ya ordena por urgencia y marca las vencidas.
 
 **Rol `colaborador` sin embudo ni buzón.** Su alcance de RLS difiere entre tablas (`jobs_select` le deja ver todas las vacantes públicas abiertas de la organización; `applications_select` lo limita a lo que él mismo refirió) — mostrarle "vacantes abiertas: 8" junto a "candidatos activos: 0" en el mismo panel lee como roto, no como vacío. Ve solo su agenda personal (correcta para cualquier rol) y un enlace a `/vacantes`. Se resuelve mejor cuando el rol se elimine (fase pendiente del plan de arriba).
 
@@ -154,7 +254,7 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 `job_collaborators` y `audit_log` ya existían completos desde Fase 2 (esquema + RLS); Fase 8 fue capa de aplicación sobre ellas, más una migración nueva:
 
-- **`enforce_application_permission_tiers`** — RLS (`can_access_job()`, usada en `applications_update`) deja pasar a cualquier colaborador por igual, sin distinguir su `permission` (viewer/interviewer/approver/owner) — a propósito, sigue gobernando solo visibilidad/acceso general. La distinción de nivel para *decidir* (`status`, `stage_id`) y *calificar* (`rating`) vive en dos funciones nuevas, `private.can_decide_application(job_id)`/`private.can_rate_application(job_id)`, y un trigger `BEFORE UPDATE` en `applications` que las llama — espejo exacto de `canDecideApplication`/`canRateApplication` en `src/lib/applications/permissions.ts`. Es defensa en profundidad: la Server Action ya bloquea antes de llegar aquí; el trigger cierra el hueco de alguien llamando Supabase directo desde el navegador con su propia sesión.
+- **`enforce_application_permission_tiers`** — RLS (`can_access_job()`, usada en `applications_update`) deja pasar a cualquier colaborador por igual, sin distinguir su `permission` (viewer/interviewer/approver/owner) — a propósito, sigue gobernando solo visibilidad/acceso general. La distinción de nivel para *decidir* (`status`, `stage_id`) y *calificar* (`rating`) vive en funciones aparte y un trigger `BEFORE UPDATE` en `applications` que las llama — espejo de `src/lib/applications/permissions.ts`. **Hoy son `private.can_decide_application` y `private.can_write_application`**; `can_rate_application` se borró y la lógica de esta fase (viewer/interviewer/approver) se reemplazó por 2 niveles, ver el bloque del inicio — incluido el agujero que abrió el haber cambiado el TypeScript sin tocar el SQL. Es defensa en profundidad: la Server Action ya bloquea antes de llegar aquí; el trigger cierra el hueco de alguien llamando Supabase directo desde el navegador con su propia sesión.
 - Verificado con simulación de rol real (transacción con rollback: `set_config('request.jwt.claims', ...)` + `set role authenticated`, un job/postulación de prueba) — viewer bloqueado en ambas, interviewer solo puede calificar, approver puede las dos, incluyendo el trigger disparando de verdad, no solo la función aislada.
 - `audit_log_select_super_admin` tiene el mismo hueco de organización que `error_reports` (Fase 7) — sin corregir, mitigado en la app (`getAuditLog()` filtra por `organization_id`). Ver `.claude/napkin.md`.
 
@@ -164,7 +264,13 @@ Los cuatro disparadores reales conectados en Fase 6 (`submitForApproval`, `refer
 
 `assigned_to` se valida server-side contra `isProfileAssignable()` (`src/lib/applications/get-applications.ts`) antes de insertar — el `<select>` del formulario ya solo ofrece gente con acceso real a la vacante, pero eso es solo la UI (mismo patrón de validación ya aplicado a `job_collaborators` en Fase 8 y a `head_profile_id` de departamentos en Fase 9).
 
-## Evaluación por competencias (Fase 11)
+## Evaluación por competencias (Fase 11) — ELIMINADA
+
+> Historia. Las dos tablas, la columna `job_templates.competencies` y los 5
+> archivos de esta fase se borraron por decisión del usuario — ver el bloque
+> "Permisos de 2 niveles + sin competencias" al inicio. Se deja el detalle
+> porque explica decisiones de RLS que se reutilizaron en otras tablas.
+
 
 **`job_competencies`** (rúbrica por vacante: nombre + peso 0-100) y **`application_competency_scores`** (calificación 1-5 + comentario, `unique(application_id, competency_id, evaluator_id)`). Mismo patrón de RLS que `candidate_tasks`, con un ajuste real: las políticas de `UPDATE`/`DELETE` sobre la propia fila (`evaluator_id = auth.uid()`) también revalidan `can_access_job` — no alcanza con "es mi fila", porque el acceso a la vacante pudo revocarse después de crearla (ver napkin.md).
 
@@ -211,6 +317,11 @@ En `JobTemplateDialog`: reabrir "Editar" sobre la misma plantilla tras guardarla
 Reusa por completo el flujo de Marca (Fase 3): mismo formulario (`BrandingForm`), misma acción (`updateBranding`), misma página (`/configuracion/marca`) — sin página ni componente nuevo. `/empleos` (portal público) los lee vía `getOrganization()` (ya cacheada con `cache()`, ya reusada por `empleos/layout.tsx`) con fallback a "Vacantes abiertas" si no están configurados.
 
 ## Fusión de plantilla de vacante + pipeline/competencias (Fase 17)
+
+> La parte de competencias de esta fase ya no existe (ver el bloque del inicio);
+> `pipeline_template_id` sigue vigente, y la decisión de seguridad de abajo
+> —nunca confiar en el contenido de la plantilla que manda el cliente— es la
+> razón por la que se deja escrita.
 
 `job_templates` gana `pipeline_template_id` (FK a `pipeline_templates`, nullable, `on delete set null`) y `competencies` (`jsonb`, array de `{name, weight}`). Sin cambio de RLS — cubierto por las políticas de fila ya existentes de `job_templates`.
 
@@ -432,8 +543,9 @@ con `createAdminClient()` (mismo motivo que Fase 4/17: un `gestor` puede
 crear su propia vacante pero no tiene RLS de escritura directa sobre esas
 tablas). "Reclutador encargado" pasa a ser una elección explícita en
 `jobs.owner_id` (antes se autoasignaba solo si el actor era admin+);
-colaboradores adicionales se insertan en `job_collaborators` con
-`permission = 'viewer'`.
+los miembros adicionales se insertan en `job_collaborators` con
+`permission = 'solo_lectura'` (era `'viewer'` antes de la migración de 2
+niveles) — el nivel más bajo por default, se sube a mano si hace falta.
 
 `src/lib/jobs/materialize-stages.ts` se borró — quedó sin ningún llamador
 tras este cambio (createJob ya no usa `pipeline_template_id` para nada).
