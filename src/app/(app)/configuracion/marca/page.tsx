@@ -9,7 +9,7 @@ export default async function MarcaPage() {
   const [, organization] = await Promise.all([requireSuperAdmin(), getOrganization()]);
 
   const org = organization ?? {
-    platform_name: "Atrio",
+    platform_name: "Demo AJE",
     accent_color: "#1f4d3d",
     logo_url: null,
     logo_dark_url: null,

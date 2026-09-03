@@ -89,7 +89,7 @@ export async function notify(input: NotifyInput): Promise<void> {
  */
 export async function getEmailContext(): Promise<{ platformName: string; siteUrl: string }> {
   const [organization, siteUrl] = await Promise.all([getOrganization(), getSiteUrl()]);
-  return { platformName: organization?.platform_name ?? "Atrio", siteUrl };
+  return { platformName: organization?.platform_name ?? "Demo AJE", siteUrl };
 }
 
 /**

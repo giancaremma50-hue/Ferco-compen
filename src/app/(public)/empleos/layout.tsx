@@ -13,7 +13,7 @@ export default async function EmpleosLayout({ children }: { children: React.Reac
             {organization?.logo_url && (
               <Image src={organization.logo_url} alt="" width={28} height={28} className="rounded-sm" />
             )}
-            <span className="font-serif text-lg">{organization?.platform_name ?? "Atrio"}</span>
+            <span className="font-serif text-lg">{organization?.platform_name ?? "Demo AJE"}</span>
           </Link>
         </div>
       </header>

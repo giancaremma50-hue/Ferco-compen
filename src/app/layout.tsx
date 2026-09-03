@@ -18,7 +18,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Atrio",
+  title: "Demo AJE",
   description: "Plataforma de reclutamiento y seguimiento de candidatos.",
 };
 

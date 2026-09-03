@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen">
       <AppHeader
-        organization={organization ?? { platform_name: "Atrio", logo_url: null }}
+        organization={organization ?? { platform_name: "Demo AJE", logo_url: null }}
         profile={profile}
         initialNotifications={notifications}
         initialUnreadCount={unreadCount}
