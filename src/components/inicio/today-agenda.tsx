@@ -79,11 +79,12 @@ export function TodayAgenda({ data }: { data: AgendaData }) {
                       className="flex items-center gap-3 py-2.5 text-sm hover:bg-muted/30"
                     >
                       <span className="min-w-0 flex-1 truncate">{t.description}</span>
+                      {/* El candidato no se sacrifica por la fecha: sin él la tarea
+                          no dice de quién es. La fecha se suma, no reemplaza. */}
                       <span className="flex-none text-xs text-muted-foreground">
-                        {due ? (
-                          <span className={due.overdue ? "text-destructive" : undefined}>{due.text}</span>
-                        ) : (
-                          t.candidateName
+                        <span className="hidden sm:inline">{t.candidateName}</span>
+                        {due && (
+                          <span className={due.overdue ? "text-destructive sm:ml-2" : "sm:ml-2"}>{due.text}</span>
                         )}
                       </span>
                     </Link>
