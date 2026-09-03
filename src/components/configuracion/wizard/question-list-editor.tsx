@@ -11,7 +11,7 @@ type QuestionRow = Omit<QuestionDraft, "options"> & { options: OptionRow[]; key:
 
 /**
  * Banco de preguntas del paso 3 — mismo patrón "estado local + input oculto
- * con el array entero" que CompetencyListEditor/PipelineStagesEditor, pero
+ * con el array entero" que PipelineStagesEditor, pero
  * con dos niveles (cada pregunta de opción múltiple lleva su propia lista
  * de opciones). El submit manda todo como un solo JSON; la Server Action
  * reemplaza la lista completa, nunca hace diff.

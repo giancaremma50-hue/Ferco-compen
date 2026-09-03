@@ -48,6 +48,8 @@ export type MyRequest = {
   title: string;
   code: string;
   status: JobStatus;
+  /** Solo viene lleno cuando RH la devolvió — el gestor necesita saber qué corregir sin abrir la vacante. */
+  returnReason: string | null;
   createdAt: string;
 };
 
@@ -56,9 +58,16 @@ export async function getMyRequests(profileId: string): Promise<MyRequest[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("jobs")
-    .select("id, title, code, status, created_at")
+    .select("id, title, code, status, return_reason, created_at")
     .eq("requested_by", profileId)
     .order("created_at", { ascending: false })
     .limit(8);
-  return (data ?? []).map((j) => ({ id: j.id, title: j.title, code: j.code, status: j.status, createdAt: j.created_at }));
+  return (data ?? []).map((j) => ({
+    id: j.id,
+    title: j.title,
+    code: j.code,
+    status: j.status,
+    returnReason: j.return_reason,
+    createdAt: j.created_at,
+  }));
 }

@@ -89,13 +89,14 @@ export function CandidateDrawer({
     handleClose();
   }
 
-  // Descartar/Siguiente etapa/Agendar reunión/Mensaje son decisiones sobre
-  // la postulación — mismo nivel que exige rechazar o contratar
-  // (canDecideApplication). Seguimientos y Asignar tarea quedan siempre
-  // disponibles (candidate_tasks solo exige can_access_job, un nivel más
-  // permisivo — ocultar el botón sin también restringir el server habría
-  // insinuado una garantía que la Server Action no cumple).
+  // Dos niveles, y los dos se exigen de verdad en el servidor (ver
+  // lib/applications/permissions.ts y su espejo en SQL): decidir
+  // (descartar, siguiente etapa, agendar, mensaje) = reclutador asignado o
+  // RH; escribir (seguimientos, tareas, calificación) = eso más el
+  // solicitante y los miembros de lectura y escritura. Un miembro de solo
+  // lectura no debe ver formularios que el servidor va a rechazar.
   const canDecide = data?.canDecide ?? false;
+  const canWrite = data?.canWrite ?? false;
   const actions: CandidateAction[] = [
     { key: "descartar", label: "Descartar candidato", icon: X, danger: true, onClick: () => rejectRef.current?.open(), hidden: !canDecide },
     {
@@ -107,7 +108,7 @@ export function CandidateDrawer({
     },
     { key: "reunion", label: "Agendar reunión", icon: CalendarPlus, onClick: () => setPanel("reunion"), hidden: !canDecide },
     { key: "seguimiento", label: "Seguimientos", icon: NotebookPen, onClick: () => setTab("seguimiento") },
-    { key: "tarea", label: "Asignar tarea", icon: ListChecks, onClick: () => setPanel(panel === "tarea" ? null : "tarea") },
+    { key: "tarea", label: "Asignar tarea", icon: ListChecks, onClick: () => setPanel(panel === "tarea" ? null : "tarea"), hidden: !canWrite },
     { key: "mensaje", label: "Mensaje por correo", icon: Mail, onClick: () => setPanel(panel === "mensaje" ? null : "mensaje"), hidden: !canDecide },
   ];
 
@@ -191,7 +192,7 @@ export function CandidateDrawer({
           ) : tab === "info" ? (
             <InfoView data={data} />
           ) : tab === "seguimiento" ? (
-            <SeguimientoView data={data} applicationId={applicationId!} />
+            <SeguimientoView data={data} applicationId={applicationId!} canWrite={canWrite} />
           ) : (
             <BitacoraView
               events={data.application.events}
@@ -200,7 +201,7 @@ export function CandidateDrawer({
             />
           )}
 
-          {data && panel === "tarea" && (
+          {data && panel === "tarea" && canWrite && (
             <section className="mt-8 border-t border-border pt-5">
               <h3 className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Tareas</h3>
               <div className="mt-3">
@@ -224,7 +225,13 @@ export function CandidateDrawer({
           {data && (
             <div className="mt-8 flex items-center gap-3 border-t border-border pt-5">
               <span className="text-xs text-muted-foreground">Calificación:</span>
-              <RatingStars applicationId={applicationId!} rating={data.application.rating} />
+              {canWrite ? (
+                <RatingStars applicationId={applicationId!} rating={data.application.rating} />
+              ) : (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {data.application.rating ? data.application.rating + " / 5" : "Sin calificar"}
+                </span>
+              )}
               {data.application.status === "activa" && data.canDecide && (
                 <HireButton applicationId={applicationId!} onSuccess={handleDecisionSuccess} />
               )}
@@ -349,7 +356,7 @@ function jobTitleFallback(application: DrawerData["application"]): string {
   return application.jobTitle ?? "";
 }
 
-function SeguimientoView({ data, applicationId }: { data: DrawerData; applicationId: string }) {
+function SeguimientoView({ data, applicationId, canWrite }: { data: DrawerData; applicationId: string; canWrite: boolean }) {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
       <div>
@@ -362,9 +369,13 @@ function SeguimientoView({ data, applicationId }: { data: DrawerData; applicatio
       </div>
       <div>
         <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Seguimiento</p>
-        <div className="mt-2">
-          <NoteForm applicationId={applicationId} />
-        </div>
+        {canWrite ? (
+          <div className="mt-2">
+            <NoteForm applicationId={applicationId} />
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">Tu nivel en esta vacante es de solo lectura.</p>
+        )}
         <div className="mt-4">
           <NoteList notes={data.application.notes} />
         </div>

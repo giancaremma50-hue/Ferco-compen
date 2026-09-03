@@ -83,71 +83,6 @@ export type Database = {
           },
         ]
       }
-      application_competency_scores: {
-        Row: {
-          application_id: string
-          comment: string | null
-          competency_id: string
-          created_at: string
-          evaluator_id: string
-          id: string
-          organization_id: string
-          score: number
-          updated_at: string
-        }
-        Insert: {
-          application_id: string
-          comment?: string | null
-          competency_id: string
-          created_at?: string
-          evaluator_id: string
-          id?: string
-          organization_id: string
-          score: number
-          updated_at?: string
-        }
-        Update: {
-          application_id?: string
-          comment?: string | null
-          competency_id?: string
-          created_at?: string
-          evaluator_id?: string
-          id?: string
-          organization_id?: string
-          score?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "application_competency_scores_application_id_fkey"
-            columns: ["application_id"]
-            isOneToOne: false
-            referencedRelation: "applications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "application_competency_scores_competency_id_fkey"
-            columns: ["competency_id"]
-            isOneToOne: false
-            referencedRelation: "job_competencies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "application_competency_scores_evaluator_id_fkey"
-            columns: ["evaluator_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "application_competency_scores_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       application_events: {
         Row: {
           actor_id: string | null
@@ -466,6 +401,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string
+          due_date: string | null
           id: string
           is_done: boolean
           organization_id: string
@@ -478,6 +414,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description: string
+          due_date?: string | null
           id?: string
           is_done?: boolean
           organization_id: string
@@ -490,6 +427,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          due_date?: string | null
           id?: string
           is_done?: boolean
           organization_id?: string
@@ -1029,51 +967,6 @@ export type Database = {
           },
         ]
       }
-      job_competencies: {
-        Row: {
-          created_at: string
-          id: string
-          job_id: string
-          name: string
-          organization_id: string
-          position: number
-          weight: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          job_id: string
-          name: string
-          organization_id: string
-          position?: number
-          weight?: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          job_id?: string
-          name?: string
-          organization_id?: string
-          position?: number
-          weight?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_competencies_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_competencies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       job_question_options: {
         Row: {
           created_at: string
@@ -1367,7 +1260,6 @@ export type Database = {
       job_templates: {
         Row: {
           candidacy_fields: Json
-          competencies: Json
           country: string | null
           created_at: string
           created_by: string
@@ -1390,7 +1282,6 @@ export type Database = {
         }
         Insert: {
           candidacy_fields?: Json
-          competencies?: Json
           country?: string | null
           created_at?: string
           created_by?: string
@@ -1413,7 +1304,6 @@ export type Database = {
         }
         Update: {
           candidacy_fields?: Json
-          competencies?: Json
           country?: string | null
           created_at?: string
           created_by?: string
@@ -1486,6 +1376,7 @@ export type Database = {
           published_at: string | null
           requested_by: string | null
           requirements: string
+          return_reason: string | null
           salary_max: number | null
           salary_min: number | null
           slug: string | null
@@ -1516,6 +1407,7 @@ export type Database = {
           published_at?: string | null
           requested_by?: string | null
           requirements?: string
+          return_reason?: string | null
           salary_max?: number | null
           salary_min?: number | null
           slug?: string | null
@@ -1546,6 +1438,7 @@ export type Database = {
           published_at?: string | null
           requested_by?: string | null
           requirements?: string
+          return_reason?: string | null
           salary_max?: number | null
           salary_min?: number | null
           slug?: string | null
@@ -2119,6 +2012,8 @@ export type Database = {
         | "interviewer"
         | "approver"
         | "owner"
+        | "lectura_escritura"
+        | "solo_lectura"
       job_stage_type:
         | "postulado"
         | "preseleccion"
@@ -2142,6 +2037,7 @@ export type Database = {
         | "vacante_pendiente_aprobacion"
         | "movimiento_referido"
         | "respuesta_reporte_error"
+        | "vacante_cambio_estado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2300,6 +2196,8 @@ export const Constants = {
         "interviewer",
         "approver",
         "owner",
+        "lectura_escritura",
+        "solo_lectura",
       ],
       job_stage_type: [
         "postulado",
@@ -2326,6 +2224,7 @@ export const Constants = {
         "vacante_pendiente_aprobacion",
         "movimiento_referido",
         "respuesta_reporte_error",
+        "vacante_cambio_estado",
       ],
     },
   },

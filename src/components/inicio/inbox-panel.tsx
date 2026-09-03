@@ -77,9 +77,14 @@ export function MyRequestsInbox({ requests }: { requests: MyRequest[] }) {
       <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Mis solicitudes</p>
       <div className="mt-3 divide-y divide-border/60">
         {requests.map((r) => (
-          <Link key={r.id} href={`/vacantes/${r.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-muted/30">
-            <p className="min-w-0 truncate font-medium">{r.title}</p>
-            <JobStatusBadge status={r.status} />
+          <Link key={r.id} href={`/vacantes/${r.id}`} className="block py-2.5 text-sm hover:bg-muted/30">
+            <span className="flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate font-medium">{r.title}</span>
+              <JobStatusBadge status={r.status} />
+            </span>
+            {r.status === "borrador" && r.returnReason && (
+              <span className="mt-1 block text-xs text-[#9A6B1F]">Devuelta: {r.returnReason}</span>
+            )}
           </Link>
         ))}
       </div>

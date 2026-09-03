@@ -5,8 +5,6 @@ import Link from "next/link";
 import { createTemplateDraftStep1, updateTemplateStep1 } from "@/lib/job-templates/wizard-actions";
 import { notifyError } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
-import { CompetencyListEditor } from "@/components/configuracion/competency-list-editor";
-import type { CompetencyDraft } from "@/lib/job-templates/schema";
 
 const FIELD_CLASS = "h-11 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-foreground";
 const TEXTAREA_CLASS = "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground";
@@ -17,7 +15,6 @@ export type Step1InitialValues = {
   department_id: string | null;
   description: string;
   requirements: string;
-  competencies: CompetencyDraft[];
 };
 
 /**
@@ -78,13 +75,6 @@ export function WizardStep1Form({
         <span className="text-xs text-muted-foreground">Requisitos</span>
         <textarea name="requirements" required rows={3} defaultValue={initialValues?.requirements} className={TEXTAREA_CLASS} />
       </label>
-
-      <div className="border-t border-border pt-4" data-tour="w1-rubrica">
-        <span className="text-xs text-muted-foreground">Rúbrica de evaluación (opcional)</span>
-        <div className="mt-1.5">
-          <CompetencyListEditor initialCompetencies={initialValues?.competencies ?? []} />
-        </div>
-      </div>
 
       <div className="mt-6 flex justify-end gap-2.5">
         <Link

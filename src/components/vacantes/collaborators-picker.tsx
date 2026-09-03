@@ -7,7 +7,7 @@ import type { TeamMemberOption } from "@/lib/jobs/get-team-options";
  * "Colaboradores adicionales" — checkboxes + un input oculto con el array de
  * ids en JSON (un <select multiple> perdería todo salvo el último valor al
  * pasar por Object.fromEntries(formData) del servidor). No excluye al
- * "Reclutador encargado" elegido en el selector de arriba — si coinciden,
+ * "Reclutador asignado" de la vacante — si coinciden,
  * createJob lo descarta server-side (agregar al mismo dos veces violaría el
  * UNIQUE de job_collaborators), evita sincronizar estado entre dos
  * componentes separados para un caso que no rompe nada de todos modos.

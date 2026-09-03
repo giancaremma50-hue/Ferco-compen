@@ -12,10 +12,10 @@ import { PERMISSION_LABEL } from "@/lib/jobs/collaborators-schema";
 
 /**
  * Resumen de la vacante, accesible desde el pipeline — el detalle completo
- * (competencias, aprobar/editar, bitácora, administrar colaboradores) se
+ * (aprobar/editar, bitácora, administrar miembros) se
  * quedó en /vacantes/[id], un clic más lejos ("Ver detalle completo"), no
  * duplicado acá: nada se perdió, solo dejó de ser la pantalla principal. El
- * equipo de reclutamiento (encargado + colaboradores) sí se muestra acá,
+ * equipo de reclutamiento (reclutador asignado + miembros) sí se muestra acá,
  * de solo lectura, porque es lo primero que se pregunta al abrir el
  * pipeline — no vale la pena un clic más para verlo.
  */
@@ -84,11 +84,11 @@ export function JobInfoModal({ job, collaborators }: { job: JobDetail; collabora
           <div className="mt-5">
             <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Equipo de reclutamiento</p>
             <div className="mt-2 flex items-center justify-between gap-3 border-b border-border py-2 text-sm">
-              <span>{job.ownerName ?? "Sin encargado asignado"}</span>
-              <span className="text-xs text-muted-foreground">Encargado</span>
+              <span>{job.ownerName ?? "Sin reclutador asignado"}</span>
+              <span className="text-xs text-muted-foreground">Reclutador asignado</span>
             </div>
             {collaborators.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">Sin colaboradores agregados todavía.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Sin miembros agregados todavía.</p>
             ) : (
               collaborators.map((c) => (
                 <div key={c.id} className="flex items-center justify-between gap-3 border-b border-border py-2 text-sm">
@@ -101,7 +101,7 @@ export function JobInfoModal({ job, collaborators }: { job: JobDetail; collabora
 
           <div className="mt-5">
             <Link href={`/vacantes/${job.id}`} className="text-sm font-medium text-accent underline">
-              Ver detalle completo (colaboradores, competencias, bitácora) →
+              Ver detalle completo (miembros, bitácora) →
             </Link>
           </div>
         </div>

@@ -14,7 +14,7 @@ const STATUS_SHORT: Record<JobStatus, string> = {
 export function RecruiterReportSection({ report }: { report: RecruiterReport }) {
   return (
     <div>
-      <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Informe por encargado</p>
+      <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Informe por reclutador asignado</p>
 
       {report.rows.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">Todavía no hay vacantes para reportar.</p>
@@ -23,7 +23,7 @@ export function RecruiterReportSection({ report }: { report: RecruiterReport }) 
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                <th className="px-4 py-2.5 font-normal">Encargado</th>
+                <th className="px-4 py-2.5 font-normal">Reclutador asignado</th>
                 <th className="px-4 py-2.5 font-normal">Vacantes por estado</th>
                 <th className="px-4 py-2.5 text-right font-normal">Conversión</th>
                 <th className="px-4 py-2.5 text-right font-normal">Días a contratación</th>

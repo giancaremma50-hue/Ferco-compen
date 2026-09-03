@@ -10,7 +10,6 @@ const HELP_STEPS = [
   { selector: '[data-tour="w1-puesto"]', title: "Puesto", description: "El nombre interno de la plantilla — lo ve tu equipo al elegirla para crear una vacante, nunca el candidato." },
   { selector: '[data-tour="w1-titulo"]', title: "Título del anuncio", description: "Este sí lo ve el candidato: es el título que aparece en la bolsa de empleo pública." },
   { selector: '[data-tour="w1-descripcion"]', title: "Descripción del puesto", description: "También pública — se copia tal cual a cada vacante creada desde esta plantilla." },
-  { selector: '[data-tour="w1-rubrica"]', title: "Rúbrica de evaluación", description: "Opcional. Competencias con un peso cada una (0-100) para calificar candidatos de forma consistente en el pipeline — no la ve el candidato." },
 ];
 
 export default async function PlantillaPaso1Page({ params }: { params: Promise<{ id: string }> }) {
@@ -53,7 +52,6 @@ export default async function PlantillaPaso1Page({ params }: { params: Promise<{
             department_id: template.department_id,
             description: template.description,
             requirements: template.requirements,
-            competencies: template.competencies,
           }}
         />
       </div>

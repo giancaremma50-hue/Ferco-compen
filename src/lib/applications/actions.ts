@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/email/send-email";
 import { CambioEtapaEmail } from "@/emails/cambio-etapa";
 import { MovimientoReferidoEmail } from "@/emails/movimiento-referido";
 import { MensajeCandidatoEmail } from "@/emails/mensaje-candidato";
-import { canDecideApplication, canRateApplication } from "./permissions";
+import { canDecideApplication, canWriteApplication } from "./permissions";
 import { isProfileAssignable } from "./get-applications";
 import { getDrawerData, type DrawerData } from "./get-drawer-data";
 import { getSignedCvUrl } from "@/lib/candidates/get-signed-cv-url";
@@ -192,6 +192,14 @@ export async function addNote(
   if (!parsed.success) return zodFieldError(parsed.error, "Revisa la nota.");
 
   const supabase = await createClient();
+
+  // RLS solo exige can_access_job, que también deja pasar a un miembro de
+  // SOLO LECTURA — sin este chequeo, "solo lectura" podría escribir notas.
+  const noteJobId = await requireApplicationJobId(supabase, applicationId);
+  if (!noteJobId) return { error: "No se encontró la postulación." };
+  if (!(await canWriteApplication(profile.role, profile.id, noteJobId))) {
+    return { error: "Tu perfil solo puede leer esta postulación." };
+  }
   const { data: note, error } = await supabase
     .from("notes")
     .insert({
@@ -227,7 +235,7 @@ export async function setRating(applicationId: string, rating: number): Promise<
 
   const jobId = await requireApplicationJobId(supabase, applicationId);
   if (!jobId) return { error: "No se encontró la postulación." };
-  if (!(await canRateApplication(profile.role, profile.id, jobId))) {
+  if (!(await canWriteApplication(profile.role, profile.id, jobId))) {
     return { error: "Tu perfil no puede calificar en esta vacante." };
   }
 
@@ -354,15 +362,19 @@ export async function addTask(
 
   const supabase = await createClient();
 
+  const taskJobId = await requireApplicationJobId(supabase, applicationId);
+  if (!taskJobId) return { error: "No se encontró la postulación." };
+  if (!(await canWriteApplication(profile.role, profile.id, taskJobId))) {
+    return { error: "Tu perfil solo puede leer esta postulación." };
+  }
+
   // El <select> del formulario ya solo lista gente con acceso a la
   // vacante, pero eso es solo la UI — el cliente nunca es fuente de
   // verdad. Sin esto, un POST directo podría asignar la tarea a alguien
   // sin ninguna relación con la vacante (ni siquiera podría verla luego,
   // candidate_tasks_select exige can_access_job).
   if (parsed.data.assigned_to) {
-    const jobId = await requireApplicationJobId(supabase, applicationId);
-    if (!jobId) return { error: "No se encontró la postulación." };
-    if (!(await isProfileAssignable(parsed.data.assigned_to, jobId, profile.organization_id))) {
+    if (!(await isProfileAssignable(parsed.data.assigned_to, taskJobId, profile.organization_id))) {
       return { error: "Esa persona no tiene acceso a esta vacante." };
     }
   }
@@ -381,17 +393,27 @@ export async function addTask(
 }
 
 export async function toggleTask(taskId: string, applicationId: string, isDone: boolean): Promise<ApplicationActionResult> {
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) return { error: "No se encontró la postulación." };
+  if (!(await canWriteApplication(profile.role, profile.id, jobId))) {
+    return { error: "Tu perfil solo puede leer esta postulación." };
+  }
   // applicationId además de taskId en el WHERE: taskId ya es suficiente
   // para que RLS decida el permiso real, pero así un id desincronizado no
   // revalida silenciosamente la página de OTRA postulación por error.
-  const { error } = await supabase
+  // `.select()` + 0 filas = RLS la negó (candidate_tasks_update solo deja
+   // al creador, al asignado y a admin+) — sin esto la action reportaba
+   // "Tarea completada" con éxito habiendo cambiado nada.
+  const { data: updated, error } = await supabase
     .from("candidate_tasks")
     .update({ is_done: isDone, completed_at: isDone ? new Date().toISOString() : null })
     .eq("id", taskId)
-    .eq("application_id", applicationId);
-  if (error) return { error: "No se pudo actualizar la tarea." };
+    .eq("application_id", applicationId)
+    .select("id");
+  if (error || !updated || updated.length === 0) return { error: "No se pudo actualizar la tarea." };
 
   revalidatePath(`/postulaciones/${applicationId}`);
   return { success: isDone ? "Tarea completada" : "Tarea reabierta" };
@@ -449,10 +471,21 @@ export async function sendCandidateMessage(
 }
 
 export async function deleteTask(taskId: string, applicationId: string): Promise<void> {
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
-  const { error } = await supabase.from("candidate_tasks").delete().eq("id", taskId).eq("application_id", applicationId);
-  if (error) throw new Error("No se pudo eliminar la tarea.");
+
+  const jobId = await requireApplicationJobId(supabase, applicationId);
+  if (!jobId) throw new Error("No se encontró la postulación.");
+  if (!(await canWriteApplication(profile.role, profile.id, jobId))) {
+    throw new Error("Tu perfil solo puede leer esta postulación.");
+  }
+  const { data: deleted, error } = await supabase
+    .from("candidate_tasks")
+    .delete()
+    .eq("id", taskId)
+    .eq("application_id", applicationId)
+    .select("id");
+  if (error || !deleted || deleted.length === 0) throw new Error("No se pudo eliminar la tarea.");
   revalidatePath(`/postulaciones/${applicationId}`);
 }
 

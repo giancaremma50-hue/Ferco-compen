@@ -70,7 +70,7 @@ export async function getRecruiterReport(): Promise<RecruiterReport> {
 
   for (const job of jobs ?? []) {
     const key = job.owner_id ?? "sin-encargado";
-    const ownerName = job.owner?.display_name ?? "Sin encargado";
+    const ownerName = job.owner?.display_name ?? "Sin reclutador asignado";
     const acc = byOwner.get(key) ?? { ownerName, jobsByStatus: {}, total: 0, hires: 0, hireDaysSum: 0 };
     acc.jobsByStatus[job.status] = (acc.jobsByStatus[job.status] ?? 0) + 1;
 

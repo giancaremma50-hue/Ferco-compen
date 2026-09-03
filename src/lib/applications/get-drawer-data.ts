@@ -4,7 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { getApplicationDetail, getAssignableProfiles, type ApplicationDetail, type AssignableProfile } from "./get-applications";
 import { getApplicationInterviews, type ApplicationInterview } from "@/lib/interviews/get-interviews";
 import { getMessageTemplates, type MessageTemplate } from "@/lib/message-templates/get-message-templates";
-import { canDecideApplication } from "./permissions";
+import { getApplicationPermissions } from "./permissions";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -28,6 +28,7 @@ export type DrawerData = {
   messageTemplates: MessageTemplate[];
   /** Descartar/Siguiente etapa/Agendar reunión/Mensaje exigen el mismo nivel — Tareas y Seguimientos no. */
   canDecide: boolean;
+  canWrite: boolean;
 };
 
 /**
@@ -44,7 +45,7 @@ export async function getDrawerData(
   if (!application) return null;
 
   const supabase = await createClient();
-  const [{ data: answerRows }, { data: fileRows }, interviews, assignable, { data: reasons }, messageTemplates, canDecide] =
+  const [{ data: answerRows }, { data: fileRows }, interviews, assignable, { data: reasons }, messageTemplates, permissions] =
     await Promise.all([
       supabase
         .from("application_answers")
@@ -59,7 +60,7 @@ export async function getDrawerData(
       getAssignableProfiles(application.jobId, actor.organizationId),
       supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
       actor.role === "colaborador" ? Promise.resolve([]) : getMessageTemplates(actor.organizationId).catch(() => []),
-      canDecideApplication(actor.role, actor.id, application.jobId),
+      getApplicationPermissions(actor.role, actor.id, application.jobId),
     ]);
 
   // job_question_options no viene embebido en la consulta de arriba (esa
@@ -88,6 +89,7 @@ export async function getDrawerData(
     assignable,
     rejectionReasons: reasons ?? [],
     messageTemplates,
-    canDecide,
+    canDecide: permissions.canDecide,
+    canWrite: permissions.canWrite,
   };
 }

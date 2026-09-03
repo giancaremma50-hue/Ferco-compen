@@ -6,8 +6,16 @@ import { getKanbanData } from "@/lib/applications/get-applications";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { JobInfoModal } from "@/components/vacantes/job-info-modal";
 
-export default async function PipelinePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelinePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `?candidato=` abre el drawer directo — es a donde redirige /postulaciones/[id], el destino de las notificaciones y de la agenda. */
+  searchParams: Promise<{ candidato?: string }>;
+}) {
   const { id } = await params;
+  const { candidato } = await searchParams;
   await requireProfile();
   const job = await getJobById(id);
   if (!job) notFound();
@@ -30,7 +38,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ id: s
         <JobInfoModal job={job} collaborators={collaborators} />
       </div>
       <div className="mt-6 min-h-0 flex-1">
-        <KanbanBoard initialData={data} jobTitle={job.title} />
+        <KanbanBoard initialData={data} jobTitle={job.title} initialOpenApplicationId={candidato ?? null} />
       </div>
     </div>
   );

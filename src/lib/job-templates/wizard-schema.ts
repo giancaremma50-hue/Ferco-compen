@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { JobBaseSchema } from "@/lib/jobs/schema";
-import { CompetencyDraftSchema } from "@/lib/job-templates/schema";
 import { CANDIDACY_STATE_SCHEMA, CANDIDACY_FIELD_LABEL } from "@/lib/job-templates/candidacy-fields";
 import type { CandidacyFieldKey } from "@/lib/job-templates/candidacy-fields";
 
@@ -19,18 +18,6 @@ export const WizardStep1Schema = JobBaseSchema.pick({
   // "Puesto" en el wizard — mismo campo que ya existía como "Nombre de la
   // plantilla" (Fase 15), solo cambia la etiqueta visible.
   name: z.string().trim().min(2, { error: "El nombre debe tener al menos 2 caracteres." }).max(80, { error: "Máximo 80 caracteres." }),
-  // Llega como JSON serializado desde CompetencyListEditor (input oculto).
-  competencies: z.preprocess(
-    (v) => (v === "" || v == null ? "[]" : v),
-    z.string().transform((value, ctx) => {
-      try {
-        return JSON.parse(value);
-      } catch {
-        ctx.addIssue({ code: "custom", message: "Competencias inválidas." });
-        return z.NEVER;
-      }
-    }),
-  ).pipe(z.array(CompetencyDraftSchema).max(20, { error: "Máximo 20 competencias." })),
 });
 export type WizardStep1Values = z.infer<typeof WizardStep1Schema>;
 
@@ -47,7 +34,7 @@ export type WizardStep2Values = z.infer<typeof WizardStep2Schema>;
 
 // Paso 3 ("Preguntas"). Las opciones de opción múltiple llegan anidadas
 // dentro de cada pregunta en el mismo JSON — mismo patrón "reemplazar todo"
-// que competencies/etapas, solo que acá hay dos niveles.
+// que las preguntas/etapas, solo que acá hay dos niveles.
 const QuestionOptionDraftSchema = z.object({
   label: z.string().trim().min(1, { error: "Escribe el texto de la opción." }).max(200, { error: "Máximo 200 caracteres." }),
   is_expected: z.boolean(),

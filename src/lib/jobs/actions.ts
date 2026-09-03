@@ -16,8 +16,8 @@ import { findOrCreateCandidate, createApplicationForCandidate } from "./create-a
 import { notify, notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { zodFieldError } from "@/lib/forms/zod-error";
 import { VacantePendienteAprobacionEmail } from "@/emails/vacante-pendiente-aprobacion";
+import { VacanteCambioEstadoEmail } from "@/emails/vacante-cambio-estado";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
-import type { CompetencyDraft } from "@/lib/job-templates/schema";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -42,7 +42,7 @@ function toJobRow(values: JobFormValues) {
 }
 
 /**
- * "Reclutador encargado" — se elige al ACEPTAR la solicitud (acceptJobRequest),
+ * "Reclutador asignado" — se elige al ACEPTAR la solicitud (acceptJobRequest),
  * ya no al crearla. Revalida rol+organización+activo, no solo que la fila
  * exista — un <select> filtrado en el cliente no es una garantía server-side.
  */
@@ -59,7 +59,7 @@ async function assertValidOwner(
     .eq("is_active", true)
     .in("role", ["admin", "super_admin"])
     .maybeSingle();
-  return data ? null : "Esa persona no puede quedar como reclutador encargado.";
+  return data ? null : "Esa persona no puede quedar como reclutador asignado.";
 }
 
 /** Colaboradores adicionales — mismo criterio que job_collaborators ya exige hoy (cualquier miembro activo de la org). */
@@ -121,7 +121,7 @@ async function assertValidExtraAdmins(
  * vacante, equipo) — título, descripción, requisitos, candidatura,
  * preguntas y etapas se vuelven a leer server-side desde la plantilla,
  * nunca del contenido que mande el formulario (mismo principio de
- * seguridad que Fase 17 con pipeline_template_id/competencies: el cliente
+ * seguridad que Fase 17 con pipeline_template_id: el cliente
  * nunca manda el contenido que un rol sin acceso directo a esas tablas no
  * podría escribir él mismo).
  *
@@ -167,7 +167,7 @@ export async function createJob(
 
   const { data: template } = await supabase
     .from("job_templates")
-    .select("id, title, department_id, description, requirements, competencies, candidacy_fields")
+    .select("id, title, department_id, description, requirements, candidacy_fields")
     .eq("id", parsed.data.template_id)
     .eq("organization_id", profile.organization_id)
     .eq("status", "published")
@@ -219,9 +219,9 @@ export async function createJob(
   }
 
   // Todo lo que sigue exige admin+ para escribir (job_stages, job_questions,
-  // job_question_options, job_competencies, job_collaborators) — un gestor
+  // job_question_options, job_collaborators) — un gestor
   // SÍ puede crear su propia vacante, pero no tiene RLS de escritura directa
-  // sobre esas tablas. Mismo motivo que materializeJobStages/job_competencies
+  // sobre esas tablas. Mismo motivo que materializeJobStages
   // en Fase 4/17: cliente admin acá, con el contenido ya releído del
   // servidor arriba (nunca del FormData) y el job.id que ACABAMOS de crear
   // (nunca uno que mande el cliente).
@@ -288,24 +288,6 @@ export async function createJob(
     }
   }
 
-  const competencies = (template.competencies as CompetencyDraft[]) ?? [];
-  if (competencies.length > 0) {
-    const { error: competenciesError } = await admin.from("job_competencies").insert(
-      competencies.map((c, i) => ({
-        organization_id: profile.organization_id,
-        job_id: job.id,
-        name: c.name,
-        weight: c.weight,
-        position: i,
-      })),
-    );
-    // No bloquea la creación — la vacante ya existe y una rúbrica vacía es
-    // un estado normal (Fase 11), a diferencia de un pipeline vacío.
-    if (competenciesError) {
-      console.error("createJob: no se pudieron copiar las competencias de la plantilla", competenciesError);
-    }
-  }
-
   // Un mismo profile_id no puede aparecer dos veces (UNIQUE(job_id,
   // profile_id)) — se arma con un Map en vez de un array plano, insertando
   // del nivel más bajo al más alto, así el nivel más alto que le toque a
@@ -315,13 +297,13 @@ export async function createJob(
   // vacante — sin esto, un gestor que pidió una vacante no podría decidir
   // sobre sus propias postulaciones una vez que los niveles de
   // job_collaborators aplican a todos menos admin+.
-  const permissionByProfile = new Map<string, "viewer" | "approver" | "owner">();
-  for (const id of parsed.data.collaborator_ids) permissionByProfile.set(id, "viewer");
-  permissionByProfile.set(requestedBy, "approver");
+  const permissionByProfile = new Map<string, "solo_lectura" | "lectura_escritura">();
+  for (const id of parsed.data.collaborator_ids) permissionByProfile.set(id, "solo_lectura");
+  permissionByProfile.set(requestedBy, "lectura_escritura");
   if (isAdminCreator) {
-    for (const id of parsed.data.extra_admin_ids) permissionByProfile.set(id, "approver");
+    for (const id of parsed.data.extra_admin_ids) permissionByProfile.set(id, "lectura_escritura");
   }
-  if (ownerId) permissionByProfile.set(ownerId, "owner");
+  if (ownerId) permissionByProfile.set(ownerId, "lectura_escritura");
 
   const collaboratorRows = Array.from(permissionByProfile, ([profile_id, permission]) => ({
     organization_id: profile.organization_id,
@@ -511,12 +493,106 @@ async function notifyPendingApproval(jobId: string, organizationId: string, subm
   );
 }
 
+/** Frase por estado — el correo y la notificación in-app comparten el texto. */
+type StatusCopyKey = JobStatus | "reabierta";
+
+const STATUS_MESSAGE: Partial<Record<StatusCopyKey, { heading: string; message: string }>> = {
+  aceptada: { heading: "Solicitud aceptada", message: "fue aceptada por RH y ya tiene reclutador asignado." },
+  borrador: { heading: "Solicitud devuelta", message: "fue devuelta para que la ajustes y la vuelvas a enviar." },
+  abierta: { heading: "Vacante publicada", message: "ya está publicada y recibiendo candidatos." },
+  // reopenJob comparte el estado "abierta" pero no la frase: avisar "ya está
+  // publicada" de una vacante publicada hace semanas sería falso.
+  reabierta: { heading: "Vacante reabierta", message: "volvió a estar abierta y recibiendo candidatos." },
+  pausada: { heading: "Vacante pausada", message: "quedó pausada: no recibe candidatos nuevos por ahora." },
+  cerrada: { heading: "Vacante cerrada", message: "se cerró." },
+  cancelada: { heading: "Vacante cancelada", message: "se canceló." },
+};
+
+/**
+ * Avisa a los involucrados de un cambio de estado de la vacante. Corre
+ * siempre envuelta en notifyBestEffort() — un fallo del correo nunca deshace
+ * la transición que ya se guardó.
+ *
+ * Antes solo existía el aviso de "pendiente de aprobación" hacia RH: aceptar,
+ * devolver, publicar, pausar, cerrar y cancelar no avisaban a nadie, así que
+ * quien solicitó una vacante quedaba a ciegas todo el resto del recorrido
+ * (decisión del usuario, 2026-09-03: notificar en cada estado).
+ *
+ * Cliente admin porque hay que leer a TODOS los involucrados (solicitante,
+ * reclutador asignado, miembros), no solo los que el actor alcance por RLS.
+ * Nunca se notifica a quien ejecutó la acción.
+ */
+async function notifyJobStatusChange(
+  jobId: string,
+  organizationId: string,
+  actorId: string,
+  to: StatusCopyKey,
+  reason?: string | null,
+): Promise<void> {
+  const copy = STATUS_MESSAGE[to];
+  if (!copy) return;
+
+  const admin = createAdminClient();
+  const [{ data: job }, { data: members }] = await Promise.all([
+    admin.from("jobs").select("title, requested_by, owner_id").eq("id", jobId).eq("organization_id", organizationId).single(),
+    // Solo hacen falta para los estados que avisan a todo el equipo.
+    admin.from("job_collaborators").select("profile_id").eq("job_id", jobId),
+  ]);
+  if (!job) return;
+
+  // Devolver le concierne solo a quien tiene que corregirla; aceptar, solo a
+  // quien la pidió y a quien la va a llevar; el resto de los cambios sí
+  // interesa a todo el equipo de la vacante.
+  const recipientIds =
+    to === "borrador"
+      ? [job.requested_by]
+      : to === "aceptada"
+        ? [job.requested_by, job.owner_id]
+        : [job.requested_by, job.owner_id, ...(members ?? []).map((m) => m.profile_id)];
+
+  const unique = [...new Set(recipientIds.filter((id): id is string => Boolean(id) && id !== actorId))];
+  if (unique.length === 0) return;
+
+  const { platformName, siteUrl } = await getEmailContext();
+  const jobUrl = `${siteUrl}/vacantes/${jobId}`;
+
+  await Promise.all(
+    unique.map((recipientId) =>
+      notify({
+        organizationId,
+        recipientId,
+        type: "vacante_cambio_estado",
+        title: copy.heading,
+        body: reason ? `"${job.title}" ${copy.message} Motivo: ${reason}` : `"${job.title}" ${copy.message}`,
+        url: `/vacantes/${jobId}`,
+        entityType: "job",
+        entityId: jobId,
+        email: {
+          subject: copy.heading,
+          react: VacanteCambioEstadoEmail({
+            platformName,
+            heading: copy.heading,
+            jobTitle: job.title,
+            message: copy.message,
+            reason,
+            jobUrl,
+          }),
+        },
+      }),
+    ),
+  );
+}
+
 export async function submitForApproval(jobId: string): Promise<JobActionResult> {
   const profile = await requireProfile();
+  // Se limpia el motivo de la devolución anterior: si no, quedaría pegado a
+  // una solicitud ya corregida y el solicitante seguiría viendo por qué se
+  // la devolvieron la vez pasada.
   const result = await transitionJob(
     jobId,
     "pendiente_aprobacion",
     ownerOrAdmin("Solo quien solicitó la vacante puede enviarla a aprobación."),
+    { return_reason: null },
   );
   if (result.success) {
     notifyBestEffort(() => notifyPendingApproval(jobId, profile.organization_id, profile.id));
@@ -549,45 +625,92 @@ export async function acceptJobRequest(jobId: string, ownerId: string): Promise<
   if (result.error) return result;
 
   const admin = createAdminClient();
-  const rows: { organization_id: string; job_id: string; profile_id: string; permission: "owner" | "approver" }[] = [
-    { organization_id: profile.organization_id, job_id: jobId, profile_id: ownerId, permission: "owner" },
+  const rows: { organization_id: string; job_id: string; profile_id: string; permission: "lectura_escritura" }[] = [
+    { organization_id: profile.organization_id, job_id: jobId, profile_id: ownerId, permission: "lectura_escritura" },
   ];
   if (job?.requested_by && job.requested_by !== ownerId) {
-    rows.push({ organization_id: profile.organization_id, job_id: jobId, profile_id: job.requested_by, permission: "approver" });
+    rows.push({ organization_id: profile.organization_id, job_id: jobId, profile_id: job.requested_by, permission: "lectura_escritura" });
   }
   const { error: collabError } = await admin.from("job_collaborators").upsert(rows, { onConflict: "job_id,profile_id" });
   if (collabError) console.error("acceptJobRequest: no se pudo asignar el equipo de la vacante", collabError);
 
+  notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "aceptada"));
   return result;
 }
 
-export async function returnJobRequest(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "borrador", adminOnly("Solo RH puede devolver una solicitud al solicitante."));
+/**
+ * Devolver exige motivo escrito: sin él, el solicitante ve su vacante de
+ * vuelta en borrador y no tiene forma de saber qué corregir (decisión del
+ * usuario, 2026-09-03). Se guarda en `jobs.return_reason` y viaja también en
+ * la notificación; `submitForApproval` lo limpia al reenviar.
+ */
+export async function returnJobRequest(jobId: string, reason: string): Promise<JobActionResult> {
+  const profile = await requireProfile();
+  const parsed = z
+    .string()
+    .trim()
+    .min(10, { error: "Explica en al menos 10 caracteres qué hay que corregir." })
+    .max(1000, { error: "Máximo 1000 caracteres." })
+    .safeParse(reason);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Escribe el motivo." };
+
+  const result = await transitionJob(jobId, "borrador", adminOnly("Solo RH puede devolver una solicitud al solicitante."), {
+    return_reason: parsed.data,
+  });
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "borrador", parsed.data));
+  }
+  return result;
 }
 
 /** Publicar exige elegir visibilidad explícitamente — no hay valor "por defecto silencioso" para algo que decide quién ve la vacante. Revalidada con Zod, no solo confiada porque el tipo de TS diga JobVisibility — el cliente es el que arma este argumento. */
 export async function publishJob(jobId: string, visibility: JobVisibility): Promise<JobActionResult> {
   const parsedVisibility = JobVisibilitySchema.safeParse(visibility);
   if (!parsedVisibility.success) return { error: "Elige una visibilidad válida." };
-  return transitionJob(jobId, "abierta", adminOnly("Solo RH puede publicar una vacante."), {
+  const profile = await requireProfile();
+  const result = await transitionJob(jobId, "abierta", adminOnly("Solo RH puede publicar una vacante."), {
     visibility: parsedVisibility.data,
   });
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "abierta"));
+  }
+  return result;
 }
 
 export async function pauseJob(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "pausada", adminOnly("Solo RH puede pausar una vacante."));
+  const profile = await requireProfile();
+  const result = await transitionJob(jobId, "pausada", adminOnly("Solo RH puede pausar una vacante."));
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "pausada"));
+  }
+  return result;
 }
 
 export async function reopenJob(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "abierta", adminOnly("Solo RH puede reabrir una vacante."));
+  const profile = await requireProfile();
+  const result = await transitionJob(jobId, "abierta", adminOnly("Solo RH puede reabrir una vacante."));
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "reabierta"));
+  }
+  return result;
 }
 
 export async function closeJob(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "cerrada", adminOnly("Solo RH puede cerrar una vacante."));
+  const profile = await requireProfile();
+  const result = await transitionJob(jobId, "cerrada", adminOnly("Solo RH puede cerrar una vacante."));
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "cerrada"));
+  }
+  return result;
 }
 
 export async function cancelJob(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "cancelada", cancelGuard);
+  const profile = await requireProfile();
+  const result = await transitionJob(jobId, "cancelada", cancelGuard);
+  if (result.success) {
+    notifyBestEffort(() => notifyJobStatusChange(jobId, profile.organization_id, profile.id, "cancelada"));
+  }
+  return result;
 }
 
 const ReferCandidateSchema = z.object({

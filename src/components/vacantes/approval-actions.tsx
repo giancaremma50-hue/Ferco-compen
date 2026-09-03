@@ -15,6 +15,7 @@ import {
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
 import { ConfirmDialog, type ConfirmDialogHandle } from "@/components/ui/confirm-dialog";
+import { DialogShell, type DialogShellHandle } from "@/components/ui/dialog-shell";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { TERMINAL_JOB_STATUSES } from "@/lib/jobs/permissions";
 import { VISIBILITY_LABEL, type JobVisibility } from "@/lib/jobs/schema";
@@ -40,6 +41,8 @@ export function ApprovalActions({
   const cancelDialogRef = useRef<ConfirmDialogHandle>(null);
   const [ownerId, setOwnerId] = useState(() => (admins.some((a) => a.id === actorId) ? actorId : (admins[0]?.id ?? "")));
   const [visibility, setVisibility] = useState<JobVisibility>("confidencial");
+  const returnDialogRef = useRef<DialogShellHandle>(null);
+  const [returnReason, setReturnReason] = useState("");
 
   const isAdmin = ADMIN_ROLES.has(role);
   const isOwner = job.requested_by === actorId;
@@ -90,7 +93,7 @@ export function ApprovalActions({
           {isAdmin ? (
             <>
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                Encargado
+                Reclutador asignado
                 <select
                   value={ownerId}
                   onChange={(e) => setOwnerId(e.target.value)}
@@ -115,9 +118,7 @@ export function ApprovalActions({
               <ActionButton
                 type="button"
                 variant="secondary"
-                pending={pending}
-                pendingLabel="Devolviendo…"
-                onClick={() => run(() => returnJobRequest(job.id))}
+                onClick={() => returnDialogRef.current?.open()}
               >
                 Devolver al solicitante
               </ActionButton>
@@ -209,6 +210,40 @@ export function ApprovalActions({
           </ActionButton>
         </>
       )}
+
+      <DialogShell ref={returnDialogRef} title="¿Devolver esta solicitud?">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Quien la solicitó va a ver este motivo para saber qué corregir antes de volver a enviarla.
+          </p>
+          <textarea
+            value={returnReason}
+            onChange={(e) => setReturnReason(e.target.value)}
+            rows={4}
+            maxLength={1000}
+            placeholder="Falta el rango salarial acordado con Finanzas…"
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+          <ActionButton
+            type="button"
+            pending={pending}
+            pendingLabel="Devolviendo…"
+            disabled={returnReason.trim().length < 10}
+            onClick={() =>
+              run(async () => {
+                const result = await returnJobRequest(job.id, returnReason);
+                if (result.success) {
+                  returnDialogRef.current?.close();
+                  setReturnReason("");
+                }
+                return result;
+              })
+            }
+          >
+            Devolver con este motivo
+          </ActionButton>
+        </div>
+      </DialogShell>
 
       <ConfirmDialog
         ref={cancelDialogRef}

@@ -8,10 +8,26 @@ import { KanbanColumn } from "./kanban-column";
 import { CandidateDrawer } from "@/components/postulaciones/candidate-drawer";
 import type { KanbanData } from "@/lib/applications/get-applications";
 
-export function KanbanBoard({ initialData, jobTitle }: { initialData: KanbanData; jobTitle: string }) {
+export function KanbanBoard({
+  initialData,
+  jobTitle,
+  initialOpenApplicationId = null,
+}: {
+  initialData: KanbanData;
+  jobTitle: string;
+  /**
+   * Candidato a abrir al entrar, desde `?candidato=` — se abre aunque su
+   * tarjeta NO esté en el tablero: el kanban solo trae postulaciones
+   * activas, así que un enlace viejo a alguien ya contratado o descartado
+   * igual tiene que poder abrirse (el drawer pide sus propios datos por id).
+   * En ese caso solo queda oculto "Siguiente etapa", que sí necesita la
+   * etapa actual del tablero.
+   */
+  initialOpenApplicationId?: string | null;
+}) {
   const [cards, setCards] = useState(initialData.cards);
   const [, startTransition] = useTransition();
-  const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
+  const [openApplicationId, setOpenApplicationId] = useState<string | null>(initialOpenApplicationId);
 
   function moveCard(applicationId: string, fromStageId: string, toStageId: string) {
     const previousCards = cards;

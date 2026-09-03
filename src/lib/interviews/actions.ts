@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email/send-email";
 import { notifyBestEffort, getEmailContext } from "@/lib/notifications/notify";
 import { EntrevistaProgramadaEmail } from "@/emails/entrevista-programada";
 import { isProfileAssignable } from "@/lib/applications/get-applications";
-import { canDecideApplication } from "@/lib/applications/permissions";
+import { canDecideApplication, canWriteApplication } from "@/lib/applications/permissions";
 import { InterviewSchema, InterviewStatusSchema } from "./schema";
 
 export type InterviewActionResult = { error?: string; success?: string };
@@ -132,7 +132,12 @@ export async function updateInterviewStatus(
   // approver/owner de la vacante (mismo auto-servicio que antes permitía
   // interviewer_id = auth.uid()); cualquier otra persona necesita el mismo
   // nivel de decisión que agendar.
-  const isAttendee = interview.interview_attendees.some((a) => a.profile_id === profile.id);
+  // Ser asistente no alcanza por sí solo: un miembro de SOLO LECTURA puede
+  // quedar invitado y no debe poder cancelar ni completar la entrevista
+  // ("no escribe nada", dice su propio nivel).
+  const isAttendee =
+    interview.interview_attendees.some((a) => a.profile_id === profile.id) &&
+    (await canWriteApplication(profile.role, profile.id, interview.applications!.job_id));
   if (!isAttendee && !(await canDecideApplication(profile.role, profile.id, interview.applications!.job_id))) {
     return { error: "Tu perfil no puede actualizar entrevistas en esta vacante." };
   }

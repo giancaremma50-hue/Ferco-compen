@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export type TeamMemberOption = { id: string; display_name: string };
 
 /**
- * Para los selectores de "Reclutador encargado" (acceptJobRequest, al
+ * Para los selectores de "Reclutador asignado" (acceptJobRequest, al
  * aceptar una solicitud) y "Admins adicionales" (createJob, cuando quien
  * crea es admin+) — `jobs.owner_id` siempre fue admin+ en este proyecto.
  */

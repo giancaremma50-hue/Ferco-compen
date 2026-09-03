@@ -171,35 +171,50 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
 export type AssignableProfile = { id: string; display_name: string };
 
 /**
- * Gente a quien tiene sentido asignar una tarea de esta postulación: admin+
- * de la organización (siempre pueden actuar) o colaboradores ACTIVOS de
- * ESTA vacante. No se usa la lista genérica de "toda la org" — asignar a
- * alguien sin acceso a la vacante dejaría una tarea que ni el propio
- * asignado puede ver (candidate_tasks_select exige can_access_job, no solo
- * ser el asignado). `!inner` en el join fuerza el filtro is_active como
- * WHERE real — con un join normal (left) solo dejaría el embed en null,
- * sin excluir la fila del colaborador inactivo.
+ * Gente de ESTA vacante, y solo de esta vacante: reclutador asignado,
+ * solicitante y miembros agregados, todos activos. Alimenta tanto el
+ * selector de "asignar tarea" como los destinatarios de una reunión.
+ *
+ * Antes traía además a TODOS los admin de la organización, sin importar si
+ * tenían algo que ver con la vacante — ruido en el selector, y podía
+ * invitarse a una entrevista a alguien totalmente ajeno al proceso
+ * (decisión del usuario, 2026-09-03: solo gente de la vacante). El costo
+ * aceptado: para asignarle algo a otro admin hay que sumarlo como miembro
+ * primero, lo que vuelve la membresía significativa en vez de decorativa.
+ *
+ * `!inner` en el join fuerza el filtro is_active como WHERE real — con un
+ * join normal (left) solo dejaría el embed en null, sin excluir la fila.
  */
 export async function getAssignableProfiles(jobId: string, organizationId: string): Promise<AssignableProfile[]> {
   const supabase = await createClient();
-  const [{ data: admins }, { data: collaborators }] = await Promise.all([
+  const [{ data: job }, { data: members }] = await Promise.all([
     supabase
-      .from("profiles")
-      .select("id, display_name")
+      .from("jobs")
+      .select(
+        "owner:profiles!jobs_owner_id_fkey(id, display_name, is_active), requester:profiles!jobs_requested_by_fkey(id, display_name, is_active)",
+      )
+      .eq("id", jobId)
       .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .in("role", ["admin", "super_admin"]),
+      .maybeSingle(),
     supabase
       .from("job_collaborators")
-      .select("profile_id, profile:profiles!job_collaborators_profile_id_fkey!inner(display_name)")
+      .select("profile_id, permission, profile:profiles!job_collaborators_profile_id_fkey!inner(display_name)")
       .eq("job_id", jobId)
       .eq("profile.is_active", true),
   ]);
 
   const byId = new Map<string, string>();
-  (admins ?? []).forEach((p) => byId.set(p.id, p.display_name));
-  (collaborators ?? []).forEach((c) => {
-    if (c.profile) byId.set(c.profile_id, c.profile.display_name);
+  for (const person of [job?.owner, job?.requester]) {
+    if (person?.is_active) byId.set(person.id, person.display_name);
+  }
+  // Un miembro de SOLO LECTURA no puede escribir: asignarle una tarea le
+  // dejaría un pendiente que no puede completar, e invitarlo como
+  // destinatario de una entrevista le dejaría botones que el servidor
+  // rechaza. Fuera de la lista.
+  (members ?? []).forEach((c) => {
+    if (c.profile && c.permission !== "solo_lectura" && c.permission !== "viewer") {
+      byId.set(c.profile_id, c.profile.display_name);
+    }
   });
 
   return Array.from(byId, ([id, display_name]) => ({ id, display_name })).sort((a, b) =>

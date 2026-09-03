@@ -44,7 +44,6 @@ export async function createTemplateDraftStep1(
       department_id: parsed.data.department_id ?? null,
       description: parsed.data.description,
       requirements: parsed.data.requirements,
-      competencies: parsed.data.competencies,
       wizard_step: 2,
     })
     .select("id")
@@ -84,7 +83,6 @@ export async function updateTemplateStep1(
       department_id: parsed.data.department_id ?? null,
       description: parsed.data.description,
       requirements: parsed.data.requirements,
-      competencies: parsed.data.competencies,
       wizard_step: 2,
     })
     .eq("id", templateId)
@@ -129,7 +127,7 @@ export async function updateTemplateStep2(
 
 /**
  * Paso 3 ("Preguntas"). Reemplaza la lista completa (borra + reinserta),
- * mismo patrón que pipeline_template_stages/job_competencies — sin
+ * mismo patrón que pipeline_template_stages — sin
  * transacción real (el cliente de Supabase JS no las soporta), aceptado ya
  * en Fase 9 para listas anidadas de bajo tráfico de escritura.
  *

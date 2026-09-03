@@ -9,6 +9,7 @@ export const PREFERENCE_TYPES: NotificationType[] = [
   "nueva_postulacion",
   "cambio_etapa",
   "vacante_pendiente_aprobacion",
+  "vacante_cambio_estado",
   "movimiento_referido",
   "respuesta_reporte_error",
 ];
@@ -23,6 +24,7 @@ export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   cambio_etapa: "Cambios de etapa en tus vacantes",
   mencion_nota: "Menciones en notas",
   vacante_pendiente_aprobacion: "Vacantes pendientes de aprobación",
+  vacante_cambio_estado: "Cambios de estado en tus vacantes",
   movimiento_referido: "Movimientos de tus referidos",
   respuesta_reporte_error: "Actividad en reportes de soporte",
 };

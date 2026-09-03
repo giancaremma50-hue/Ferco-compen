@@ -12,7 +12,7 @@ const HELP_STEPS = [
   { selector: '[data-tour="nv-preview"]', title: "Lo que trae la plantilla", description: "Título, descripción y requisitos vienen tal cual de la plantilla, de solo lectura acá — si necesitás cambiarlos, se edita en la plantilla, no en esta vacante puntual." },
   { selector: '[data-tour="nv-salario"]', title: "Salario y plazas", description: "El salario es opcional y siempre interno — nunca se muestra en el portal público. \"Plazas\" es cuántos puestos idénticos abre esta misma vacante." },
   { selector: '[data-tour="nv-tipo"]', title: "Tipo y motivo de la vacante", description: "Nueva posición, reemplazo o crecimiento — el motivo es un catálogo de tu organización, y podés agregar uno nuevo ahí mismo si no está en la lista." },
-  { selector: '[data-tour="nv-equipo"]', title: "Equipo de reclutamiento", description: "El reclutador encargado y la visibilidad se deciden después, al aceptar y publicar la solicitud — acá solo se suman colaboradores adicionales, que entran como \"viewer\" (ven, no operan) hasta que alguien les suba el nivel desde el panel de colaboradores de la vacante." },
+  { selector: '[data-tour="nv-equipo"]', title: "Equipo de reclutamiento", description: "El reclutador asignado y la visibilidad se deciden después, al aceptar y publicar la solicitud — acá solo se suman miembros adicionales, que entran como \"solo lectura\" hasta que alguien les suba el nivel desde el panel de miembros de la vacante." },
 ];
 
 export default async function NuevaVacantePage() {

@@ -27,6 +27,7 @@ export type JobDetail = JobListItem & {
   salary_min: number | null;
   salary_max: number | null;
   visibility: JobVisibility;
+  return_reason: string | null;
   department_id: string | null;
   requested_by: string | null;
   owner_id: string | null;
@@ -58,7 +59,7 @@ export async function getJobById(id: string): Promise<JobDetail | null> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, visibility, department_id, requested_by, owner_id, organization_id, owner:profiles!jobs_owner_id_fkey(display_name)",
+      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, visibility, return_reason, department_id, requested_by, owner_id, organization_id, owner:profiles!jobs_owner_id_fkey(display_name)",
     )
     .eq("id", id)
     .maybeSingle();

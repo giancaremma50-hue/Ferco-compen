@@ -1,18 +1,15 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
-import type { CompetencyDraft } from "./schema";
 
-export type JobTemplate = Omit<Tables<"job_templates">, "organization_id" | "created_at" | "competencies"> & {
-  competencies: CompetencyDraft[];
-};
+export type JobTemplate = Omit<Tables<"job_templates">, "organization_id" | "created_at">;
 
 // updated_at viaja aunque la UI no la muestre — JobTemplateRow la usa como
 // key para forzar que el diálogo de edición se remonte con los datos
 // frescos después de guardar (defaultValue de un input no controlado solo
 // aplica al montar, no se actualiza solo si el componente sigue vivo).
 const COLUMNS =
-  "id, name, title, department_id, country, location, work_mode, employment_type, description, requirements, pipeline_template_id, competencies, updated_at, created_by, is_public, status, is_confidential, candidacy_fields, wizard_step";
+  "id, name, title, department_id, country, location, work_mode, employment_type, description, requirements, pipeline_template_id, updated_at, created_by, is_public, status, is_confidential, candidacy_fields, wizard_step";
 
 /** Cualquier miembro de la organización puede leerlas (RLS: job_templates_select) — se usan al solicitar una vacante, no solo al administrarlas. */
 export async function getJobTemplates(organizationId: string): Promise<JobTemplate[]> {
@@ -22,7 +19,7 @@ export async function getJobTemplates(organizationId: string): Promise<JobTempla
     .select(COLUMNS)
     .eq("organization_id", organizationId)
     .order("name");
-  return (data ?? []).map((t) => ({ ...t, competencies: (t.competencies as CompetencyDraft[]) ?? [] }));
+  return data ?? [];
 }
 
 /**
@@ -45,6 +42,5 @@ export async function getJobTemplateForWizard(id: string, organizationId: string
     .eq("id", id)
     .eq("organization_id", organizationId)
     .maybeSingle();
-  if (!data) return null;
-  return { ...data, competencies: (data.competencies as CompetencyDraft[]) ?? [] };
+  return data ?? null;
 }
