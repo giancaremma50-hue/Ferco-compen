@@ -60,6 +60,7 @@ export type ApplicationTask = {
   createdByName: string;
   assignedToId: string | null;
   assignedToName: string | null;
+  dueDate: string | null;
   createdAt: string;
 };
 export type ApplicationDetail = {
@@ -119,7 +120,7 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
     supabase
       .from("candidate_tasks")
       .select(
-        "id, description, is_done, created_at, assigned_to, creator:profiles!candidate_tasks_created_by_fkey(display_name), assignee:profiles!candidate_tasks_assigned_to_fkey(display_name)",
+        "id, description, is_done, created_at, due_date, assigned_to, creator:profiles!candidate_tasks_created_by_fkey(display_name), assignee:profiles!candidate_tasks_assigned_to_fkey(display_name)",
       )
       .eq("application_id", applicationId)
       .order("created_at"),
@@ -163,6 +164,7 @@ export async function getApplicationDetail(applicationId: string): Promise<Appli
       createdByName: t.creator?.display_name ?? "Alguien",
       assignedToId: t.assigned_to,
       assignedToName: t.assignee?.display_name ?? null,
+      dueDate: t.due_date,
       createdAt: t.created_at,
     })),
   };

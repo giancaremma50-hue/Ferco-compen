@@ -384,6 +384,7 @@ export async function addTask(
     application_id: applicationId,
     description: parsed.data.description,
     assigned_to: parsed.data.assigned_to ?? null,
+    due_date: parsed.data.due_date ?? null,
     created_by: profile.id,
   });
   if (error) return { error: "No se pudo agregar la tarea." };

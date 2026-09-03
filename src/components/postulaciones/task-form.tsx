@@ -20,7 +20,7 @@ export function TaskForm({ applicationId, assignable }: { applicationId: string;
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex items-end gap-2">
+    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-2">
       <input
         name="description"
         required
@@ -28,6 +28,12 @@ export function TaskForm({ applicationId, assignable }: { applicationId: string;
         maxLength={300}
         placeholder="Agendar segunda entrevista…"
         className="h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-foreground"
+      />
+      <input
+        name="due_date"
+        type="date"
+        aria-label="Fecha límite (opcional)"
+        className="h-9 rounded-md border border-border bg-background px-2 text-xs"
       />
       <select
         name="assigned_to"

@@ -1,14 +1,7 @@
 import "server-only";
-
-// ponytail: UTC-6 fijo, no una zona horaria real por organización (no existe
-// esa columna en el esquema — mismo límite ya documentado en
-// emails/entrevista-programada.tsx). Válido hoy porque los 4 países que
-// opera esta plataforma (Guatemala, El Salvador, Honduras, Nicaragua, ver
-// src/lib/geo/countries.ts) están TODOS en UTC-6 todo el año, sin horario de
-// verano — no es una suposición, es un hecho geográfico estable. Se rompe
-// solo si la organización opera en un país fuera de Centroamérica; en ese
-// caso hace falta una columna de zona horaria real, no ajustar este número.
-const ORG_UTC_OFFSET_HOURS = 6;
+// Una sola constante para toda la app — ver el porqué del UTC-6 fijo y sus
+// límites en lib/org-today.ts, que también la usa desde el cliente.
+import { ORG_UTC_OFFSET_HOURS } from "@/lib/org-today";
 
 /** Rango [inicio, fin] del "día de hoy" de la organización, como instantes UTC reales — no el día del servidor (que en Vercel es UTC y puede ir 6 horas adelantado). */
 export function getOrgDayRange(now: Date = new Date()): { start: Date; end: Date } {

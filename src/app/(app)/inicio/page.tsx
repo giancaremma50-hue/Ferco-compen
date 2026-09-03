@@ -8,7 +8,7 @@ import { getRecruiterReport } from "@/lib/dashboard/get-recruiter-report";
 import { Greeting } from "@/components/inicio/greeting";
 import { TodayLabel } from "@/components/inicio/today-label";
 import { PendingApprovalsInbox, MyRequestsInbox } from "@/components/inicio/inbox-panel";
-import { FunnelKpis } from "@/components/inicio/funnel-kpis";
+import { FunnelKpis, FunnelKpiStrip } from "@/components/inicio/funnel-kpis";
 import { TodayAgenda } from "@/components/inicio/today-agenda";
 import { RecruiterReportSection } from "@/components/inicio/recruiter-report";
 
@@ -40,14 +40,24 @@ export default async function InicioPage() {
 
   return (
     <div>
-      <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">
-        <TodayLabel />
-      </p>
-      <h1 className="font-serif mt-2.5 text-[42px] leading-[1.1]">
-        <Greeting name={profile.display_name.split(" ")[0]} />
-      </h1>
+      {/* Encabezado: saludo a la izquierda, cifras como tira de números a la
+          derecha — quedan visibles sin robarle el primer lugar a la agenda,
+          que es lo único accionable de esta pantalla (layout B). */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+        <div>
+          <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">
+            <TodayLabel />
+          </p>
+          <h1 className="font-serif mt-2.5 text-[38px] leading-[1.1] sm:text-[42px]">
+            <Greeting name={profile.display_name.split(" ")[0]} />
+          </h1>
+        </div>
+        {funnel && <FunnelKpiStrip data={funnel} />}
+      </div>
 
       <div className="mt-8 flex flex-col gap-6">
+        <TodayAgenda data={agenda} />
+
         {isColaborador ? (
           <div className="border border-border bg-card p-5">
             <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Vacantes</p>
@@ -63,8 +73,6 @@ export default async function InicioPage() {
         )}
 
         {funnel && <FunnelKpis data={funnel} />}
-
-        <TodayAgenda data={agenda} />
 
         {report && <RecruiterReportSection report={report} />}
       </div>

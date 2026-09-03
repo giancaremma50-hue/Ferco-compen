@@ -4,7 +4,14 @@ import { useState, useTransition } from "react";
 import { toggleTask, deleteTask } from "@/lib/applications/actions";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 import { DeleteButton } from "@/components/ui/delete-button";
+import { dueDateLabel } from "@/lib/org-today";
 import type { ApplicationTask } from "@/lib/applications/get-applications";
+
+/** Fecha límite de una tarea, en rojo si ya venció. */
+function DueDate({ dueDate }: { dueDate: string }) {
+  const due = dueDateLabel(dueDate);
+  return <span className={due.overdue ? "text-destructive" : undefined}>{due.text}</span>;
+}
 
 function TaskRow({ task, applicationId }: { task: ApplicationTask; applicationId: string }) {
   const [isDone, setIsDone] = useState(task.isDone);
@@ -37,6 +44,7 @@ function TaskRow({ task, applicationId }: { task: ApplicationTask; applicationId
         <span className={isDone ? "truncate text-muted-foreground line-through" : "truncate"}>{task.description}</span>
       </label>
       <div className="flex flex-none items-center gap-2 text-xs text-muted-foreground">
+        {task.dueDate && !isDone && <DueDate dueDate={task.dueDate} />}
         {task.assignedToName && <span>{task.assignedToName}</span>}
         <DeleteButton
           itemLabel="esta tarea"

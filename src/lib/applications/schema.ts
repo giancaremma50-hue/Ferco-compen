@@ -25,6 +25,13 @@ export const TaskSchema = z.object({
     .min(3, { error: "Describe la tarea." })
     .max(300, { error: "Máximo 300 caracteres." }),
   assigned_to: optionalAssignee,
+  // Opcional a propósito: una tarea sin fecha sigue siendo válida (se ordena
+  // al final). La agenda de Inicio la necesita para poder decir "vencida" —
+  // antes no existía la columna y el copy tenía que evitar esa palabra.
+  due_date: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.iso.date({ error: "Fecha inválida." }).optional(),
+  ),
 });
 
 export const SendMessageSchema = z.object({
