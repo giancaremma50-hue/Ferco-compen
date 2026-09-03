@@ -92,14 +92,18 @@ export function BrandVideoField({
           </div>
           <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">{hint}</p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* flex-wrap, no min-w-0/flex-1 en el input: ver el comentario en
+            BrandImageField — un <input type="file"> nativo no se achica por
+            CSS, así que si no cabe junto al botón de eliminar, este cae a
+            la línea de abajo en vez de cortarse contra el borde. */}
+        <div className="flex flex-wrap items-center gap-2">
           <input
             ref={inputRef}
             type="file"
             accept="video/mp4,video/webm"
             onChange={handleUpload}
             disabled={pending}
-            className="min-w-0 flex-1 text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-32 sm:flex-none"
+            className="max-w-full text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-32"
           />
           {pending && <span className="flex-none text-xs text-muted-foreground">Subiendo…</span>}
           {currentUrl && (

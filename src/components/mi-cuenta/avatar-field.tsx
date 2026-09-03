@@ -33,15 +33,18 @@ export function AvatarField({ currentUrl, initials }: { currentUrl: string | nul
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2">
-        <form ref={formRef} action={formAction} className="flex items-center gap-2">
+        {/* flex-wrap: un <input type="file"> nativo no se achica por CSS —
+            si no cabe junto al botón "Subir", este cae a la línea de abajo
+            en vez de cortarse contra el borde en un celular angosto. */}
+        <form ref={formRef} action={formAction} className="flex flex-wrap items-center gap-2">
           <input
             type="file"
             name="file"
             accept="image/png,image/jpeg,image/webp"
             required
-            className="w-full max-w-[220px] text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs"
+            className="max-w-full text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-[220px]"
           />
-          <ActionButton variant="secondary" className="h-8 px-3 text-xs">
+          <ActionButton variant="secondary" className="h-8 flex-none px-3 text-xs">
             Subir
           </ActionButton>
         </form>

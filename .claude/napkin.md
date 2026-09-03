@@ -1,5 +1,20 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-03 (auditoría de responsividad, ronda 2 — confirmada con capturas reales de celular)_
+_Última actualización: 2026-09-03 (auditoría de responsividad, ronda 3 — un `<input type="file">` nativo no se achica por CSS)_
+
+## Un `<input type="file">` nativo no respeta `flex-1`/`min-w-0` — MÁXIMA PRIORIDAD
+
+Ronda 3 de la auditoría de responsividad: el arreglo de la ronda 2 para `BrandImageField`/`BrandVideoField`
+(`flex-1 min-w-0` en el input de archivo para que se achicara junto al botón "Subir") **no funcionó** — el usuario
+mandó otra captura mostrando el botón "Subir" todavía cortado contra el borde de la pantalla. Causa real: el control
+nativo de un `<input type="file">` (el botón "Seleccionar archivo" + el texto "Sin archivos seleccionados") tiene un
+ancho mínimo intrínseco que el navegador **no deja achicar por flexbox**, sin importar `flex-1`/`min-w-0`/`w-0` — es
+una limitación del control nativo, no de CSS. Confirmado en `avatar-field.tsx`, `brand-image-field.tsx` y
+`brand-video-field.tsx`, las 3 pantallas del proyecto donde un `<input type="file">` comparte fila con un botón.
+
+**Do instead**: no pelear por achicar el input — usar `flex-wrap` en el contenedor de esa fila (más `max-w-full` en
+el input, sin `flex-1`/`min-w-0`, y `flex-none` en el botón vecino). Si no caben en una línea, el botón cae a la de
+abajo, en vez de cortarse contra el borde. **Regla para todo campo nuevo con `<input type="file">` junto a un
+botón: `flex flex-wrap`, nunca `flex` a secas ni `flex-1` en el input esperando que se achique — no lo va a hacer.**
 
 ## Auditoría de responsividad completa — MÁXIMA PRIORIDAD
 

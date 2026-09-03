@@ -57,15 +57,21 @@ export function BrandImageField({
             {hint}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <form ref={formRef} action={formAction} className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* flex-wrap, no min-w-0/flex-1 en el input: un <input type="file">
+              nativo tiene un ancho mínimo propio que el navegador no deja
+              achicar por CSS por más flex-1 que se le ponga — en vez de
+              pelear por encogerlo, se deja que el botón "Subir" caiga a la
+              línea de abajo cuando no cabe al lado, en vez de cortarse
+              contra el borde de la pantalla. */}
+          <form ref={formRef} action={formAction} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="field" value={field} />
             <input
               type="file"
               name="file"
               accept="image/png,image/jpeg,image/webp"
               required
-              className="min-w-0 flex-1 text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-32 sm:flex-none"
+              className="max-w-full text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-32"
             />
             <ActionButton variant="secondary" className="h-8 flex-none px-3 text-xs">
               Subir
