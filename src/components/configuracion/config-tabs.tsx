@@ -23,19 +23,29 @@ export function ConfigTabs({ role }: { role: string }) {
     // rótulos — antes se desbordaban en silencio (cortadas contra el borde
     // de la pantalla) y encima el texto envolvía a 2 líneas. Ahora, si no
     // caben, se deslizan horizontalmente como cualquier barra de pestañas.
-    <nav className="flex gap-6 overflow-x-auto border-b border-border">
-      {visible.map((tab) => {
-        const active = pathname === tab.href;
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={`flex-none pb-3 text-[13px] whitespace-nowrap ${active ? "border-b-2 border-foreground font-medium text-foreground" : "text-muted-foreground"}`}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+    // El difuminado del borde derecho (pointer-events-none, decorativo) es
+    // la única pista de que hay más pestañas — sin él, la última visible se
+    // ve simplemente cortada, igual que antes, y nada avisa que se puede
+    // deslizar.
+    <div className="relative">
+      <nav className="flex gap-6 overflow-x-auto border-b border-border">
+        {visible.map((tab) => {
+          const active = pathname === tab.href;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`flex-none pb-3 text-[13px] whitespace-nowrap ${active ? "border-b-2 border-foreground font-medium text-foreground" : "text-muted-foreground"}`}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent"
+      />
+    </div>
   );
 }
