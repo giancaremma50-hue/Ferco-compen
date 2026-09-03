@@ -43,7 +43,10 @@ export const ConfirmDialog = forwardRef<
     <dialog
       ref={dialogRef}
       className={cn(
-        "w-full max-w-[440px] rounded-lg border border-border bg-card p-0 text-foreground",
+        // w-[calc(100%-2rem)], no w-full: ver el mismo comentario en
+        // DialogShell — sin esto el diálogo toca los bordes de la pantalla
+        // en un celular angosto.
+        "w-[calc(100%-2rem)] max-w-[440px] rounded-lg border border-border bg-card p-0 text-foreground",
         "backdrop:bg-foreground/25",
       )}
       onClick={(e) => {

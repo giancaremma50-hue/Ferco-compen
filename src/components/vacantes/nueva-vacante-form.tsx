@@ -93,7 +93,7 @@ export function NuevaVacanteForm({
       {/* key={templateId}: un input no controlado solo lee defaultValue al
           montar — sin remontar, cambiar de plantilla no actualizaría el
           país/modalidad prellenados de la anterior. */}
-      <div key={templateId} className="grid grid-cols-2 gap-4">
+      <div key={templateId} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">País</span>
           <select name="country" required defaultValue={selected?.country ?? ""} className={FIELD_CLASS}>
@@ -122,7 +122,7 @@ export function NuevaVacanteForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-4" data-tour="nv-salario">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-tour="nv-salario">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Salario mín. (opcional)</span>
           <input name="salary_min" type="number" min={0} className={`${FIELD_CLASS} tabular-nums`} />
@@ -137,7 +137,7 @@ export function NuevaVacanteForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-4" data-tour="nv-tipo">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-tour="nv-tipo">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Tipo de vacante</span>
           <LabelSelect name="vacancy_type" required labels={VACANCY_TYPE_LABEL} className={FIELD_CLASS} />

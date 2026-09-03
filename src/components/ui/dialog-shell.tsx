@@ -31,7 +31,11 @@ export const DialogShell = forwardRef<
         if (e.target === dialogRef.current) dialogRef.current?.close();
       }}
       className={cn(
-        "w-full rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-foreground/25",
+        // w-[calc(100%-2rem)], no w-full: un <dialog> nativo mostrado con
+        // showModal() se centra con margin:auto, pero width:100% no deja
+        // espacio para ese margen — sin este ajuste el diálogo toca los dos
+        // bordes de la pantalla en un celular angosto, sin aire alrededor.
+        "w-[calc(100%-2rem)] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-foreground/25",
         maxWidthClassName,
       )}
     >

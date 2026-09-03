@@ -50,7 +50,10 @@ export function UserRow({
   }
 
   return (
-    <div className="grid grid-cols-[1fr_180px_120px] items-center gap-4 border-b border-border px-1 py-3.5 text-sm">
+    // En celular se apila (persona / rol / estado, cada uno en su línea) —
+    // 180px + 120px de columnas fijas nunca caben junto al nombre en un
+    // teléfono. Desde `sm` vuelve a ser la fila de 3 columnas de escritorio.
+    <div className="grid grid-cols-1 gap-2 border-b border-border px-1 py-3.5 text-sm sm:grid-cols-[1fr_180px_120px] sm:items-center sm:gap-4">
       <div className="min-w-0">
         <p className="truncate font-medium">{user.display_name}</p>
         <p className="truncate text-xs text-muted-foreground">{user.email}</p>

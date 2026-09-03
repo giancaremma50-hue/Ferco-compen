@@ -10,7 +10,7 @@ export default async function PlantillasMensajePage() {
 
   return (
     <section className="border border-border bg-card p-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-serif text-2xl">Plantillas de mensaje</h2>
           <p className="mt-1 text-[13px] text-muted-foreground">

@@ -1,5 +1,5 @@
 # Napkin Runbook — ATS
-_Última actualización: 2026-09-03 (Inicio: buzón + embudo + agenda + informe por encargado)_
+_Última actualización: 2026-09-03 (Inicio: buzón + embudo + agenda + informe por encargado; auditoría de responsividad, ronda 3)_
 
 ## Inicio: buzón + embudo + agenda + informe — MÁXIMA PRIORIDAD
 
@@ -12,6 +12,47 @@ _Última actualización: 2026-09-03 (Inicio: buzón + embudo + agenda + informe 
 
 ---
 
+## Un `<input type="file">` nativo no respeta `flex-1`/`min-w-0` — MÁXIMA PRIORIDAD
+
+Ronda 3 de la auditoría de responsividad: el arreglo de la ronda 2 para `BrandImageField`/`BrandVideoField`
+(`flex-1 min-w-0` en el input de archivo para que se achicara junto al botón "Subir") **no funcionó** — el usuario
+mandó otra captura mostrando el botón "Subir" todavía cortado contra el borde de la pantalla. Causa real: el control
+nativo de un `<input type="file">` (el botón "Seleccionar archivo" + el texto "Sin archivos seleccionados") tiene un
+ancho mínimo intrínseco que el navegador **no deja achicar por flexbox**, sin importar `flex-1`/`min-w-0`/`w-0` — es
+una limitación del control nativo, no de CSS. Confirmado en `avatar-field.tsx`, `brand-image-field.tsx` y
+`brand-video-field.tsx`, las 3 pantallas del proyecto donde un `<input type="file">` comparte fila con un botón.
+
+**Do instead**: no pelear por achicar el input — usar `flex-wrap` en el contenedor de esa fila (más `max-w-full` en
+el input, sin `flex-1`/`min-w-0`, y `flex-none` en el botón vecino). Si no caben en una línea, el botón cae a la de
+abajo, en vez de cortarse contra el borde. **Regla para todo campo nuevo con `<input type="file">` junto a un
+botón: `flex flex-wrap`, nunca `flex` a secas ni `flex-1` en el input esperando que se achique — no lo va a hacer.**
+
+## Auditoría de responsividad completa — MÁXIMA PRIORIDAD
+
+Reporte real del usuario: "estoy usando la web en celular y no está la adaptación". Causa: nadie había hecho un
+barrido explícito de responsividad — cada pantalla se construyó y se probó (cuando se pudo) en escritorio; el
+sandbox de desarrollo nunca tuvo salida de red hacia Supabase para probar en un viewport móvil real. Trabajado en
+un worktree aislado (`git worktree add`) para no interferir con otra sesión activa sobre el mismo repo.
+
+**Ronda 2 (post-despliegue):** el usuario mandó capturas reales de su celular tras el primer despliegue. Confirmaron
+que la auditoría de código por sí sola no basta — dos patrones sobrevivieron a la ronda 1 porque nunca se grepearon
+explícitamente (ítems 6 y 7 abajo). **Lección de proceso**: cuando no se puede probar visualmente (sin salida de
+red), pedir al usuario una captura real de celular ANTES de dar por cerrada una auditoría de responsividad es más
+confiable que asumir que el grep cubrió todos los patrones posibles.
+
+1. **BUG REAL, el más grave: `grid-cols-[Npx_...]` sin ningún prefijo `sm:`/`lg:` fuerza columnas de ancho fijo en CUALQUIER pantalla, celular incluido.** Encontrado en el panel maestro-detalle de `/configuracion/errores` (`grid-cols-[380px_1fr]` — 380px solo para la lista, ya más ancho que cualquier teléfono), y en las "tablas" de `/configuracion/usuarios` y `/configuracion/departamentos` (`grid-cols-[1fr_180px_120px]` / `grid-cols-[1fr_140px_180px_160px]`, 300-480px de columnas fijas). Corregido apilando en una sola columna por defecto (`grid-cols-1`) y volviendo al layout de escritorio desde `sm:`/`lg:` — patrón mobile-first correcto que SÍ se seguía en otras partes del código (`lg:grid-cols-[560px_1fr]` en marca, `lg:grid-cols-[1fr_320px]` en postulaciones) pero no en estas tres pantallas. **Regla para toda pantalla nueva con `grid-cols-[Npx...]`: el valor en px SIEMPRE va detrás de un prefijo de breakpoint, nunca en la clase base.**
+2. **BUG REAL: sin `overflow-x: hidden` en `html`/`body`, un solo elemento desbordado arrastra TODA la página a scroll horizontal en celular**, no solo se ve mal — se pierde el layout completo de la pantalla. Agregado en `globals.css` como red de seguridad (no reemplaza corregir cada componente, solo evita que un descuido futuro rompa la app entera).
+3. **`AppHeader` (aparece en TODAS las páginas autenticadas) tenía 7 elementos en una sola fila `flex` sin `flex-wrap` ni truncado**: logo, nombre de plataforma, insignia "Super admin", campana, etiqueta de rol, nombre+avatar, botón de salir. Corregido con `min-w-0 truncate` en el nombre de la plataforma y ocultando (`hidden sm:inline`/`md:inline`) los elementos decorativos/redundantes en celular — insignia, etiqueta de rol, nombre junto al avatar. El avatar solo, como link a "Mi cuenta", es affordance suficiente en pantallas angostas.
+4. **Todo `<dialog>` nativo mostrado con `showModal()` usaba `w-full` + `max-w-[Npx]` — en celular, `width:100%` no deja espacio para el `margin:auto` que lo centra, así que toca los dos bordes de la pantalla sin aire.** Corregido en los 4 diálogos del proyecto (`DialogShell`, `ConfirmDialog`, `job-info-modal`, `refer-candidate-dialog`) cambiando a `w-[calc(100%-2rem)]` — deja 1rem de margen fijo a cada lado sin importar el ancho de viewport.
+5. **`grid-cols-2`/`grid-cols-3` (sin corchetes, con `1fr`, no rompen el layout pero sí aprietan de más un formulario en celular)** — no es tan grave como el punto 1 (usan fracciones, no px fijos, así que nunca desbordan), pero sigue sin ser "adaptado". Convertidos a `grid-cols-1 sm:grid-cols-2` (o `sm:grid-cols-3`) en los formularios de vacante (`job-form`, `nueva-vacante-form`, wizard paso 1) y en los paneles de info del drawer de candidato.
+6. **BUG REAL, encontrado en la captura del usuario: `ConfigTabs` (la barra "Marca | Usuarios y roles | Departamentos | ...") es un `flex gap-6` sin `overflow-x-auto` ni `whitespace-nowrap` — con 7 pestañas, en celular el texto envuelve a 2 líneas ("Usuarios y roles", "Motivos de rechazo") Y la barra igual se corta contra el borde de la pantalla.** El grep de la ronda 1 buscó `grid-cols-[...]`/`w-[Npx]` pero no este patrón (una barra de pestañas horizontal sin scroll). Corregido con `overflow-x-auto` en el `<nav>` y `flex-none whitespace-nowrap` en cada pestaña — patrón estándar de barra de pestañas: si no caben, se deslizan horizontalmente en vez de envolver o cortarse.
+7. **BUG REAL, mismo hallazgo por captura: `BrandImageField`/`BrandVideoField` (subir logo/imagen/video en `/configuracion/marca`) metían miniatura + texto de ayuda + input de archivo (`w-32` fijo) + botón "Subir" + botón eliminar en una sola fila `flex items-center` sin wrap — 5 elementos, varios con ancho fijo, nunca caben en un teléfono.** Mismo problema de fondo que el punto 1 (fila sin wrap con anchos fijos) pero en un componente de subida de archivos, no en un grid de tabla — otro patrón que el grep de grid-cols no iba a encontrar. Corregido con `flex-col sm:flex-row`: en celular, primero la fila miniatura+texto, luego la fila de subir/eliminar (con el input de archivo en `flex-1 min-w-0` para que se achique en vez de desbordar).
+8. **BUG REAL en `candidate-drawer.tsx`, encontrado por `/code-review` durante la ronda 1 (no relacionado con responsividad, pero en un archivo que se estaba tocando): `BitacoraView` mostraba "(en curso)" y seguía sumando días contra `new Date()` para una postulación YA CERRADA (contratada/rechazada).** `hireApplication()` no inserta un evento propio, así que no hay una marca de tiempo real de cierre. Corregido pasando `application.status` a `BitacoraView` y dejando de mostrar una duración fabricada para el último tramo cuando la postulación ya no está "activa" — más honesto no mostrar nada que mostrar un número que sigue creciendo solo.
+9. **Verificación real de estos cambios NO fue posible en este sandbox** — sin salida de red hacia Supabase, ni `npm run dev` ni `next start` pueden renderizar una página que llame a `getOrganization()`/`requireProfile()` (se cuelgan esperando la conexión, no hay error rápido que capturar). Verificado solo con `typecheck`/`lint`/`build` + inspección de código + `/code-review`, exactamente el mismo límite documentado para Fase 17/tooltips del menú — **pendiente de confirmación visual real del usuario en producción o en su celular.**
+
+---
+
+## Pipeline pantalla completa + drawer de candidato — MÁXIMA PRIORIDAD
 
 1. **[2026-09-02] BUG REAL, encontrado en review antes de commitear: "Asignar tarea" se ocultaba en la UI detrás de `canDecideApplication` (approver/owner), pero `addTask` en el servidor solo exige `can_access_job` (cualquier colaborador con acceso a la vacante) — la UI insinuaba una garantía de seguridad que el servidor nunca tuvo.** No era una fuga nueva (`candidate_tasks` siempre fue de nivel más permisivo), pero ocultar el botón sin restringir el server es peor que no ocultarlo: alguien podía pensar que ese nivel de protección existía. Do instead: cuando un botón de la UI se oculta por un permiso, verificar que la Server Action detrás exige ese mismo nivel — si exige uno más laxo, la UI no debe fingir uno más estricto. Corregido quitando el `hidden` de "Asignar tarea" (igual que "Seguimientos", que ya estaba correctamente sin ese gate por la misma razón).
 2. **[2026-09-02] BUG REAL: el fetch de datos del drawer (`getApplicationDrawerData`) no tenía `.catch()` — un fallo de red dejaba el skeleton de carga para siempre, sin mensaje ni salida.** `loading` nunca volvía a `false` si la promesa rechazaba. Corregido con `.catch()` que llama `notifyError` y baja `loading`, más un estado explícito "No se pudo cargar esta postulación" en vez de asumir que `!loading` implica `data` presente.

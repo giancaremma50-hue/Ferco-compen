@@ -38,7 +38,9 @@ export function ReferCandidateDialog({ jobId }: { jobId: string }) {
         onClick={(e) => {
           if (e.target === dialogRef.current) dialogRef.current?.close();
         }}
-        className="w-full max-w-[440px] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-foreground/25"
+        // w-[calc(100%-2rem)], no w-full: ver el comentario en DialogShell —
+        // sin esto el diálogo toca los bordes de la pantalla en un celular.
+        className="w-[calc(100%-2rem)] max-w-[440px] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-foreground/25"
       >
         <div className="p-7">
           <div className="flex items-start justify-between gap-5">

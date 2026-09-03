@@ -72,7 +72,7 @@ export const JobForm = forwardRef<
         </Field>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field id="country" label="País" error={state?.field === "country" ? state.error : undefined}>
           <select
             name="country"
@@ -113,7 +113,7 @@ export const JobForm = forwardRef<
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field id="work_mode" label="Modalidad" error={state?.field === "work_mode" ? state.error : undefined}>
           <LabelSelect
             id="work_mode"
@@ -168,7 +168,7 @@ export const JobForm = forwardRef<
         />
       </Field>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field
           id="salary_min"
           label="Salario mín. (opcional)"
