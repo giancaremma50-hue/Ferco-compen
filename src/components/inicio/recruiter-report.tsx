@@ -4,6 +4,7 @@ import type { JobStatus } from "@/lib/jobs/get-jobs";
 const STATUS_SHORT: Record<JobStatus, string> = {
   borrador: "Borrador",
   pendiente_aprobacion: "Pendiente",
+  aceptada: "Aceptada",
   abierta: "Abierta",
   pausada: "Pausada",
   cerrada: "Cerrada",

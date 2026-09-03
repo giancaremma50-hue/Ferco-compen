@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   submitForApproval,
-  approveAndPublish,
-  rejectApproval,
+  acceptJobRequest,
+  returnJobRequest,
+  publishJob,
   pauseJob,
   reopenJob,
   closeJob,
@@ -16,7 +17,9 @@ import { ActionButton } from "@/components/ui/action-button";
 import { ConfirmDialog, type ConfirmDialogHandle } from "@/components/ui/confirm-dialog";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { TERMINAL_JOB_STATUSES } from "@/lib/jobs/permissions";
+import { VISIBILITY_LABEL, type JobVisibility } from "@/lib/jobs/schema";
 import type { JobDetail } from "@/lib/jobs/get-jobs";
+import type { TeamMemberOption } from "@/lib/jobs/get-team-options";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -25,14 +28,18 @@ export function ApprovalActions({
   job,
   role,
   actorId,
+  admins,
 }: {
   job: JobDetail;
   role: AppRole;
   actorId: string;
+  admins: TeamMemberOption[];
 }) {
   const [pending, startTransition] = useTransition();
   const closeDialogRef = useRef<ConfirmDialogHandle>(null);
   const cancelDialogRef = useRef<ConfirmDialogHandle>(null);
+  const [ownerId, setOwnerId] = useState(() => (admins.some((a) => a.id === actorId) ? actorId : (admins[0]?.id ?? "")));
+  const [visibility, setVisibility] = useState<JobVisibility>("confidencial");
 
   const isAdmin = ADMIN_ROLES.has(role);
   const isOwner = job.requested_by === actorId;
@@ -65,16 +72,6 @@ export function ApprovalActions({
               Enviar a aprobación
             </ActionButton>
           )}
-          {isAdmin && (
-            <ActionButton
-              type="button"
-              pending={pending}
-              pendingLabel="Publicando…"
-              onClick={() => run(() => approveAndPublish(job.id))}
-            >
-              Publicar directamente
-            </ActionButton>
-          )}
           {(isOwner || isAdmin) && (
             <ActionButton
               type="button"
@@ -92,22 +89,37 @@ export function ApprovalActions({
         <>
           {isAdmin ? (
             <>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Encargado
+                <select
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                >
+                  {admins.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <ActionButton
                 type="button"
                 pending={pending}
-                pendingLabel="Publicando…"
-                onClick={() => run(() => approveAndPublish(job.id))}
+                pendingLabel="Aceptando…"
+                disabled={!ownerId}
+                onClick={() => run(() => acceptJobRequest(job.id, ownerId))}
               >
-                Aprobar y publicar
+                Aceptar
               </ActionButton>
               <ActionButton
                 type="button"
                 variant="secondary"
                 pending={pending}
-                pendingLabel="Regresando…"
-                onClick={() => run(() => rejectApproval(job.id))}
+                pendingLabel="Devolviendo…"
+                onClick={() => run(() => returnJobRequest(job.id))}
               >
-                Regresar a borrador
+                Devolver al solicitante
               </ActionButton>
               <ActionButton
                 type="button"
@@ -120,6 +132,47 @@ export function ApprovalActions({
             </>
           ) : (
             <p className="text-sm text-muted-foreground">Esperando aprobación de RH.</p>
+          )}
+        </>
+      )}
+
+      {job.status === "aceptada" && (
+        <>
+          {isAdmin ? (
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Visibilidad
+                <select
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value as JobVisibility)}
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                >
+                  {Object.entries(VISIBILITY_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ActionButton
+                type="button"
+                pending={pending}
+                pendingLabel="Publicando…"
+                onClick={() => run(() => publishJob(job.id, visibility))}
+              >
+                Publicar
+              </ActionButton>
+              <ActionButton
+                type="button"
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => cancelDialogRef.current?.open()}
+              >
+                Cancelar
+              </ActionButton>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Aceptada — RH la está preparando para publicarse.</p>
           )}
         </>
       )}

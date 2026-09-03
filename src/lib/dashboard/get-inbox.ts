@@ -6,29 +6,29 @@ export type PendingRequest = {
   id: string;
   title: string;
   code: string;
+  status: "pendiente_aprobacion" | "aceptada";
   requestedByName: string | null;
   departmentName: string | null;
   createdAt: string;
 };
 
 /**
- * Buzón de RH: solicitudes esperando resolución. `jobs_select_internal` (RLS)
- * ya deja ver toda la organización a admin/super_admin — este query solo
- * agrega el filtro de estado, no de alcance.
- *
- * Flujo de hoy (aprobar = publicar en un solo paso, `approveAndPublish`) —
- * cuando exista el estado `aceptada` (fase 2 del plan), este query y las
- * acciones que dispara el botón cambian a aceptar/devolver en vez de
- * aprobar/publicar directo.
+ * Buzón de RH — dos cosas por resolver, no una: solicitudes esperando
+ * aceptar/devolver (`pendiente_aprobacion`), y solicitudes ya aceptadas
+ * esperando publicarse (`aceptada`) — sin esto, un job aceptado desaparece
+ * del buzón hasta que alguien lo encuentra a mano en /vacantes.
+ * `jobs_select_internal` (RLS) ya deja ver toda la organización a
+ * admin/super_admin — este query solo agrega el filtro de estado, no de
+ * alcance.
  */
 export async function getPendingApprovals(): Promise<PendingRequest[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, title, code, created_at, requester:profiles!jobs_requested_by_fkey(display_name), department:departments(name)",
+      "id, title, code, status, created_at, requester:profiles!jobs_requested_by_fkey(display_name), department:departments(name)",
     )
-    .eq("status", "pendiente_aprobacion")
+    .in("status", ["pendiente_aprobacion", "aceptada"])
     .order("created_at")
     .limit(50);
 
@@ -36,6 +36,7 @@ export async function getPendingApprovals(): Promise<PendingRequest[]> {
     id: j.id,
     title: j.title,
     code: j.code,
+    status: j.status as "pendiente_aprobacion" | "aceptada",
     requestedByName: j.requester?.display_name ?? null,
     departmentName: j.department?.name ?? null,
     createdAt: j.created_at,

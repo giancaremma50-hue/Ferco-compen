@@ -1368,16 +1368,16 @@ export type Database = {
         Row: {
           candidacy_fields: Json
           competencies: Json
-          country: string
+          country: string | null
           created_at: string
           created_by: string
           department_id: string | null
           description: string
-          employment_type: string
+          employment_type: string | null
           id: string
           is_confidential: boolean
           is_public: boolean
-          location: string
+          location: string | null
           name: string
           organization_id: string
           pipeline_template_id: string | null
@@ -1386,21 +1386,21 @@ export type Database = {
           title: string
           updated_at: string
           wizard_step: number
-          work_mode: string
+          work_mode: string | null
         }
         Insert: {
           candidacy_fields?: Json
           competencies?: Json
-          country: string
+          country?: string | null
           created_at?: string
           created_by?: string
           department_id?: string | null
           description: string
-          employment_type: string
+          employment_type?: string | null
           id?: string
           is_confidential?: boolean
           is_public?: boolean
-          location: string
+          location?: string | null
           name: string
           organization_id: string
           pipeline_template_id?: string | null
@@ -1409,21 +1409,21 @@ export type Database = {
           title: string
           updated_at?: string
           wizard_step?: number
-          work_mode: string
+          work_mode?: string | null
         }
         Update: {
           candidacy_fields?: Json
           competencies?: Json
-          country?: string
+          country?: string | null
           created_at?: string
           created_by?: string
           department_id?: string | null
           description?: string
-          employment_type?: string
+          employment_type?: string | null
           id?: string
           is_confidential?: boolean
           is_public?: boolean
-          location?: string
+          location?: string | null
           name?: string
           organization_id?: string
           pipeline_template_id?: string | null
@@ -1432,7 +1432,7 @@ export type Database = {
           title?: string
           updated_at?: string
           wizard_step?: number
-          work_mode?: string
+          work_mode?: string | null
         }
         Relationships: [
           {
@@ -1477,7 +1477,7 @@ export type Database = {
           employment_type: string | null
           headcount: number
           id: string
-          is_public: boolean
+          is_public: boolean | null
           job_template_id: string | null
           location: string | null
           organization_id: string
@@ -1493,6 +1493,7 @@ export type Database = {
           title: string
           updated_at: string
           vacancy_type: string | null
+          visibility: Database["public"]["Enums"]["job_visibility"]
           work_mode: string | null
         }
         Insert: {
@@ -1506,7 +1507,7 @@ export type Database = {
           employment_type?: string | null
           headcount?: number
           id?: string
-          is_public?: boolean
+          is_public?: boolean | null
           job_template_id?: string | null
           location?: string | null
           organization_id: string
@@ -1522,6 +1523,7 @@ export type Database = {
           title: string
           updated_at?: string
           vacancy_type?: string | null
+          visibility?: Database["public"]["Enums"]["job_visibility"]
           work_mode?: string | null
         }
         Update: {
@@ -1535,7 +1537,7 @@ export type Database = {
           employment_type?: string | null
           headcount?: number
           id?: string
-          is_public?: boolean
+          is_public?: boolean | null
           job_template_id?: string | null
           location?: string | null
           organization_id?: string
@@ -1551,6 +1553,7 @@ export type Database = {
           title?: string
           updated_at?: string
           vacancy_type?: string | null
+          visibility?: Database["public"]["Enums"]["job_visibility"]
           work_mode?: string | null
         }
         Relationships: [
@@ -2126,10 +2129,12 @@ export type Database = {
       job_status:
         | "borrador"
         | "pendiente_aprobacion"
+        | "aceptada"
         | "abierta"
         | "pausada"
         | "cerrada"
         | "cancelada"
+      job_visibility: "publica" | "interna" | "confidencial"
       notification_type:
         | "nueva_postulacion"
         | "cambio_etapa"
@@ -2307,11 +2312,13 @@ export const Constants = {
       job_status: [
         "borrador",
         "pendiente_aprobacion",
+        "aceptada",
         "abierta",
         "pausada",
         "cerrada",
         "cancelada",
       ],
+      job_visibility: ["publica", "interna", "confidencial"],
       notification_type: [
         "nueva_postulacion",
         "cambio_etapa",

@@ -7,8 +7,8 @@ import { requireProfile } from "@/lib/auth/dal";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { JobFormSchema, CreateJobFromTemplateSchema } from "./schema";
-import type { JobStatus, JobFormValues } from "./schema";
+import { JobFormSchema, CreateJobFromTemplateSchema, JobVisibilitySchema } from "./schema";
+import type { JobStatus, JobVisibility, JobFormValues } from "./schema";
 import { generateJobSlug } from "./slug";
 import { assertBelongsToOrg } from "@/lib/assert-belongs-to-org";
 import { TERMINAL_JOB_STATUSES } from "./permissions";
@@ -42,11 +42,9 @@ function toJobRow(values: JobFormValues) {
 }
 
 /**
- * "Reclutador encargado" — mismo criterio que ya usaba `owner_id` antes de
- * esta fase (`ADMIN_ROLES.has(profile.role) ? profile.id : null`), ahora
- * elegido a mano en vez de autoasignado. Revalida rol+organización+activo,
- * no solo que la fila exista — un <select> filtrado en el cliente no es
- * una garantía server-side.
+ * "Reclutador encargado" — se elige al ACEPTAR la solicitud (acceptJobRequest),
+ * ya no al crearla. Revalida rol+organización+activo, no solo que la fila
+ * exista — un <select> filtrado en el cliente no es una garantía server-side.
  */
 async function assertValidOwner(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -81,22 +79,67 @@ async function assertValidCollaborators(
   return profileIds.every((id) => validIds.has(id)) ? null : "Alguno de los colaboradores elegidos no es válido.";
 }
 
+/** `requester_id`: en nombre de quién solicita un admin — cualquier miembro activo de la org, no solo gestores (un admin también podría solicitar en nombre de otro admin). */
+async function assertValidRequester(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  requesterId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", requesterId)
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .maybeSingle();
+  return data ? null : "Esa persona no es válida como solicitante.";
+}
+
+/** `extra_admin_ids`: admins adicionales que un admin agrega al equipo al crear la vacante él mismo. */
+async function assertValidExtraAdmins(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  profileIds: string[],
+): Promise<string | null> {
+  if (profileIds.length === 0) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .in("role", ["admin", "super_admin"])
+    .in("id", profileIds);
+  const validIds = new Set((data ?? []).map((p) => p.id));
+  return profileIds.every((id) => validIds.has(id)) ? null : "Alguno de los admins elegidos no es válido.";
+}
+
 /**
  * Crea una vacante a partir de una plantilla — obligatoria desde esta fase
  * (Fase 18), ya no existe "vacante en blanco". El cliente solo manda
  * `template_id` y los campos que de verdad quedan editables (país,
- * modalidad, salario, plazas, tipo/motivo de vacante, equipo) — título,
- * descripción, requisitos, candidatura, preguntas y etapas se vuelven a
- * leer server-side desde la plantilla, nunca del contenido que mande el
- * formulario (mismo principio de seguridad que Fase 17 con
- * pipeline_template_id/competencies: el cliente nunca manda el contenido
- * que un rol sin acceso directo a esas tablas no podría escribir él mismo).
+ * ubicación, modalidad, tipo de contrato, salario, plazas, tipo/motivo de
+ * vacante, equipo) — título, descripción, requisitos, candidatura,
+ * preguntas y etapas se vuelven a leer server-side desde la plantilla,
+ * nunca del contenido que mande el formulario (mismo principio de
+ * seguridad que Fase 17 con pipeline_template_id/competencies: el cliente
+ * nunca manda el contenido que un rol sin acceso directo a esas tablas no
+ * podría escribir él mismo).
+ *
+ * Dos caminos, decididos por el ROL REAL del actor (nunca por lo que mande
+ * el formulario): un gestor solicita y queda en "borrador" — el flujo de
+ * siempre (submitForApproval → RH acepta/publica). Un admin+ que crea una
+ * vacante YA es la aprobación: nace directo en "aceptada", él se autoasigna
+ * como encargado, y puede elegir en nombre de qué gestor se solicita
+ * (`requester_id`) y sumar más admins al equipo (`extra_admin_ids`).
  */
 export async function createJob(
   _prevState: JobActionResult | undefined,
   formData: FormData,
 ): Promise<JobActionResult> {
   const profile = await requireProfile();
+  // colaborador sigue siendo un rol invitable hoy (invite-form.tsx lo ofrece
+  // por defecto) — eliminarlo del todo es un paso aparte, delicado,
+  // pendiente. Hasta entonces sigue sin poder solicitar vacantes.
   if (profile.role === "colaborador") {
     return { error: "Tu perfil no puede solicitar vacantes." };
   }
@@ -107,26 +150,32 @@ export async function createJob(
   }
 
   const supabase = await createClient();
+  const isAdminCreator = ADMIN_ROLES.has(profile.role);
 
-  const [reasonError, ownerError, collaboratorsError] = await Promise.all([
+  const [reasonError, collaboratorsError, requesterError, extraAdminsError] = await Promise.all([
     assertBelongsToOrg(supabase, "employment_reasons", parsed.data.employment_reason_id, profile.organization_id, "Ese motivo de vacante no es válido."),
-    assertValidOwner(supabase, profile.organization_id, parsed.data.owner_id),
     assertValidCollaborators(supabase, profile.organization_id, parsed.data.collaborator_ids),
+    isAdminCreator && parsed.data.requester_id
+      ? assertValidRequester(supabase, profile.organization_id, parsed.data.requester_id)
+      : Promise.resolve(null),
+    isAdminCreator ? assertValidExtraAdmins(supabase, profile.organization_id, parsed.data.extra_admin_ids) : Promise.resolve(null),
   ]);
   if (reasonError) return { error: reasonError };
-  if (ownerError) return { error: ownerError };
   if (collaboratorsError) return { error: collaboratorsError };
+  if (requesterError) return { error: requesterError };
+  if (extraAdminsError) return { error: extraAdminsError };
 
   const { data: template } = await supabase
     .from("job_templates")
-    .select(
-      "id, title, department_id, location, employment_type, description, requirements, competencies, candidacy_fields, is_public",
-    )
+    .select("id, title, department_id, description, requirements, competencies, candidacy_fields")
     .eq("id", parsed.data.template_id)
     .eq("organization_id", profile.organization_id)
     .eq("status", "published")
     .maybeSingle();
   if (!template) return { error: "Esa plantilla ya no está disponible." };
+
+  const requestedBy = isAdminCreator && parsed.data.requester_id ? parsed.data.requester_id : profile.id;
+  const ownerId = isAdminCreator ? profile.id : null;
 
   const { data: job, error } = await supabase
     .from("jobs")
@@ -135,22 +184,31 @@ export async function createJob(
       title: template.title,
       department_id: template.department_id,
       country: parsed.data.country,
-      location: template.location,
+      location: parsed.data.location,
       work_mode: parsed.data.work_mode,
-      employment_type: template.employment_type,
+      employment_type: parsed.data.employment_type,
       description: template.description,
       requirements: template.requirements,
       salary_min: parsed.data.salary_min ?? null,
       salary_max: parsed.data.salary_max ?? null,
       headcount: parsed.data.headcount,
-      is_public: template.is_public,
       vacancy_type: parsed.data.vacancy_type,
       employment_reason_id: parsed.data.employment_reason_id ?? null,
       job_template_id: template.id,
       candidacy_fields: template.candidacy_fields,
-      requested_by: profile.id,
-      owner_id: parsed.data.owner_id,
-      status: "borrador",
+      requested_by: requestedBy,
+      owner_id: ownerId,
+      // Explícito, no el default de la columna — publishJob() exige elegir
+      // visibilidad a propósito ("no hay valor por defecto silencioso para
+      // algo que decide quién ve la vacante"), sería inconsistente confiar
+      // en un default implícito acá mismo, un insert antes.
+      visibility: "confidencial",
+      // Gestor: borrador -> pendiente_aprobacion (submitForApproval, como
+      // siempre). Admin+: su creación ya ES la aprobación, nace lista para
+      // publicar. La visibilidad recién elegida arriba no cambia hasta
+      // publishJob — nadie fuera del equipo la ve todavía, aunque status ya
+      // sea "aceptada".
+      status: isAdminCreator ? "aceptada" : "borrador",
       slug: generateJobSlug(template.title),
     })
     .select("id")
@@ -248,23 +306,29 @@ export async function createJob(
     }
   }
 
-  // Reclutador encargado = owner de job_collaborators (mismo id que
-  // jobs.owner_id, ambos lados del mismo hecho); colaboradores adicionales
-  // = viewer, ajustable después desde el panel que ya existe. Se descarta
-  // cualquier id repetido con el owner — agregarlo dos veces violaría el
-  // UNIQUE(job_id, profile_id), y no es un error del usuario, es un caso
-  // esperable (eligió a la misma persona en los dos selectores).
-  const collaboratorRows = [
-    { organization_id: profile.organization_id, job_id: job.id, profile_id: parsed.data.owner_id, permission: "owner" as const },
-    ...parsed.data.collaborator_ids
-      .filter((id) => id !== parsed.data.owner_id)
-      .map((id) => ({
-        organization_id: profile.organization_id,
-        job_id: job.id,
-        profile_id: id,
-        permission: "viewer" as const,
-      })),
-  ];
+  // Un mismo profile_id no puede aparecer dos veces (UNIQUE(job_id,
+  // profile_id)) — se arma con un Map en vez de un array plano, insertando
+  // del nivel más bajo al más alto, así el nivel más alto que le toque a
+  // cada persona es el que queda (ej. si el encargado además aparece como
+  // "colaborador adicional" por error del formulario, gana "owner", no
+  // "viewer"). Quien solicitó siempre queda approver de su propia
+  // vacante — sin esto, un gestor que pidió una vacante no podría decidir
+  // sobre sus propias postulaciones una vez que los niveles de
+  // job_collaborators aplican a todos menos admin+.
+  const permissionByProfile = new Map<string, "viewer" | "approver" | "owner">();
+  for (const id of parsed.data.collaborator_ids) permissionByProfile.set(id, "viewer");
+  permissionByProfile.set(requestedBy, "approver");
+  if (isAdminCreator) {
+    for (const id of parsed.data.extra_admin_ids) permissionByProfile.set(id, "approver");
+  }
+  if (ownerId) permissionByProfile.set(ownerId, "owner");
+
+  const collaboratorRows = Array.from(permissionByProfile, ([profile_id, permission]) => ({
+    organization_id: profile.organization_id,
+    job_id: job.id,
+    profile_id,
+    permission,
+  }));
   const { error: collaboratorsInsertError } = await admin.from("job_collaborators").insert(collaboratorRows);
   if (collaboratorsInsertError) {
     console.error("createJob: no se pudo armar el equipo de reclutamiento", collaboratorsInsertError);
@@ -309,9 +373,16 @@ export async function updateJob(
   return { success: "Vacante actualizada" };
 }
 
+// pendiente_aprobacion ya no salta directo a "abierta" — aprobar y publicar
+// son dos pasos separados (aceptada, en medio) desde que RH necesita elegir
+// encargado y visibilidad por separado, no de una sola vez. "borrador"
+// tampoco salta directo a "abierta" (se quitó el atajo de admin) — todo
+// camino a "abierta" pasa por "aceptada", una sola forma de publicar en vez
+// de dos con distinto comportamiento.
 const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  borrador: ["pendiente_aprobacion", "abierta", "cancelada"],
-  pendiente_aprobacion: ["abierta", "borrador", "cancelada"],
+  borrador: ["pendiente_aprobacion", "cancelada"],
+  pendiente_aprobacion: ["aceptada", "borrador", "cancelada"],
+  aceptada: ["abierta", "cancelada"],
   abierta: ["pausada", "cerrada"],
   pausada: ["abierta", "cerrada"],
   cerrada: [],
@@ -321,6 +392,7 @@ const VALID_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 const SUCCESS_MESSAGE: Record<JobStatus, string> = {
   borrador: "Vacante regresada a borrador",
   pendiente_aprobacion: "Vacante enviada a aprobación",
+  aceptada: "Solicitud aceptada",
   abierta: "Vacante publicada",
   pausada: "Vacante pausada",
   cerrada: "Vacante cerrada",
@@ -330,7 +402,12 @@ const SUCCESS_MESSAGE: Record<JobStatus, string> = {
 type CurrentJob = { status: JobStatus; requested_by: string | null; published_at: string | null };
 type TransitionGuard = (actorRole: AppRole, actorId: string, current: CurrentJob) => string | null;
 
-async function transitionJob(jobId: string, to: JobStatus, guard: TransitionGuard): Promise<JobActionResult> {
+async function transitionJob(
+  jobId: string,
+  to: JobStatus,
+  guard: TransitionGuard,
+  extraFields: Record<string, unknown> = {},
+): Promise<JobActionResult> {
   const profile = await requireProfile();
   const supabase = await createClient();
 
@@ -362,7 +439,7 @@ async function transitionJob(jobId: string, to: JobStatus, guard: TransitionGuar
   // el resultado de la primera.
   const { data, error } = await supabase
     .from("jobs")
-    .update({ status: to, ...extra })
+    .update({ status: to, ...extra, ...extraFields })
     .eq("id", jobId)
     .eq("organization_id", profile.organization_id)
     .eq("status", current.status)
@@ -447,12 +524,54 @@ export async function submitForApproval(jobId: string): Promise<JobActionResult>
   return result;
 }
 
-export async function approveAndPublish(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "abierta", adminOnly("Solo RH puede aprobar y publicar una vacante."));
+/**
+ * Aceptar ya no publica de una — RH revisa la solicitud y asigna encargado;
+ * publicarla (con su visibilidad) es un paso aparte, publishJob. El
+ * encargado y quien solicitó quedan con acceso operativo real sobre la
+ * vacante (job_collaborators), no solo con RLS de solo-ver: sin esto,
+ * ninguno de los dos podría mover etapas ni decidir sobre sus propias
+ * postulaciones (canDecideApplication exige nivel real para todos menos
+ * admin+, ya no hay excepción por rol "colaborador").
+ */
+export async function acceptJobRequest(jobId: string, ownerId: string): Promise<JobActionResult> {
+  const profile = await requireProfile();
+  if (!ADMIN_ROLES.has(profile.role)) return { error: "Solo RH puede aceptar una solicitud de vacante." };
+
+  const supabase = await createClient();
+  const ownerError = await assertValidOwner(supabase, profile.organization_id, ownerId);
+  if (ownerError) return { error: ownerError };
+
+  const { data: job } = await supabase.from("jobs").select("requested_by").eq("id", jobId).single();
+
+  const result = await transitionJob(jobId, "aceptada", adminOnly("Solo RH puede aceptar una solicitud de vacante."), {
+    owner_id: ownerId,
+  });
+  if (result.error) return result;
+
+  const admin = createAdminClient();
+  const rows: { organization_id: string; job_id: string; profile_id: string; permission: "owner" | "approver" }[] = [
+    { organization_id: profile.organization_id, job_id: jobId, profile_id: ownerId, permission: "owner" },
+  ];
+  if (job?.requested_by && job.requested_by !== ownerId) {
+    rows.push({ organization_id: profile.organization_id, job_id: jobId, profile_id: job.requested_by, permission: "approver" });
+  }
+  const { error: collabError } = await admin.from("job_collaborators").upsert(rows, { onConflict: "job_id,profile_id" });
+  if (collabError) console.error("acceptJobRequest: no se pudo asignar el equipo de la vacante", collabError);
+
+  return result;
 }
 
-export async function rejectApproval(jobId: string): Promise<JobActionResult> {
-  return transitionJob(jobId, "borrador", adminOnly("Solo RH puede regresar una vacante a borrador."));
+export async function returnJobRequest(jobId: string): Promise<JobActionResult> {
+  return transitionJob(jobId, "borrador", adminOnly("Solo RH puede devolver una solicitud al solicitante."));
+}
+
+/** Publicar exige elegir visibilidad explícitamente — no hay valor "por defecto silencioso" para algo que decide quién ve la vacante. Revalidada con Zod, no solo confiada porque el tipo de TS diga JobVisibility — el cliente es el que arma este argumento. */
+export async function publishJob(jobId: string, visibility: JobVisibility): Promise<JobActionResult> {
+  const parsedVisibility = JobVisibilitySchema.safeParse(visibility);
+  if (!parsedVisibility.success) return { error: "Elige una visibilidad válida." };
+  return transitionJob(jobId, "abierta", adminOnly("Solo RH puede publicar una vacante."), {
+    visibility: parsedVisibility.data,
+  });
 }
 
 export async function pauseJob(jobId: string): Promise<JobActionResult> {

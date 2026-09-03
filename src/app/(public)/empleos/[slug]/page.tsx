@@ -13,7 +13,7 @@ export default async function EmpleoDetailPage({ params }: { params: Promise<{ s
     .select("id, title, country, location, work_mode, employment_type, description, requirements, candidacy_fields")
     .eq("slug", slug)
     .eq("status", "abierta")
-    .eq("is_public", true)
+    .eq("visibility", "publica")
     .maybeSingle();
 
   if (!job) notFound();

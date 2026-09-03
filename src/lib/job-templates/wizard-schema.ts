@@ -4,16 +4,15 @@ import { CompetencyDraftSchema } from "@/lib/job-templates/schema";
 import { CANDIDACY_STATE_SCHEMA, CANDIDACY_FIELD_LABEL } from "@/lib/job-templates/candidacy-fields";
 import type { CandidacyFieldKey } from "@/lib/job-templates/candidacy-fields";
 
-// Paso 1 del wizard ("Detalles de la vacante"). No incluye
-// pipeline_template_id — el pipeline de la plantilla se arma en el
-// paso "Etapas" (Fase 18, 4/7), no se elige de un catálogo aparte.
+// Paso 1 del wizard ("Detalles del puesto"). No incluye pipeline_template_id
+// — el pipeline de la plantilla se arma en el paso "Etapas" (Fase 18, 4/7),
+// no se elige de un catálogo aparte. País/ubicación/modalidad/tipo de
+// contrato NO viven acá (post-manual de uso): un puesto es general, la
+// SOLICITUD de vacante es la que lo vuelve específico a un país/modalidad
+// concreto — ver CreateJobFromTemplateSchema en lib/jobs/schema.ts.
 export const WizardStep1Schema = JobBaseSchema.pick({
   title: true,
   department_id: true,
-  country: true,
-  location: true,
-  work_mode: true,
-  employment_type: true,
   description: true,
   requirements: true,
 }).extend({

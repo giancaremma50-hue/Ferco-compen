@@ -5,7 +5,7 @@ import { ActionButton } from "@/components/ui/action-button";
 import { Field } from "@/components/ui/field";
 import { LabelSelect } from "@/components/ui/label-select";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
-import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
+import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL, VISIBILITY_LABEL } from "@/lib/jobs/schema";
 import { COUNTRIES } from "@/lib/geo/countries";
 import type { JobActionResult } from "@/lib/jobs/actions";
 import type { JobDetail } from "@/lib/jobs/get-jobs";
@@ -206,15 +206,20 @@ export const JobForm = forwardRef<
         </Field>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-foreground">
-        <input
-          name="is_public"
-          type="checkbox"
-          defaultChecked={defaultValues?.is_public ?? true}
-          className="size-4"
-        />
-        Mostrar en el portal público de empleos al publicarse
-      </label>
+      <Field id="visibility" label="Visibilidad" error={state?.field === "visibility" ? state.error : undefined}>
+        <select
+          name="visibility"
+          required
+          defaultValue={defaultValues?.visibility ?? "confidencial"}
+          className="h-11 rounded-md border border-border bg-background px-3 text-sm"
+        >
+          {Object.entries(VISIBILITY_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <div className="border-t border-border pt-5">
         <ActionButton>{submitLabel}</ActionButton>

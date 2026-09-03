@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 export type TeamMemberOption = { id: string; display_name: string };
 
 /**
- * Para el selector de "Reclutador encargado" al crear una vacante —
- * `jobs.owner_id` siempre fue admin+ en este proyecto (createJob lo
- * autoasignaba así antes de esta fase), el wizard solo lo vuelve una
- * elección explícita en vez de implícita.
+ * Para los selectores de "Reclutador encargado" (acceptJobRequest, al
+ * aceptar una solicitud) y "Admins adicionales" (createJob, cuando quien
+ * crea es admin+) — `jobs.owner_id` siempre fue admin+ en este proyecto.
  */
 export async function getOrgAdmins(organizationId: string): Promise<TeamMemberOption[]> {
   const supabase = await createClient();

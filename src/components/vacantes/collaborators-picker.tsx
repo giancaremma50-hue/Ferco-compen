@@ -12,7 +12,16 @@ import type { TeamMemberOption } from "@/lib/jobs/get-team-options";
  * UNIQUE de job_collaborators), evita sincronizar estado entre dos
  * componentes separados para un caso que no rompe nada de todos modos.
  */
-export function CollaboratorsPicker({ members }: { members: TeamMemberOption[] }) {
+export function CollaboratorsPicker({
+  members,
+  name = "collaborator_ids",
+  emptyLabel = "No hay nadie más en la organización todavía.",
+}: {
+  members: TeamMemberOption[];
+  /** Nombre del campo oculto — reusado también para "extra_admin_ids" en el flujo de solicitud creada por un admin. */
+  name?: string;
+  emptyLabel?: string;
+}) {
   const [selected, setSelected] = useState<string[]>([]);
 
   function toggle(id: string, checked: boolean) {
@@ -21,9 +30,9 @@ export function CollaboratorsPicker({ members }: { members: TeamMemberOption[] }
 
   return (
     <div>
-      <input type="hidden" name="collaborator_ids" value={JSON.stringify(selected)} />
+      <input type="hidden" name={name} value={JSON.stringify(selected)} />
       {members.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No hay nadie más en la organización todavía.</p>
+        <p className="text-xs text-muted-foreground">{emptyLabel}</p>
       ) : (
         <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto rounded-md border border-border p-2.5">
           {members.map((m) => (

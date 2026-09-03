@@ -8,7 +8,7 @@ import { ActionButton } from "@/components/ui/action-button";
 import { LabelSelect } from "@/components/ui/label-select";
 import { EmploymentReasonSelect } from "@/components/vacantes/employment-reason-select";
 import { CollaboratorsPicker } from "@/components/vacantes/collaborators-picker";
-import { WORK_MODE_LABEL, VACANCY_TYPE_LABEL } from "@/lib/jobs/schema";
+import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL, VACANCY_TYPE_LABEL } from "@/lib/jobs/schema";
 import { COUNTRIES } from "@/lib/geo/countries";
 import type { EmploymentReasonOption } from "@/lib/employment-reasons/get-employment-reasons";
 import type { TeamMemberOption } from "@/lib/jobs/get-team-options";
@@ -21,8 +21,6 @@ export type TemplateSummary = {
   title: string;
   description: string;
   requirements: string;
-  country: string;
-  work_mode: string;
 };
 
 export function NuevaVacanteForm({
@@ -30,18 +28,18 @@ export function NuevaVacanteForm({
   admins,
   members,
   employmentReasons,
-  currentProfileId,
+  isAdmin,
 }: {
   templates: TemplateSummary[];
   admins: TeamMemberOption[];
   members: TeamMemberOption[];
   employmentReasons: EmploymentReasonOption[];
-  currentProfileId: string;
+  /** El formulario para admin+ gana "solicitar en nombre de" y "admins adicionales" — un gestor ni ve esos campos. */
+  isAdmin: boolean;
 }) {
   const [state, formAction] = useActionState(createJob, undefined);
   const [templateId, setTemplateId] = useState("");
   const selected = templates.find((t) => t.id === templateId);
-  const defaultOwner = admins.some((a) => a.id === currentProfileId) ? currentProfileId : "";
 
   useEffect(() => {
     if (state?.error) notifyError(state.error);
@@ -90,25 +88,16 @@ export function NuevaVacanteForm({
         </div>
       )}
 
-      {/* key={templateId}: un input no controlado solo lee defaultValue al
-          montar — sin remontar, cambiar de plantilla no actualizaría el
-          país/modalidad prellenados de la anterior. */}
-      <div key={templateId} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* País/ubicación/modalidad/tipo de contrato son de ESTA solicitud, no
+          de la plantilla — un mismo puesto puede abrirse en más de un país o
+          modalidad sin duplicar la plantilla. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">País</span>
-          <select name="country" required defaultValue={selected?.country ?? ""} className={FIELD_CLASS}>
+          <select name="country" required defaultValue="" className={FIELD_CLASS}>
             <option value="" disabled>
               Elige un país
             </option>
-            {/* La plantilla puede traer un país que ya no está en la lista
-                (se cargó antes de que "País" fuera un select fijo) — se
-                muestra deshabilitado para que quede claro que hay que
-                elegir uno real antes de crear la vacante. */}
-            {selected?.country && !(COUNTRIES as readonly string[]).includes(selected.country) && (
-              <option value={selected.country} disabled>
-                {selected.country} (elige uno de la lista)
-              </option>
-            )}
             {COUNTRIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -117,8 +106,19 @@ export function NuevaVacanteForm({
           </select>
         </label>
         <label className="flex flex-col gap-2">
+          <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Ubicación</span>
+          <input name="location" required maxLength={120} placeholder="Ciudad de Guatemala" className={FIELD_CLASS} />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2">
           <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Modalidad</span>
-          <LabelSelect name="work_mode" required labels={WORK_MODE_LABEL} defaultValue={selected?.work_mode} className={FIELD_CLASS} />
+          <LabelSelect name="work_mode" required labels={WORK_MODE_LABEL} className={FIELD_CLASS} />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Tipo de contrato</span>
+          <LabelSelect name="employment_type" required labels={EMPLOYMENT_TYPE_LABEL} className={FIELD_CLASS} />
         </label>
       </div>
 
@@ -151,19 +151,25 @@ export function NuevaVacanteForm({
       <div className="border-t border-border pt-5" data-tour="nv-equipo">
         <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Equipo de reclutamiento</span>
         <div className="mt-3 flex flex-col gap-4">
-          <label className="flex flex-col gap-2">
-            <span className="text-xs text-muted-foreground">Reclutador encargado</span>
-            <select name="owner_id" required defaultValue={defaultOwner} className={FIELD_CLASS}>
-              <option value="" disabled>
-                Elige quién queda a cargo…
-              </option>
-              {admins.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.display_name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {isAdmin && (
+            <>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Solicitar en nombre de (opcional — por defecto, tú)</span>
+                <select name="requester_id" defaultValue="" className={FIELD_CLASS}>
+                  <option value="">Yo mismo</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Admins adicionales (opcional)</span>
+                <CollaboratorsPicker members={admins} name="extra_admin_ids" emptyLabel="No hay otros admins en la organización." />
+              </label>
+            </>
+          )}
           <label className="flex flex-col gap-2">
             <span className="text-xs text-muted-foreground">Colaboradores adicionales (opcional)</span>
             <CollaboratorsPicker members={members} />

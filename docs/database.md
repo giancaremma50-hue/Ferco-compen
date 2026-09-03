@@ -2,6 +2,35 @@
 
 **Proyecto**: `V1-motoslam` (ref `cgudnnlcwcotovcslgzu`), reutilizado y limpiado por indicación del usuario — tenía un sistema de vacaciones "PCG" sin uso que se eliminó por completo (tablas, tipos, función y políticas de storage) antes de montar el esquema del ATS.
 
+## Flujo de solicitud de vacante: plantilla general + estado `aceptada` + visibilidad de 3 niveles (post-Fase 19, sin número de fase)
+
+Plan completo en `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-design.md`. Este bloque documenta lo que YA se construyó (pasos 1-3 del plan); lo que falta queda al final.
+
+**3 migraciones aplicadas, en orden:**
+1. `job_visibility_and_general_templates` — tipo `job_visibility` (`publica`/`interna`/`confidencial`) + columna `jobs.visibility` (default `confidencial`, migrado desde `is_public`: `true → publica`, `false → confidencial`); `jobs.is_public` se deja de leer (no se borra); `job_templates.country/location/work_mode/employment_type` pasan a nullable; RLS: `jobs_select_public` reescrita para leer `visibility`, nueva `jobs_select_interna` para que empleados autenticados vean también el nivel `interna`.
+2. `job_status_add_aceptada` — nuevo valor `aceptada` en el enum, entre `pendiente_aprobacion` y `abierta`.
+3. `remove_colaborador_role` — los 2 perfiles con `role='colaborador'` pasan a `gestor`; se reescribe `employment_reasons_insert` (única política que nombraba ese rol). **Solo la migración de datos** — el código que trata `colaborador` como especial (`hasCollaboratorPermission` en `src/lib/applications/permissions.ts`) NO se tocó todavía, es un paso aparte pendiente (ver abajo). El rol sigue siendo invitable hoy (`invite-form.tsx` lo ofrece por defecto), así que `createJob` y `/vacantes/nueva` siguen bloqueándolo explícitamente — se probó quitar esas guardias asumiendo que el rol ya no existía y era un error real, encontrado en review.
+
+**Plantilla de puesto general, solicitud específica.** `country`/`location`/`work_mode`/`employment_type` se movieron del wizard de plantilla (`WizardStep1Schema`) al formulario de solicitud (`CreateJobFromTemplateSchema`) — un mismo puesto puede abrirse en más de un país o modalidad sin duplicar la plantilla. Arregla de paso un bug real que ya existía: `job_templates.is_public` nunca se preguntaba ni se escribía, así que toda vacante creada desde plantilla nacía invisible en el portal — ahora la visibilidad ni siquiera vive en la plantilla, se elige al publicar.
+
+**Visibilidad de 3 niveles reemplaza `is_public`.** `publica` (portal + empleados) / `interna` (solo empleados, no sale al portal — el nivel que el manual de uso ya prometía y no existía) / `confidencial` (solo el equipo de la vacante). Se elige recién al publicar (`publishJob`), nunca antes — una vacante `aceptada` sigue siendo `confidencial` hasta ese momento, fijado explícitamente en el insert de `createJob` (no se deja al default de la columna, aunque hoy coincida).
+
+**Aceptar y publicar son dos pasos separados**, ya no un solo "aprobar y publicar":
+- `pendiente_aprobacion → aceptada` (`acceptJobRequest`): RH asigna encargado (`owner_id`), admin-only. Encargado y solicitante quedan con acceso operativo real (`job_collaborators`: `owner`/`approver`) — sin esto, ninguno de los dos podría decidir sobre sus propias postulaciones el día que `canDecideApplication` deje de tener excepción por rol.
+- `aceptada → abierta` (`publishJob`): exige elegir visibilidad explícita, admin-only.
+- Se quitó el atajo `borrador → abierta` ("Publicar directamente") — todo camino a `abierta` pasa por `aceptada`, una sola forma de publicar.
+- El buzón de Inicio (`getPendingApprovals`) muestra las dos bandejas por separado: "Por aceptar" y "Aceptadas, por publicar" — un hallazgo real de review encontró que solo mostraba la primera, dejando vacantes aceptadas invisibles hasta que alguien las buscara a mano.
+
+**Admin puede crear la solicitud directamente.** Si quien crea (`createJob`) es admin/super_admin, la vacante nace ya en `aceptada` (se salta borrador y pendiente_aprobacion) y se autoasigna como encargado. Puede elegir en nombre de qué persona se solicita (`requester_id`, opcional, por defecto él mismo) y sumar más admins al equipo (`extra_admin_ids`) — ambos campos se ignoran server-side si quien manda el formulario no es admin+ de verdad (revalidado por rol real, nunca por lo que declare el cliente).
+
+**`job_collaborators` en `createJob`**: se arma con un `Map<profileId, permission>` insertado de menor a mayor nivel (colaboradores adicionales = viewer, solicitante = approver, admins extra = approver, encargado = owner) — así, si una misma persona cae en más de un balde, gana el nivel más alto, sin violar el `UNIQUE(job_id, profile_id)`.
+
+**Pendiente, explícitamente fuera de este bloque:**
+- Rewire de `canDecideApplication`/`canRateApplication` (hoy: cualquier rol que no sea `colaborador` pasa de largo; con `colaborador` vacío, la excepción es universal — no rompe nada nuevo hoy, pero tampoco aplica los niveles de `job_collaborators` a `gestor` como decidió el usuario).
+- Eliminar de verdad el rol `colaborador` (quitarlo de `invite-form.tsx`, limpiar los ~11 puntos de la interfaz que preguntan "¿es colaborador?").
+- Filtro de plantillas por área del solicitante (paso 5 del plan) — bloqueado en datos reales del cliente (`profiles.department_id`/`job_templates.department_id` sin poblar).
+- Actualizar el manual de uso (`AtrioManualdeuso.docx`) con el flujo nuevo.
+
 ## Inicio: buzón + embudo + agenda + informe por encargado (post-Fase 19, sin número de fase)
 
 Reemplaza el placeholder de `/inicio` ("El tablero llega en la siguiente fase"). Primer tramo (6 y 7) del plan de flujo de solicitud de vacante — ver `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-design.md` para el resto (estado `aceptada`, visibilidad de 3 niveles, eliminar `colaborador`, filtro de plantillas por área — todavía no construidos, cada uno necesita su propia migración).

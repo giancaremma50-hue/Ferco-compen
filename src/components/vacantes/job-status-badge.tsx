@@ -3,6 +3,7 @@ import type { JobStatus } from "@/lib/jobs/get-jobs";
 const LABEL: Record<JobStatus, string> = {
   borrador: "Borrador",
   pendiente_aprobacion: "Pendiente de aprobación",
+  aceptada: "Aceptada, sin publicar",
   abierta: "Abierta",
   pausada: "Pausada",
   cerrada: "Cerrada",
@@ -12,6 +13,7 @@ const LABEL: Record<JobStatus, string> = {
 const STYLE: Record<JobStatus, string> = {
   borrador: "text-muted-foreground border-border",
   pendiente_aprobacion: "text-[#9A6B1F] border-[#9A6B1F]/40",
+  aceptada: "text-[#1F6B9A] border-[#1F6B9A]/40",
   abierta: "text-[#2F6F4E] border-[#2F6F4E]/40",
   pausada: "text-[#9A6B1F] border-[#9A6B1F]/40",
   cerrada: "text-muted-foreground border-border",

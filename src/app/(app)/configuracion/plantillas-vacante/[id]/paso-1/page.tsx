@@ -33,7 +33,7 @@ export default async function PlantillaPaso1Page({ params }: { params: Promise<{
           <div>
             <h1 className="font-serif text-[32px]">Editar plantilla de puesto</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Detalles de la vacante — la información general que trae cada vacante creada desde esta plantilla.
+              Lo general del puesto — país, ubicación, modalidad y tipo de contrato se eligen al solicitar cada vacante, no acá.
             </p>
           </div>
           <HelpTourButton
@@ -51,10 +51,6 @@ export default async function PlantillaPaso1Page({ params }: { params: Promise<{
             name: template.name,
             title: template.title,
             department_id: template.department_id,
-            country: template.country,
-            location: template.location,
-            work_mode: template.work_mode,
-            employment_type: template.employment_type,
             description: template.description,
             requirements: template.requirements,
             competencies: template.competencies,

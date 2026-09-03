@@ -5,9 +5,7 @@ import Link from "next/link";
 import { createTemplateDraftStep1, updateTemplateStep1 } from "@/lib/job-templates/wizard-actions";
 import { notifyError } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
-import { LabelSelect } from "@/components/ui/label-select";
 import { CompetencyListEditor } from "@/components/configuracion/competency-list-editor";
-import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { CompetencyDraft } from "@/lib/job-templates/schema";
 
 const FIELD_CLASS = "h-11 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-foreground";
@@ -17,10 +15,6 @@ export type Step1InitialValues = {
   name: string;
   title: string;
   department_id: string | null;
-  country: string;
-  location: string;
-  work_mode: string;
-  employment_type: string;
   description: string;
   requirements: string;
   competencies: CompetencyDraft[];
@@ -76,38 +70,6 @@ export function WizardStep1Form({
           ))}
         </select>
       </label>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">País</span>
-          <input name="country" required maxLength={60} defaultValue={initialValues?.country} className={FIELD_CLASS} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Ubicación</span>
-          <input name="location" required maxLength={120} defaultValue={initialValues?.location} className={FIELD_CLASS} />
-        </label>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Modalidad</span>
-          <LabelSelect
-            name="work_mode"
-            required
-            labels={WORK_MODE_LABEL}
-            defaultValue={initialValues?.work_mode}
-            className={FIELD_CLASS}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Tipo de contrato</span>
-          <LabelSelect
-            name="employment_type"
-            required
-            labels={EMPLOYMENT_TYPE_LABEL}
-            defaultValue={initialValues?.employment_type}
-            className={FIELD_CLASS}
-          />
-        </label>
-      </div>
       <label className="flex flex-col gap-1" data-tour="w1-descripcion">
         <span className="text-xs text-muted-foreground">Descripción del puesto</span>
         <textarea name="description" required rows={4} defaultValue={initialValues?.description} className={TEXTAREA_CLASS} />

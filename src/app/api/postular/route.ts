@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
 
   const { data: job } = await admin
     .from("jobs")
-    .select("id, organization_id, status, is_public, title, owner_id, requested_by, candidacy_fields")
+    .select("id, organization_id, status, visibility, title, owner_id, requested_by, candidacy_fields")
     .eq("id", jobIdResult.data)
     .single();
 
-  if (!job || job.status !== "abierta" || !job.is_public) {
+  if (!job || job.status !== "abierta" || job.visibility !== "publica") {
     return NextResponse.json({ error: "Esta vacante ya no está disponible." }, { status: 404 });
   }
 

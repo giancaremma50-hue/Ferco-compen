@@ -28,7 +28,7 @@ export default async function EmpleosPage() {
       .from("jobs")
       .select("id, slug, title, country, location, work_mode, department_id, departments(name)")
       .eq("status", "abierta")
-      .eq("is_public", true)
+      .eq("visibility", "publica")
       .order("published_at", { ascending: false }),
     getOrganization(),
   ]);

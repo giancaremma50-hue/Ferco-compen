@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 // Duplicarlo aquí desde Database["public"]["Enums"]["job_status"] permitía
 // que ambos se desincronizaran silenciosamente si el enum de Postgres
 // cambiaba sin actualizar el z.enum de validación, o viceversa.
-import type { JobStatus } from "./schema";
-export type { JobStatus };
+import type { JobStatus, JobVisibility } from "./schema";
+export type { JobStatus, JobVisibility };
 
 export type JobListItem = {
   id: string;
@@ -26,7 +26,7 @@ export type JobDetail = JobListItem & {
   requirements: string;
   salary_min: number | null;
   salary_max: number | null;
-  is_public: boolean;
+  visibility: JobVisibility;
   department_id: string | null;
   requested_by: string | null;
   owner_id: string | null;
@@ -58,7 +58,7 @@ export async function getJobById(id: string): Promise<JobDetail | null> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, is_public, department_id, requested_by, owner_id, organization_id, owner:profiles!jobs_owner_id_fkey(display_name)",
+      "id, code, title, status, country, headcount, published_at, slug, location, work_mode, employment_type, description, requirements, salary_min, salary_max, visibility, department_id, requested_by, owner_id, organization_id, owner:profiles!jobs_owner_id_fkey(display_name)",
     )
     .eq("id", id)
     .maybeSingle();
