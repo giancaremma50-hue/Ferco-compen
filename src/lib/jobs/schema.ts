@@ -139,7 +139,7 @@ export const CreateJobFromTemplateSchema = z
     // Llega como JSON serializado desde CollaboratorsPicker — un <select
     // multiple> perdería todas las opciones salvo la última al pasar por
     // Object.fromEntries(formData), que no soporta claves repetidas.
-    collaborator_ids: idListField(30, "Máximo 30 colaboradores adicionales."),
+    collaborator_ids: idListField(30, "Máximo 30 miembros adicionales."),
     extra_admin_ids: idListField(10, "Máximo 10 admins adicionales."),
   })
   .refine((data) => data.salary_min == null || data.salary_max == null || data.salary_min <= data.salary_max, {

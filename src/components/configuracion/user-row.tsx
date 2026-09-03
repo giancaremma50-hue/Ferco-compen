@@ -3,16 +3,11 @@
 import { useTransition } from "react";
 import { updateUserRole, toggleUserActive } from "@/lib/users/actions";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
-import { ROLE_LABEL } from "@/lib/auth/role-labels";
+import { ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/auth/role-labels";
 import { ActionButton } from "@/components/ui/action-button";
 import type { Database } from "@/lib/supabase/database.types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
-
-const ROLE_OPTIONS = (Object.keys(ROLE_LABEL) as AppRole[]).map((value) => ({
-  value,
-  label: ROLE_LABEL[value],
-}));
 
 export function UserRow({
   user,
@@ -29,9 +24,15 @@ export function UserRow({
   // editable ni asignarle ese rol a alguien más. El select siempre incluye
   // el rol real de la fila para que nunca muestre un valor falso.
   const canEditThisUser = !isSelf && !(user.role === "super_admin" && !canAssignSuperAdmin);
-  const visibleOptions = ROLE_OPTIONS.filter(
-    (r) => r.value !== "super_admin" || canAssignSuperAdmin || user.role === "super_admin",
-  );
+  // Solo roles asignables (lista blanca), más el rol REAL de esta fila si es
+  // uno que ya no se asigna: sin eso, un perfil heredado con un rol retirado
+  // mostraría el primer valor de la lista, un dato falso sobre esa persona.
+  const visibleOptions = ASSIGNABLE_ROLES.filter(
+    (r) => r !== "super_admin" || canAssignSuperAdmin || user.role === "super_admin",
+  ).map((value) => ({ value: value as AppRole, label: ROLE_LABEL[value] }));
+  if (!visibleOptions.some((r) => r.value === user.role)) {
+    visibleOptions.unshift({ value: user.role, label: ROLE_LABEL[user.role] });
+  }
 
   function handleRoleChange(role: AppRole) {
     startTransition(async () => {

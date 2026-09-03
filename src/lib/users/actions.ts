@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdminOrAbove } from "@/lib/auth/dal";
+import { ASSIGNABLE_ROLES } from "@/lib/auth/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -12,7 +13,11 @@ type ActionResult = { error?: string; success?: boolean };
 // Un Server Action es un endpoint invocable por red: los tipos de
 // TypeScript no protegen en runtime contra una llamada fabricada a mano.
 // Se valida con Zod igual que src/lib/organizations/actions.ts.
-const RoleSchema = z.enum(["colaborador", "gestor", "admin", "super_admin"]);
+// z.enum sobre la LISTA BLANCA, no sobre el enum completo de Postgres: el
+// desplegable ya no ofrece `colaborador`, pero un POST fabricado a mano sí
+// podía mandarlo — limpiar solo la interfaz habría dejado el rol asignable
+// por red. Un valor nuevo del enum tampoco se vuelve asignable por accidente.
+const RoleSchema = z.enum(ASSIGNABLE_ROLES);
 const UserIdSchema = z.uuid();
 
 type Target = { role: AppRole; is_active: boolean };

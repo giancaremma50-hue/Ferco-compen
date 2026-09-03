@@ -59,7 +59,7 @@ export async function getDrawerData(
       getApplicationInterviews(applicationId),
       getAssignableProfiles(application.jobId, actor.organizationId),
       supabase.from("rejection_reasons").select("id, label").eq("is_active", true),
-      actor.role === "colaborador" ? Promise.resolve([]) : getMessageTemplates(actor.organizationId).catch(() => []),
+      getMessageTemplates(actor.organizationId).catch(() => []),
       getApplicationPermissions(actor.role, actor.id, application.jobId),
     ]);
 

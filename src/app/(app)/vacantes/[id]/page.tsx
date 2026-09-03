@@ -37,8 +37,9 @@ export default async function VacanteDetailPage({
   const showPublicLink = job.status === "abierta" && job.visibility === "publica" && job.slug;
   const publicUrl = showPublicLink ? `${(await getEmailContext()).siteUrl}/empleos/${job.slug}` : null;
 
-  const isOpenForCandidates = !TERMINAL_JOB_STATUSES.has(job.status);
-  const canRefer = isOpenForCandidates && (profile.role !== "colaborador" || job.status === "abierta");
+  // Referir depende del estado de la vacante, no del rol: RLS (jobs_select_*)
+  // ya decide quién llega a ver esta página.
+  const canRefer = !TERMINAL_JOB_STATUSES.has(job.status);
   const canEdit = canEditJob(profile.role, profile.id, job);
   const canManageCollaborators = ADMIN_ROLES.has(profile.role);
   const [collaborators, addable, auditEntries, admins] = await Promise.all([
@@ -124,7 +125,7 @@ export default async function VacanteDetailPage({
       <div className="mt-10 flex flex-wrap items-center gap-2.5 border-t border-border pt-6">
         <ApprovalActions job={job} role={profile.role} actorId={profile.id} admins={admins} />
         {canRefer && <ReferCandidateDialog jobId={job.id} />}
-        {profile.role !== "colaborador" && !["borrador", "pendiente_aprobacion"].includes(job.status) && (
+        {!["borrador", "pendiente_aprobacion"].includes(job.status) && (
           <Link href={`/vacantes/${job.id}/pipeline`} className="text-sm font-medium text-accent underline">
             Ver pipeline
           </Link>

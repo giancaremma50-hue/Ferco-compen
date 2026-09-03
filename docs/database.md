@@ -2,6 +2,59 @@
 
 **Proyecto**: `V1-motoslam` (ref `cgudnnlcwcotovcslgzu`), reutilizado y limpiado por indicación del usuario — tenía un sistema de vacaciones "PCG" sin uso que se eliminó por completo (tablas, tipos, función y políticas de storage) antes de montar el esquema del ATS.
 
+## El rol `colaborador`, fuera de verdad (post-Fase 19, sin número de fase)
+
+Migración `quitar_colaborador_de_los_defaults`. Cierra el pendiente que las
+dos secciones de abajo dejaron abierto tres veces.
+
+**Lo que se creía y era falso.** Se venía diciendo que el rol "sigue siendo
+invitable porque `invite-form.tsx` lo ofrece". El formulario era el síntoma, no
+la causa: el desplegable se generaba con `Object.keys(ROLE_LABEL)`, y
+`ROLE_LABEL` es un `Record<AppRole, string>` — exhaustivo sobre el enum por
+obligación del tipo. O sea, el rol aparecía solo, y encima como opción por
+defecto.
+
+**La causa real estaba en la base, donde nadie la había buscado:**
+- `profiles.role` DEFAULT `'colaborador'`
+- `profile_invites.role` DEFAULT `'colaborador'`
+- `handle_new_user()` caía a `'colaborador'` cuando alguien entraba sin invitación
+
+Es decir: **todo usuario nuevo nacía con un rol que ya no existía en el
+producto.** Vaciar la tabla de perfiles (migración `remove_colaborador_role`)
+no cambiaba nada de eso. Los tres pasan a `gestor`, que con 3 roles es el piso.
+
+**Y dos huecos del lado del servidor**, que una limpieza de interfaz sola habría
+dejado abiertos: `updateUserRole` y `createInvite` validaban con
+`z.enum(["colaborador", "gestor", "admin", "super_admin"])` — el enum completo
+de Postgres. El desplegable ya no lo ofrecía, pero un POST fabricado a mano sí
+podía asignarlo. Ahora ambos usan `z.enum(ASSIGNABLE_ROLES)`.
+
+**`ASSIGNABLE_ROLES` en `src/lib/auth/role-labels.ts` es la lista blanca** de
+roles que un humano puede elegir, y `DEFAULT_ROLE` el que sale preseleccionado.
+`ROLE_LABEL` se queda exhaustivo (traduce un rol heredado si aparece) pero deja
+de ser la fuente de los desplegables — derivar una lista de opciones de las
+llaves del enum es exactamente cómo un valor retirado vuelve a la interfaz sin
+que nadie lo decida.
+
+**Guardias retiradas al final, no al principio:** los bloqueos de `createJob` y
+`/vacantes/nueva`, más el de `createEmploymentReason`, se quitaron solo después
+de comprobar que ningún camino asigna el rol. Se quitaron una vez antes,
+asumiendo que el rol ya estaba muerto, y fue un bug real encontrado en review.
+
+**Verificado en la base, no asumido:** 0 perfiles con el rol, 0 invitaciones sin
+consumir con el rol, los 2 defaults en `gestor`, `handle_new_user()` cayendo a
+`gestor`, 0 políticas RLS y 0 funciones que lo nombren.
+
+**Efecto secundario que hay que tener presente:** el piso subió. Antes, quien
+entraba sin invitación quedaba `colaborador` (solo vacantes públicas y sus
+propios referidos); ahora queda `gestor` (puede solicitar vacantes). Con
+`organizations.allowed_email_domain` todavía sin definir, cualquier cuenta de
+Google que entre recibe ese nivel. El rol no es lo que cierra esa puerta —
+el dominio corporativo sí, y sigue pendiente (`docs/PENDIENTE.md`, punto 1).
+
+**El valor `colaborador` se queda en el enum `app_role` para siempre.** Postgres
+no permite borrar un valor de un enum.
+
 ## Permisos de 2 niveles + sin competencias + notificaciones por estado (post-Fase 19, sin número de fase)
 
 Plan completo en `docs/superpowers/specs/2026-09-03-ajustes-permisos-agenda-notificaciones-design.md`.
@@ -128,7 +181,7 @@ Plan completo en `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-desi
 
 **Pendiente, explícitamente fuera de este bloque:**
 - ~~Rewire de `canDecideApplication`/`canRateApplication`~~ — hecho en el bloque de arriba.
-- Terminar de sacar el rol `colaborador`: quitarlo de `invite-form.tsx` y limpiar los puntos de la interfaz que todavía preguntan "¿es colaborador?". Mientras siga invitable, las guardias de `createJob` y `/vacantes/nueva` se quedan.
+- ~~Terminar de sacar el rol `colaborador`~~ — hecho, ver el bloque del inicio. La causa no era `invite-form.tsx` sino los defaults de la base.
 - Filtro de plantillas por área del solicitante (paso 5 del plan) — bloqueado en datos reales del cliente (`profiles.department_id`/`job_templates.department_id` sin poblar).
 
 ## Inicio: buzón + embudo + agenda + informe por encargado (post-Fase 19, sin número de fase)

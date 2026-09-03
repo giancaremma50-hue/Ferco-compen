@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSuperAdmin } from "@/lib/auth/dal";
+import { ASSIGNABLE_ROLES } from "@/lib/auth/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import { zodFieldError } from "@/lib/forms/zod-error";
 import type { Database } from "@/lib/supabase/database.types";
@@ -16,7 +17,9 @@ export type InviteActionResult = { error?: string; success?: string; field?: str
 // dos veces, aquí y en RLS, igual que el resto de acciones de usuarios.
 const InviteSchema = z.object({
   email: z.email({ error: "Correo inválido." }).transform((e) => e.toLowerCase()),
-  role: z.enum(["colaborador", "gestor", "admin", "super_admin"], { error: "Elige un rol." }),
+  // Lista blanca, mismo motivo que en users/actions.ts: sin esto se podía
+  // invitar a alguien con un rol que ya no existe en el producto.
+  role: z.enum(ASSIGNABLE_ROLES, { error: "Elige un rol." }),
 });
 
 export async function createInvite(

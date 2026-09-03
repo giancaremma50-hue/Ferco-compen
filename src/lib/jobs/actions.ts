@@ -137,13 +137,10 @@ export async function createJob(
   formData: FormData,
 ): Promise<JobActionResult> {
   const profile = await requireProfile();
-  // colaborador sigue siendo un rol invitable hoy (invite-form.tsx lo ofrece
-  // por defecto) — eliminarlo del todo es un paso aparte, delicado,
-  // pendiente. Hasta entonces sigue sin poder solicitar vacantes.
-  if (profile.role === "colaborador") {
-    return { error: "Tu perfil no puede solicitar vacantes." };
-  }
-
+  // Sin guardia de rol: los 3 roles que existen pueden solicitar una vacante.
+  // Acá vivía un bloqueo para `colaborador`, retirado junto con el rol —
+  // ningún camino de la aplicación lo asigna ya (ASSIGNABLE_ROLES es lista
+  // blanca, y el default de `profiles.role`/`handle_new_user()` es `gestor`).
   const parsed = CreateJobFromTemplateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return zodFieldError(parsed.error, "Revisa los datos del formulario.");

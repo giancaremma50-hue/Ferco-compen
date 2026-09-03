@@ -41,19 +41,30 @@ Competencias se eliminó del proyecto por decisión del usuario. Detalle en
 
 `.env.example` en realidad **nunca llegó al repo** — `.gitignore` tenía `.env*` sin excepción, así que cualquier intento de commitearlo se ignoraba en silencio. En un repo público, eso significa que nadie que clone el proyecto tiene plantilla de qué variables llenar (el `cp .env.example .env.local` del README fallaba). Se agregó `!.env.example` al `.gitignore` y se creó el archivo desde cero, solo con las 6 variables que el código de verdad lee (`process.env.*` grepeado en `src/`) — sin `ALLOWED_EMAIL_DOMAIN` ni `SUPER_ADMIN_EMAIL`, que nunca existieron como variables reales.
 
-### 5. Terminar de sacar el rol `colaborador` de la interfaz
+### 5. ~~Sacar el rol `colaborador`~~ — Resuelto 2026-09-03
 
-Los perfiles ya se migraron a `gestor` y el modelo de permisos nuevo no lo usa,
-pero **el rol sigue siendo invitable**: `invite-form.tsx` lo ofrece (y por
-defecto). Mientras eso siga así, no es un rol muerto — es un rol sin nadie
-asignado, y toda la lógica que lo trata como especial sigue siendo necesaria
-(las guardias de `createJob` y `/vacantes/nueva` se quitaron una vez asumiendo
-lo contrario y fue un bug real, ver `.claude/napkin.md`).
+La causa no era `invite-form.tsx` (como decía este documento tres versiones
+seguidas) sino los defaults de la base: `profiles.role` y
+`profile_invites.role` con DEFAULT `'colaborador'`, y `handle_new_user()`
+cayendo a ese rol para todo login sin invitación — o sea, **todo usuario nuevo
+nacía con un rol que ya no existía en el producto**. Los tres pasan a `gestor`
+(migración `quitar_colaborador_de_los_defaults`).
 
-Falta: quitarlo de `invite-form.tsx` y limpiar los puntos de la interfaz que
-todavía preguntan "¿es colaborador?". Va como paso propio, no colgado de otra
-tarea. El valor `colaborador` se queda en el enum `app_role` para siempre —
-Postgres no permite borrar un valor de un enum.
+De paso se cerraron dos huecos que una limpieza de interfaz sola habría dejado:
+`updateUserRole` y `createInvite` validaban contra el enum COMPLETO de
+Postgres, así que un POST fabricado a mano podía asignar el rol aunque el
+desplegable ya no lo ofreciera. Ahora ambos usan `z.enum(ASSIGNABLE_ROLES)`, la
+lista blanca de `src/lib/auth/role-labels.ts`.
+
+Verificado en la base: 0 perfiles, 0 invitaciones pendientes, los 2 defaults en
+`gestor`, 0 políticas RLS y 0 funciones que lo nombren. Detalle en
+`docs/database.md` y `.claude/napkin.md`.
+
+**Ojo con el efecto secundario:** el piso subió. Quien entra sin invitación
+queda `gestor` (puede solicitar vacantes), no `colaborador` (solo veía vacantes
+públicas y sus referidos). Con el punto 1 de este documento todavía abierto,
+cualquier cuenta de Google recibe ese nivel — eso sube la prioridad del dominio
+corporativo, no la baja.
 
 ### 6. Filtro de plantillas por área — bloqueado en datos del cliente
 
@@ -96,8 +107,9 @@ garantizado. El arreglo es una columna `hired_at` o loguear el evento en
 ## Cómo verificar que sigue al día
 
 1. `select allowed_email_domain from organizations;` — si ya no es `null`, el punto 1 de arriba (dominio corporativo) está resuelto.
-2. `grep -rn "colaborador" src/components/configuracion/invite-form.tsx` — sin
-   resultados significa que el punto 5 está resuelto.
+2. Punto 5 resuelto. Para confirmar que no volvió: `grep -rn "colaborador" src/`
+   solo debe dar `ROLE_LABEL` (exhaustivo a propósito), `database.types.ts`
+   (generado) y comentarios; ningún `z.enum` ni `Object.keys(ROLE_LABEL)`.
 3. `select count(*) from profiles where department_id is not null;` — si es > 0,
    el punto 6 se puede desbloquear.
 4. `.claude/napkin.md` tiene el detalle técnico de cada hallazgo real detrás de estos pendientes.

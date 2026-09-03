@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/dal";
 import { ADMIN_ROLES } from "@/lib/auth/role-labels";
 import { getPublishedJobTemplates } from "@/lib/job-templates/get-job-templates";
@@ -17,10 +16,6 @@ const HELP_STEPS = [
 
 export default async function NuevaVacantePage() {
   const profile = await requireProfile();
-  // colaborador sigue siendo un rol invitable hoy — eliminarlo del todo es
-  // un paso aparte, delicado, pendiente. Hasta entonces sigue sin acceso a
-  // esta pantalla, igual que createJob lo sigue rechazando server-side.
-  if (profile.role === "colaborador") redirect("/vacantes");
   const isAdmin = ADMIN_ROLES.has(profile.role);
 
   const [jobTemplates, admins, members, employmentReasons] = await Promise.all([

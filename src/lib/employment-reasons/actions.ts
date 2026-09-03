@@ -11,16 +11,14 @@ export type EmploymentReasonActionResult = { error?: string; id?: string; label?
  * Alta inline desde el selector de "Motivo de la vacante" al crear una
  * vacante — a diferencia de rejection_reasons (admin-only), cualquier rol
  * que pueda crear una vacante puede agregar un motivo nuevo (RLS:
- * employment_reasons_insert, `auth_role() <> 'colaborador'`). Es una lista
- * operativa, no una política de rechazo.
+ * employment_reasons_insert). Es una lista operativa, no una política de
+ * rechazo, y los 3 roles que existen pueden crear vacantes.
  */
 export async function createEmploymentReason(
   _prevState: EmploymentReasonActionResult | undefined,
   formData: FormData,
 ): Promise<EmploymentReasonActionResult> {
   const profile = await requireProfile();
-  if (profile.role === "colaborador") return { error: "Tu perfil no puede agregar motivos." };
-
   const parsed = EmploymentReasonSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa el motivo." };
 
