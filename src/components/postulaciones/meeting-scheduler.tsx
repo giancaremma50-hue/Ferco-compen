@@ -17,11 +17,15 @@ const STEP_LABELS = ["Fecha", "Hora", "Destinatarios"];
  */
 export function MeetingScheduler({
   applicationId,
+  candidateName,
+  candidateEmail,
   assignable,
   onClose,
   onScheduled,
 }: {
   applicationId: string;
+  candidateName: string;
+  candidateEmail: string;
   assignable: AssignableProfile[];
   onClose: () => void;
   onScheduled: () => void;
@@ -32,6 +36,7 @@ export function MeetingScheduler({
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
   const [duration, setDuration] = useState(30);
   const [location, setLocation] = useState("");
+  const [search, setSearch] = useState("");
 
   const boundAction = scheduleInterview.bind(null, applicationId);
   async function action(prevState: Awaited<ReturnType<typeof boundAction>> | undefined, formData: FormData) {
@@ -51,9 +56,18 @@ export function MeetingScheduler({
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function toggleAttendee(id: string) {
-    setAttendeeIds((prev) => (prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]));
+  function addAttendee(id: string) {
+    setAttendeeIds((prev) => [...prev, id]);
+    setSearch("");
   }
+  function removeAttendee(id: string) {
+    setAttendeeIds((prev) => prev.filter((a) => a !== id));
+  }
+
+  const selectedAttendees = assignable.filter((p) => attendeeIds.includes(p.id));
+  const searchResults = assignable.filter(
+    (p) => !attendeeIds.includes(p.id) && p.display_name.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <div className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-[420px] flex-col border-l border-border bg-card p-5">
@@ -127,16 +141,66 @@ export function MeetingScheduler({
         )}
 
         {step === 2 && (
-          <div className="flex flex-1 flex-col gap-1">
+          <div className="flex flex-1 flex-col gap-3">
             <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Paso 3 de 3 — Destinatarios</span>
-            <p className="mb-1 text-xs text-muted-foreground">Cada uno recibe su propio enlace para agregarlo a su calendario.</p>
-            {assignable.length === 0 && <p className="text-sm text-muted-foreground">Nadie más tiene acceso a esta vacante todavía.</p>}
-            {assignable.map((p) => (
-              <label key={p.id} className="flex items-center gap-2.5 border-b border-border py-2 text-sm">
-                <input type="checkbox" checked={attendeeIds.includes(p.id)} onChange={() => toggleAttendee(p.id)} />
-                {p.display_name}
-              </label>
-            ))}
+            <p className="text-xs text-muted-foreground">Cada uno recibe su propio enlace para agregarlo a su calendario.</p>
+
+            <div className="flex items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1 truncate">
+                <strong>{candidateName}</strong> <span className="text-xs text-muted-foreground">{candidateEmail}</span>
+              </span>
+              <span className="flex-none text-[10px] tracking-[0.06em] text-muted-foreground uppercase">Candidato · automático</span>
+            </div>
+
+            {selectedAttendees.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedAttendees.map((p) => (
+                  <span key={p.id} className="flex items-center gap-1.5 rounded-full border border-border py-1 pl-2.5 pr-1.5 text-xs">
+                    {p.display_name}
+                    <button
+                      type="button"
+                      aria-label={`Quitar a ${p.display_name}`}
+                      onClick={() => removeAttendee(p.id)}
+                      className="flex size-4 items-center justify-center rounded-full hover:bg-muted"
+                    >
+                      <X className="size-3" aria-hidden />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              // Enter en este campo no debe enviar el formulario — el botón
+              // "Confirmar" queda habilitado en cuanto hay 1 destinatario, y
+              // sin esto, Enter mientras se busca a un segundo colega agenda
+              // la reunión de una vez (con menos destinatarios de los que el
+              // usuario todavía quería agregar), sin pasar por "Confirmar".
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              placeholder="Buscar colega por nombre…"
+              className="h-9 rounded-md border border-border bg-background px-2.5 text-sm"
+            />
+            {assignable.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nadie más tiene acceso a esta vacante todavía.</p>
+            ) : (
+              <div className="flex flex-col gap-0.5 overflow-y-auto" style={{ maxHeight: 160 }}>
+                {searchResults.length === 0 && <p className="px-1 text-xs text-muted-foreground">Sin resultados.</p>}
+                {searchResults.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addAttendee(p.id)}
+                    className="rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-muted/60"
+                  >
+                    {p.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

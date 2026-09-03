@@ -4,17 +4,22 @@ import { useRef } from "react";
 import Link from "next/link";
 import { Info, X } from "lucide-react";
 import type { JobDetail } from "@/lib/jobs/get-jobs";
+import type { JobCollaboratorRow } from "@/lib/jobs/get-collaborators";
 import { JobStatusBadge } from "./job-status-badge";
 import { WORK_MODE_LABEL, EMPLOYMENT_TYPE_LABEL } from "@/lib/jobs/schema";
 import type { WorkMode, EmploymentType } from "@/lib/jobs/schema";
+import { PERMISSION_LABEL } from "@/lib/jobs/collaborators-schema";
 
 /**
  * Resumen de la vacante, accesible desde el pipeline — el detalle completo
- * (colaboradores, competencias, aprobar/editar, bitácora) se quedó en
- * /vacantes/[id], un clic más lejos ("Ver detalle completo"), no duplicado
- * acá: nada se perdió, solo dejó de ser la pantalla principal.
+ * (competencias, aprobar/editar, bitácora, administrar colaboradores) se
+ * quedó en /vacantes/[id], un clic más lejos ("Ver detalle completo"), no
+ * duplicado acá: nada se perdió, solo dejó de ser la pantalla principal. El
+ * equipo de reclutamiento (encargado + colaboradores) sí se muestra acá,
+ * de solo lectura, porque es lo primero que se pregunta al abrir el
+ * pipeline — no vale la pena un clic más para verlo.
  */
-export function JobInfoModal({ job }: { job: JobDetail }) {
+export function JobInfoModal({ job, collaborators }: { job: JobDetail; collaborators: JobCollaboratorRow[] }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   return (
@@ -72,6 +77,24 @@ export function JobInfoModal({ job }: { job: JobDetail }) {
           <div className="mt-5">
             <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Descripción</p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{job.description}</p>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Equipo de reclutamiento</p>
+            <div className="mt-2 flex items-center justify-between gap-3 border-b border-border py-2 text-sm">
+              <span>{job.ownerName ?? "Sin encargado asignado"}</span>
+              <span className="text-xs text-muted-foreground">Encargado</span>
+            </div>
+            {collaborators.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Sin colaboradores agregados todavía.</p>
+            ) : (
+              collaborators.map((c) => (
+                <div key={c.id} className="flex items-center justify-between gap-3 border-b border-border py-2 text-sm">
+                  <span>{c.profile?.display_name ?? "—"}</span>
+                  <span className="text-xs text-muted-foreground">{PERMISSION_LABEL[c.permission]}</span>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="mt-5">

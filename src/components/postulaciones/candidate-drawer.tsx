@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { formatDistanceStrict } from "date-fns";
+import { es } from "date-fns/locale";
 import { X, ArrowRight, CalendarPlus, NotebookPen, ListChecks, Mail } from "lucide-react";
 import { getApplicationDrawerData, getCvViewUrl } from "@/lib/applications/actions";
 import type { DrawerData } from "@/lib/applications/get-drawer-data";
-import type { KanbanStage } from "@/lib/applications/get-applications";
+import type { ApplicationEvent, KanbanStage } from "@/lib/applications/get-applications";
 import { notifyError } from "@/lib/notifications/toast";
 import { CandidateActionBar, type CandidateAction } from "./candidate-action-bar";
 import { RejectDialog, type RejectDialogHandle } from "./reject-dialog";
@@ -20,7 +22,7 @@ import { ApplicationTimeline } from "./application-timeline";
 import { MeetingScheduler } from "./meeting-scheduler";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Tab = "info" | "seguimiento";
+type Tab = "info" | "seguimiento" | "bitacora";
 type Panel = null | "tarea" | "mensaje" | "reunion";
 
 export function CandidateDrawer({
@@ -166,6 +168,13 @@ export function CandidateDrawer({
                 >
                   Seguimientos
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("bitacora")}
+                  className={`pb-2.5 text-[13px] ${tab === "bitacora" ? "border-b-2 border-accent font-medium text-foreground" : "text-muted-foreground"}`}
+                >
+                  Bitácora
+                </button>
               </div>
             </>
           )}
@@ -181,8 +190,10 @@ export function CandidateDrawer({
             <p className="text-sm text-muted-foreground">No se pudo cargar esta postulación.</p>
           ) : tab === "info" ? (
             <InfoView data={data} />
-          ) : (
+          ) : tab === "seguimiento" ? (
             <SeguimientoView data={data} applicationId={applicationId!} />
+          ) : (
+            <BitacoraView events={data.application.events} stages={stages} />
           )}
 
           {data && panel === "tarea" && (
@@ -233,6 +244,8 @@ export function CandidateDrawer({
       {data && panel === "reunion" && (
         <MeetingScheduler
           applicationId={applicationId!}
+          candidateName={data.application.candidateName}
+          candidateEmail={data.application.candidateEmail}
           assignable={data.assignable}
           onClose={() => setPanel(null)}
           onScheduled={() => {
@@ -357,6 +370,48 @@ function SeguimientoView({ data, applicationId }: { data: DrawerData; applicatio
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Reconstruida en el cliente a partir de `application_events` — no hace
+ * falta una tabla ni un query nuevo: "postulacion_creada" ya marca la
+ * entrada a la primera etapa (siempre `stages[0]`, la postulación nunca
+ * nace en otra) y cada "etapa_cambiada" ya trae `payload.to` (id de la
+ * etapa nueva). La duración de cada etapa es la resta entre el evento que
+ * entra y el siguiente — el tramo actual usa "ahora" y se marca "en curso".
+ */
+function BitacoraView({ events, stages }: { events: ApplicationEvent[]; stages: KanbanStage[] }) {
+  const stageName = (id: unknown) => stages.find((s) => s.id === id)?.name ?? "Etapa eliminada";
+
+  const movements = events
+    .filter((e) => e.type === "postulacion_creada" || e.type === "etapa_cambiada")
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  if (movements.length === 0) return <p className="text-sm text-muted-foreground">Sin movimientos todavía.</p>;
+
+  return (
+    <ol className="flex flex-col gap-3">
+      {movements.map((e, i) => {
+        const enteredStage = e.type === "postulacion_creada" ? (stages[0]?.name ?? "Postulado") : stageName(e.payload.to);
+        const next = movements[i + 1];
+        const start = new Date(e.createdAt);
+        const end = next ? new Date(next.createdAt) : new Date();
+        const duration = formatDistanceStrict(start, end, { locale: es });
+
+        return (
+          <li key={e.id} className="border-l-2 border-border pl-3 text-sm">
+            <p>
+              Entró a <strong>{enteredStage}</strong>
+            </p>
+            <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+              {e.actorName ?? "Sistema"} · {start.toLocaleString("es")} · {duration} en esta etapa{!next && " (en curso)"}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth/dal";
 import { getJobById } from "@/lib/jobs/get-jobs";
+import { getJobCollaborators } from "@/lib/jobs/get-collaborators";
 import { getKanbanData } from "@/lib/applications/get-applications";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { JobInfoModal } from "@/components/vacantes/job-info-modal";
@@ -11,7 +12,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ id: s
   const job = await getJobById(id);
   if (!job) notFound();
 
-  const data = await getKanbanData(id);
+  const [data, collaborators] = await Promise.all([getKanbanData(id), getJobCollaborators(id)]);
 
   return (
     // Se sale del ancho centrado de <main> (max-w-6xl) a propósito — el
@@ -26,7 +27,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ id: s
           <h1 className="font-serif text-[28px]">{job.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Pipeline · {data.cards.length} postulaciones activas</p>
         </div>
-        <JobInfoModal job={job} />
+        <JobInfoModal job={job} collaborators={collaborators} />
       </div>
       <div className="mt-6 min-h-0 flex-1">
         <KanbanBoard initialData={data} jobTitle={job.title} />

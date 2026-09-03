@@ -12,7 +12,7 @@ export function KanbanColumn({
   onOpenCard: (applicationId: string) => void;
 }) {
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col">
+    <div className="flex h-full min-w-[240px] max-w-[420px] flex-1 flex-col">
       <div className="flex items-center justify-between px-1 pb-2">
         <p className="text-[11px] tracking-[0.1em] text-muted-foreground uppercase">{stage.name}</p>
         <span className="text-xs tabular-nums text-muted-foreground">{cards.length}</span>
