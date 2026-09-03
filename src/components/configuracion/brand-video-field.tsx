@@ -83,11 +83,15 @@ export function BrandVideoField({
   return (
     <div className="flex flex-col gap-2">
       <label className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">{label}</label>
-      <div className="flex items-center gap-3.5 rounded-md border border-dashed bg-background p-3.5">
-        <div className="flex h-11 w-[62px] flex-none items-center justify-center border border-border bg-card">
-          <Video className="size-4 text-muted-foreground" aria-hidden />
+      {/* Mismo patrón que BrandImageField: flex-col en celular, la fila
+          única de escritorio no cabe en un teléfono. */}
+      <div className="flex flex-col gap-3 rounded-md border border-dashed bg-background p-3.5 sm:flex-row sm:items-center sm:gap-3.5">
+        <div className="flex min-w-0 items-center gap-3.5 sm:flex-1">
+          <div className="flex h-11 w-[62px] flex-none items-center justify-center border border-border bg-card">
+            <Video className="size-4 text-muted-foreground" aria-hidden />
+          </div>
+          <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">{hint}</p>
         </div>
-        <p className="flex-1 text-xs leading-snug text-muted-foreground">{hint}</p>
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -95,19 +99,19 @@ export function BrandVideoField({
             accept="video/mp4,video/webm"
             onChange={handleUpload}
             disabled={pending}
-            className="w-32 text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs"
+            className="min-w-0 flex-1 text-xs file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-xs sm:w-32 sm:flex-none"
           />
-          {pending && <span className="text-xs text-muted-foreground">Subiendo…</span>}
+          {pending && <span className="flex-none text-xs text-muted-foreground">Subiendo…</span>}
+          {currentUrl && (
+            <DeleteButton
+              iconOnly
+              itemLabel={label.toLowerCase()}
+              onDelete={() => removeBrandVideo(field)}
+              successMessage={`${label} eliminado`}
+              confirmDescription="Se quitará de la plataforma hasta que subas otro."
+            />
+          )}
         </div>
-        {currentUrl && (
-          <DeleteButton
-            iconOnly
-            itemLabel={label.toLowerCase()}
-            onDelete={() => removeBrandVideo(field)}
-            successMessage={`${label} eliminado`}
-            confirmDescription="Se quitará de la plataforma hasta que subas otro."
-          />
-        )}
       </div>
     </div>
   );
