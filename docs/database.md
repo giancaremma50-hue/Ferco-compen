@@ -2,6 +2,24 @@
 
 **Proyecto**: `V1-motoslam` (ref `cgudnnlcwcotovcslgzu`), reutilizado y limpiado por indicación del usuario — tenía un sistema de vacaciones "PCG" sin uso que se eliminó por completo (tablas, tipos, función y políticas de storage) antes de montar el esquema del ATS.
 
+## Inicio: buzón + embudo + agenda + informe por encargado (post-Fase 19, sin número de fase)
+
+Reemplaza el placeholder de `/inicio` ("El tablero llega en la siguiente fase"). Primer tramo (6 y 7) del plan de flujo de solicitud de vacante — ver `docs/superpowers/specs/2026-09-03-flujo-solicitud-vacante-design.md` para el resto (estado `aceptada`, visibilidad de 3 niveles, eliminar `colaborador`, filtro de plantillas por área — todavía no construidos, cada uno necesita su propia migración).
+
+**Sin tablas ni vistas nuevas.** Cuatro archivos en `src/lib/dashboard/`, cada uno se apoya en RLS para el alcance (ningún query pide `organization_id`/rol al cliente):
+- `get-inbox.ts` — `getPendingApprovals()` (RH: `jobs` en `pendiente_aprobacion`, org completa vía `jobs_select_internal`) y `getMyRequests(profileId)` (gestor: lo que él mismo solicitó).
+- `get-funnel.ts` — KPIs + candidatos por `job_stages.type`. Excluye a propósito las postulaciones en una etapa tipo `descartado` aunque su `status` siga `activa` (arrastrar al kanban no rechaza formalmente, `moveApplicationStage` no toca `status`) — si no, el KPI "candidatos activos" y la suma de las barras del embudo no cuadran.
+- `get-agenda.ts` — agenda PERSONAL de quien mira Inicio (sus entrevistas de hoy vía `interview_attendees`, sus tareas pendientes vía `candidate_tasks.assigned_to`), igual para cualquier rol.
+- `get-recruiter-report.ts` — solo admin/super_admin (gate del caller, no de RLS aparte). Agrupa `jobs`+`applications` en memoria por `owner_id`, acotado a los 300 jobs más recientes (`JOBS_LOOKBACK_LIMIT`) para no traer el historial completo de la organización en cada carga.
+
+**Reloj de la organización, no del servidor.** `src/lib/dashboard/org-clock.ts` calcula "hoy" y "este mes" con un offset fijo UTC-6 — no es una suposición: los 4 países que opera la plataforma (`src/lib/geo/countries.ts`: Guatemala, El Salvador, Honduras, Nicaragua) están todos en UTC-6 todo el año, sin horario de verano. Mismo bug que ya existía y se había resuelto para `today-label.tsx` (cálculo en cliente) — acá tenía que resolverse del lado del servidor porque el rango alimenta un query, no solo un texto. Se rompe si la organización opera fuera de Centroamérica; en ese caso hace falta una columna de zona horaria real, no ajustar el número.
+
+**`avgDaysToHire`/`hiresThisMonth` son una aproximación.** `applications` no guarda cuándo pasó a `contratada` (sin columna ni evento para eso) — se usa `updated_at` como sustituto. Preciso casi siempre, no garantizado; la fecha exacta necesita una columna nueva o un evento `contratada` en `application_events`, pendiente junto con el resto de las migraciones del flujo de solicitud.
+
+**`candidate_tasks` no tiene fecha de vencimiento.** La agenda muestra tareas pendientes (`is_done = false`) más antiguas primero, nunca "vencidas" — esa palabra prometería un límite que el esquema no guarda.
+
+**Rol `colaborador` sin embudo ni buzón.** Su alcance de RLS difiere entre tablas (`jobs_select` le deja ver todas las vacantes públicas abiertas de la organización; `applications_select` lo limita a lo que él mismo refirió) — mostrarle "vacantes abiertas: 8" junto a "candidatos activos: 0" en el mismo panel lee como roto, no como vacío. Ve solo su agenda personal (correcta para cualquier rol) y un enlace a `/vacantes`. Se resuelve mejor cuando el rol se elimine (fase pendiente del plan de arriba).
+
 ## Cómo se generó
 
 Todo el esquema vive como migraciones aplicadas vía el MCP de Supabase (`apply_migration`), no como archivos `.sql` en el repo — Supabase es la fuente de verdad y `list_migrations` desde el MCP reconstruye el historial completo si hace falta. Lo que sí vive en el repo es lo que el código de Next.js necesita:
