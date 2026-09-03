@@ -44,7 +44,10 @@ export default async function UsuariosPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-[1fr_180px_120px] gap-4 border-b border-border px-1 py-2.5 text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
+              {/* Encabezado de columnas solo tiene sentido con la fila de 3
+                  columnas de escritorio — en celular las filas se apilan
+                  (ver UserRow) y este encabezado no describiría nada. */}
+              <div className="hidden gap-4 border-b border-border px-1 py-2.5 text-[11px] tracking-[0.08em] text-muted-foreground uppercase sm:grid sm:grid-cols-[1fr_180px_120px]">
                 <span>Persona</span>
                 <span>Rol</span>
                 <span>Estado</span>

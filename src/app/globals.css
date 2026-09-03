@@ -114,8 +114,18 @@
     @apply border-border;
   }
 
+  /* Red de seguridad: ningún elemento individual que se pase del ancho de
+     viewport (una tabla, un grid de columnas fijas mal calculado, un menú)
+     debe poder arrastrar TODA la página a scroll horizontal en celular. Esto
+     no reemplaza hacer cada componente responsivo — solo evita que un
+     descuido futuro rompa la app entera en vez de quedar contenido. */
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: hidden;
   }
 
   /* Cifras alineadas en toda métrica y tabla. */

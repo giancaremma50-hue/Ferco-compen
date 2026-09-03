@@ -23,32 +23,35 @@ export function AppHeader({
   const initials = getInitials(profile.display_name);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6 lg:px-10">
-      <div className="flex items-center gap-2.5">
+    <header className="flex h-16 items-center justify-between gap-3 border-b border-border bg-card px-4 sm:px-6 lg:px-10">
+      <div className="flex min-w-0 items-center gap-2.5">
         {organization.logo_url ? (
-          <Image src={organization.logo_url} alt="" width={24} height={24} className="object-contain" />
+          <Image src={organization.logo_url} alt="" width={24} height={24} className="shrink-0 object-contain" />
         ) : (
-          <div className="flex size-6 items-center justify-center border border-foreground">
+          <div className="flex size-6 flex-none items-center justify-center border border-foreground">
             <span className="font-serif text-[15px] leading-none">
               {organization.platform_name.charAt(0)}
             </span>
           </div>
         )}
-        <span className="font-serif text-lg">{organization.platform_name}</span>
+        {/* truncate + min-w-0: en un teléfono angosto un nombre de
+            plataforma largo no debe empujar la campana/avatar fuera de
+            pantalla — se corta con "…" en vez de forzar scroll horizontal. */}
+        <span className="truncate font-serif text-lg">{organization.platform_name}</span>
         {profile.role === "super_admin" && (
-          <span className="ml-2.5 inline-flex h-[22px] items-center rounded-sm border border-accent px-2 text-[11px] text-accent">
+          <span className="ml-2.5 hidden h-[22px] flex-none items-center rounded-sm border border-accent px-2 text-[11px] text-accent sm:inline-flex">
             Super admin
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-none items-center gap-2 sm:gap-3">
         <NotificationBell
           profileId={profile.id}
           initialItems={initialNotifications}
           initialUnreadCount={initialUnreadCount}
         />
-        <span className="text-xs text-muted-foreground">{ROLE_LABEL[profile.role]}</span>
+        <span className="hidden text-xs text-muted-foreground md:inline">{ROLE_LABEL[profile.role]}</span>
         <Link href="/mi-cuenta" data-tour="mi-cuenta" className="flex items-center gap-2">
           {profile.avatar_url ? (
             <Image
@@ -59,11 +62,15 @@ export function AppHeader({
               className="size-[30px] rounded-full object-cover"
             />
           ) : (
-            <div className="flex size-[30px] items-center justify-center rounded-full bg-primary text-[12px] font-medium text-primary-foreground">
+            <div className="flex size-[30px] flex-none items-center justify-center rounded-full bg-primary text-[12px] font-medium text-primary-foreground">
               {initials}
             </div>
           )}
-          <span className="text-[13px]">{profile.display_name}</span>
+          {/* Nombre del usuario: solo desde sm — en celular el avatar solo
+              (con su alt/aria implícito vía el link a "Mi cuenta") ya es
+              suficiente affordance, y liberar ese espacio es lo que evita
+              que esta fila se desborde. */}
+          <span className="hidden text-[13px] sm:inline">{profile.display_name}</span>
         </Link>
         <form action={signOut}>
           <ActionButton

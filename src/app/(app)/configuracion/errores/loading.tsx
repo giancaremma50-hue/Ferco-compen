@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="grid grid-cols-[380px_1fr] gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
       <div className="border border-border bg-card p-4">
         {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="mb-3 h-20 w-full" />
