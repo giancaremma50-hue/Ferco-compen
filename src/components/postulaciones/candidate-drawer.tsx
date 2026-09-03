@@ -193,7 +193,11 @@ export function CandidateDrawer({
           ) : tab === "seguimiento" ? (
             <SeguimientoView data={data} applicationId={applicationId!} />
           ) : (
-            <BitacoraView events={data.application.events} stages={stages} />
+            <BitacoraView
+              events={data.application.events}
+              stages={stages}
+              isActive={data.application.status === "activa"}
+            />
           )}
 
           {data && panel === "tarea" && (
@@ -285,7 +289,7 @@ function InfoView({ data }: { data: DrawerData }) {
 
       <div>
         <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Contacto</p>
-        <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
           <Field k="Correo" v={application.candidateEmail} />
           <Field k="Teléfono" v={application.candidatePhone ?? "—"} />
           <Field k="Dirección" v={application.candidateAddress ?? "—"} />
@@ -305,7 +309,7 @@ function InfoView({ data }: { data: DrawerData }) {
       {data.answers.length > 0 && (
         <div>
           <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Respuestas de la postulación</p>
-          <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
             {data.answers.map((a) => (
               <Field key={a.questionId} k={a.prompt} v={a.answerText ?? a.selectedOptionLabel ?? "—"} />
             ))}
@@ -347,7 +351,7 @@ function jobTitleFallback(application: DrawerData["application"]): string {
 
 function SeguimientoView({ data, applicationId }: { data: DrawerData; applicationId: string }) {
   return (
-    <div className="grid grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
       <div>
         <p className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">Candidato</p>
         <div className="mt-2 flex flex-col gap-2.5 text-sm">
@@ -381,21 +385,42 @@ function SeguimientoView({ data, applicationId }: { data: DrawerData; applicatio
  * etapa nueva). La duración de cada etapa es la resta entre el evento que
  * entra y el siguiente — el tramo actual usa "ahora" y se marca "en curso".
  */
-function BitacoraView({ events, stages }: { events: ApplicationEvent[]; stages: KanbanStage[] }) {
+function BitacoraView({
+  events,
+  stages,
+  isActive,
+}: {
+  events: ApplicationEvent[];
+  stages: KanbanStage[];
+  // Cuando la postulación ya no está activa (contratada/rechazada/retirada)
+  // el último tramo no sigue corriendo — hireApplication() no inserta un
+  // evento propio, así que no hay una marca de tiempo real de cierre para
+  // calcular su duración. Mostrarla contra "ahora" (como si "en curso"
+  // siguiera vigente) sería una cifra que crece sola y engaña al
+  // reclutador; mejor no inventar una duración que no se puede sustentar.
+  isActive: boolean;
+}) {
   const stageName = (id: unknown) => stages.find((s) => s.id === id)?.name ?? "Etapa eliminada";
 
-  const movements = events
-    .filter((e) => e.type === "postulacion_creada" || e.type === "etapa_cambiada")
-    .slice()
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  // getApplicationDetail ya trae `events` ordenados por created_at
+  // ascendente — filter() preserva ese orden, así que no hace falta
+  // volver a ordenar acá.
+  const movements = events.filter((e) => e.type === "postulacion_creada" || e.type === "etapa_cambiada");
 
-  if (movements.length === 0) return <p className="text-sm text-muted-foreground">Sin movimientos todavía.</p>;
+  if (movements.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Sin movimientos todavía — aparecerán aquí en cuanto muevas esta postulación de etapa en el pipeline.
+      </p>
+    );
+  }
 
   return (
     <ol className="flex flex-col gap-3">
       {movements.map((e, i) => {
         const enteredStage = e.type === "postulacion_creada" ? (stages[0]?.name ?? "Postulado") : stageName(e.payload.to);
         const next = movements[i + 1];
+        const isLastAndClosed = !next && !isActive;
         const start = new Date(e.createdAt);
         const end = next ? new Date(next.createdAt) : new Date();
         const duration = formatDistanceStrict(start, end, { locale: es });
@@ -406,7 +431,8 @@ function BitacoraView({ events, stages }: { events: ApplicationEvent[]; stages: 
               Entró a <strong>{enteredStage}</strong>
             </p>
             <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-              {e.actorName ?? "Sistema"} · {start.toLocaleString("es")} · {duration} en esta etapa{!next && " (en curso)"}
+              {e.actorName ?? "Sistema"} · {start.toLocaleString("es")}
+              {!isLastAndClosed && ` · ${duration} en esta etapa${!next ? " (en curso)" : ""}`}
             </p>
           </li>
         );

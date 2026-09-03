@@ -76,7 +76,7 @@ export function WizardStep1Form({
           ))}
         </select>
       </label>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">País</span>
           <input name="country" required maxLength={60} defaultValue={initialValues?.country} className={FIELD_CLASS} />
@@ -86,7 +86,7 @@ export function WizardStep1Form({
           <input name="location" required maxLength={120} defaultValue={initialValues?.location} className={FIELD_CLASS} />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">Modalidad</span>
           <LabelSelect

@@ -24,7 +24,7 @@ export default async function PlantillasVacantePage({
       {borrador && <NotifyOnMount message="Guardada como borrador" />}
       {publicada && <NotifyOnMount message="Plantilla publicada" />}
       {confidencial && <NotifyOnMount message="Guardado — como no la creaste vos, ya no te aparece" />}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-serif text-2xl">Plantillas de puesto</h2>
           <p className="mt-1 text-[13px] text-muted-foreground">

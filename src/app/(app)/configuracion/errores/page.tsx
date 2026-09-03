@@ -46,12 +46,12 @@ export default async function CentroErroresPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="font-serif text-[28px] leading-tight">Centro de errores</h2>
           <p className="mt-1 text-sm text-muted-foreground">Lo que se rompió, quién lo vivió, y la conversación para resolverlo.</p>
         </div>
-        <div className="flex items-center gap-6 text-right">
+        <div className="flex items-center gap-6 sm:text-right">
           <div>
             <p className="text-[11px] tracking-[0.13em] text-muted-foreground uppercase">Sin abrir</p>
             <p className="font-serif text-[26px] tabular-nums text-destructive">{sinAbrir}</p>
@@ -67,7 +67,10 @@ export default async function CentroErroresPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-[380px_1fr] gap-6">
+      {/* Apiladas en celular (lista completa, después el detalle del
+          seleccionado) — el panel de 380px fijo solo tiene sentido con
+          espacio de escritorio de sobra. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
         <div className="border border-border bg-card">
           <div className="flex gap-1.5 border-b border-border p-3">
             {[
@@ -149,7 +152,7 @@ export default async function CentroErroresPage({
                   <p className="mb-3 text-[11px] tracking-[0.13em] text-muted-foreground uppercase">
                     Contexto capturado automáticamente
                   </p>
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 text-xs sm:grid-cols-2">
                     {selected.url && (
                       <div className="flex gap-3">
                         <span className="w-16 text-muted-foreground">Ruta</span>

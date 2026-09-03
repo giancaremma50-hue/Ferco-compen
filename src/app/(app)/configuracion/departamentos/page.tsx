@@ -14,7 +14,7 @@ export default async function DepartamentosPage() {
 
   return (
     <section className="border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border p-5">
+      <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-serif text-2xl">Departamentos</h2>
           <p className="mt-1 text-[13px] text-muted-foreground">{departments.length} departamentos.</p>
@@ -31,18 +31,24 @@ export default async function DepartamentosPage() {
         </p>
       ) : (
         <div className="px-5 pb-5">
-          <div className="grid grid-cols-[1fr_140px_180px_160px] gap-4 border-b border-border px-1 py-2.5 text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
+          {/* Encabezado de columnas solo desde `sm` — en celular cada
+              departamento se apila en una tarjeta (nombre, país,
+              responsable, acciones), no en fila de tabla. */}
+          <div className="hidden gap-4 border-b border-border px-1 py-2.5 text-[11px] tracking-[0.08em] text-muted-foreground uppercase sm:grid sm:grid-cols-[1fr_140px_180px_160px]">
             <span>Nombre</span>
             <span>País</span>
             <span>Responsable</span>
             <span />
           </div>
           {departments.map((d) => (
-            <div key={d.id} className="grid grid-cols-[1fr_140px_180px_160px] items-center gap-4 border-b border-border/60 px-1 py-3 text-sm">
+            <div
+              key={d.id}
+              className="grid grid-cols-1 gap-1.5 border-b border-border/60 px-1 py-3 text-sm sm:grid-cols-[1fr_140px_180px_160px] sm:items-center sm:gap-4"
+            >
               <span>{d.name}</span>
               <span className="text-muted-foreground">{d.country ?? "—"}</span>
               <span className="text-muted-foreground">{d.head?.display_name ?? "—"}</span>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-start gap-2 sm:justify-end">
                 <DepartmentDialog
                   department={d}
                   profiles={profiles}
