@@ -18,6 +18,45 @@ Competencias se eliminó del proyecto por decisión del usuario. Detalle en
 
 ## Pendiente real
 
+### 0. BLOQUEANTE — el portal no puede recibir postulaciones EN PRODUCCIÓN
+
+El bug de enrutamiento (`/api/postular` fuera de `PUBLIC_PATHS`) está corregido
+y desplegado (`039dda4`, deployment `dpl_865f9o…`, READY). Pero en producción la
+postulación **sigue fallando, por otra causa: las credenciales**.
+
+Medido en `https://demo-atrio.vercel.app`:
+
+| Cliente | Misma vacante, misma base | Resultado |
+|---|---|---|
+| anón/sesión — `/empleos/analista-operaciones-demo-62b930` | la lee | página y casilla renderizan |
+| admin/service role — `POST /api/postular` | **no la encuentra** | `404 "Esta vacante ya no está disponible."` |
+
+La vacante está `abierta` + `publica` en la base, y `/empleos` la lista. El
+cliente admin salta RLS, así que la única variable que difiere entre ambos es
+**`SUPABASE_SERVICE_ROLE_KEY` en las variables de entorno de Vercel**: si es
+inválida o pertenece a otro proyecto, PostgREST responde 401, `data` vuelve
+`null` y la ruta lo reportaba como "vacante no disponible".
+
+**Cómo confirmarlo y arreglarlo (no lo puedo hacer desde acá, no puedo leer las
+variables de Vercel):**
+1. Vercel → proyecto `demo-ats` → Settings → Environment Variables.
+2. Comparar `SUPABASE_SERVICE_ROLE_KEY` contra Supabase → proyecto
+   `cgudnnlcwcotovcslgzu` → Settings → API → `service_role`. **Ojo:** este
+   proyecto de Supabase se reutilizó de un sistema anterior, así que es
+   plausible que ahí siga una key de otro proyecto.
+3. Verificar también `NEXT_PUBLIC_SUPABASE_URL` = `https://cgudnnlcwcotovcslgzu.supabase.co`,
+   y que `EMAIL_FROM` y `RESEND_API_KEY` tengan valor (sin ellos el correo de
+   confirmación al candidato falla en silencio, por `notifyBestEffort`).
+4. Redeploy y comprobar: un POST a `/api/postular` sin la casilla de
+   consentimiento debe devolver
+   `400 {"error":"Tienes que aceptar la política de privacidad para postular."}`.
+   Si devuelve `503`, la key sigue mal (ese código se agregó justo para
+   distinguir los dos casos). Si devuelve `404`, revisar el estado de la
+   vacante.
+
+Mientras esto no se resuelva, **ninguna persona externa puede postular**, aunque
+el portal se vea perfecto.
+
 ### 1. Dominio corporativo aún sin definir
 
 `organizations.allowed_email_domain` sigue vacío. Mientras tanto, **cualquier cuenta de Google puede entrar** a la app — no solo las del dominio de la empresa. El mecanismo de restricción y su lista de excepciones (`profile_invites`, para invitar puntualmente a alguien fuera del dominio) ya están construidos y activos en `src/app/auth/callback/route.ts`; falta solo:

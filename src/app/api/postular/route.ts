@@ -55,11 +55,29 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: job } = await admin
+  const { data: job, error: jobError } = await admin
     .from("jobs")
     .select("id, organization_id, status, visibility, title, owner_id, requested_by, candidacy_fields")
     .eq("id", jobIdResult.data)
     .single();
+
+  // El error se distingue de "no existe" a propósito. Antes se descartaba, y
+  // eso escondió un fallo real de configuración: con una service role key
+  // inválida en el entorno, PostgREST responde 401, `data` vuelve null, y el
+  // candidato recibía "Esta vacante ya no está disponible" — un mensaje que
+  // culpa a la vacante por un problema de credenciales del servidor, y que no
+  // deja rastro para diagnosticarlo. PGRST116 = 0 filas, ése sí es "no existe".
+  if (jobError && jobError.code !== "PGRST116") {
+    console.error("[postular] no se pudo leer la vacante con el cliente admin", {
+      jobId: jobIdResult.data,
+      code: jobError.code,
+      message: jobError.message,
+    });
+    return NextResponse.json(
+      { error: "No pudimos procesar tu postulación en este momento. Inténtalo más tarde." },
+      { status: 503 },
+    );
+  }
 
   if (!job || job.status !== "abierta" || job.visibility !== "publica") {
     return NextResponse.json({ error: "Esta vacante ya no está disponible." }, { status: 404 });
