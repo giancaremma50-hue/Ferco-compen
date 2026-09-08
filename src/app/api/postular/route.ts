@@ -270,11 +270,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // El CV nuevo pasa a ser el vigente en el perfil; si ya tenía uno de una
-  // postulación anterior, queda igual en attachments (no se borra). Best
-  // effort: si esto falla, la postulación y los adjuntos de abajo ya
-  // quedaron bien registrados.
-  if (cvPath) {
+  // Solo se fija el CV del PERFIL cuando el candidato se acaba de crear en
+  // esta misma postulación. Antes se hacía siempre, y al volverse esta ruta
+  // alcanzable por anónimos (PUBLIC_PATHS) eso pasó a ser explotable: la
+  // única prueba de identidad que pide el formulario es escribir un correo,
+  // así que cualquiera que conociera el correo de un candidato ya registrado
+  // podía sobrescribir el CV de SU perfil — el que el reclutador abre en
+  // todos sus procesos, incluidos los de vacantes confidenciales a las que
+  // el atacante nunca tuvo acceso. Hallado en /security-review.
+  //
+  // El CV de ESTA postulación no se pierde: queda en `attachments` ligado a
+  // su `application_id`, que es el vínculo correcto. Para que un candidato
+  // recurrente actualice el CV de su perfil hace falta verificar el correo
+  // (enlace de confirmación), no basta con escribirlo en el formulario.
+  // Best effort: si esto falla, la postulación y los adjuntos ya quedaron.
+  if (cvPath && isNewCandidate) {
     await admin.from("candidates").update({ cv_file_path: cvPath }).eq("id", candidateId);
   }
 

@@ -188,7 +188,29 @@ anterior de este proyecto de Supabase reutilizado. Ningún código del ATS
 referencia ese bucket. Falta que el usuario diga si el archivo sirve; si no,
 borrar objeto y bucket.
 
-### 12. Verificar el logo de Google contra sus guidelines
+### 12. DECISIÓN PENDIENTE — el 409 de duplicado es un oráculo de enumeración
+
+Hallado por `/security-review`. `POST /api/postular` responde `409 "Ya tienes una
+postulación registrada para esta vacante."` **antes de escribir nada**, y la ruta
+ya es anónima. Eso permite confirmar, correo por correo, si una persona postuló a
+una vacante concreta — el dato "está buscando trabajo", que es justo el sensible
+en un ATS. Contradice la sección 8 de la propia política de privacidad.
+
+Mitigante real: cada intento fallido SÍ crea candidato + postulación, así que un
+barrido deja rastro visible para el reclutador. Y hace falta el `job_id` (público)
+más adivinar correos.
+
+No se corrigió porque el arreglo cuesta UX y es decisión de producto:
+
+- **Opción A** — responder siempre `201` con el mismo texto y dejar que el
+  `UNIQUE(job_id, candidate_id)` sea la defensa. Quita el oráculo, pero al
+  candidato legítimo se le dice "enviada" cuando no pasó nada.
+- **Opción B** — responder igual, y avisar "ya habías postulado" **por correo** a
+  esa dirección. Quita el oráculo y conserva el aviso, solo que lo recibe quien
+  de verdad tiene ese buzón. Cuesta una plantilla de correo nueva.
+- **Opción C** — dejarlo como está, asumiendo el mitigante.
+
+### 13. Verificar el logo de Google contra sus guidelines
 
 `src/app/login/page.tsx:9` dibuja el "G" oficial en SVG inline. Es **marca
 registrada, no copyright**, y usar el logo oficial es lo correcto para "Iniciar
@@ -197,15 +219,14 @@ alterar colores, texto aprobado del botón). El uso actual (18×18, colores
 oficiales, "Continuar con Google") se ve conforme. Falta contrastarlo contra las
 Google Sign-In Branding Guidelines vigentes. Riesgo bajo.
 
-### 13. Nota de licencia en el configurador de marca
+### 14. ~~Nota de licencia en el configurador de marca~~ — Resuelto 2026-09-08
 
-Los buckets de marca están vacíos hoy, así que el riesgo de copyright de
-imágenes es futuro. Cuando el cliente suba logo, portada o video de login, ese
-material entra sin control de procedencia. Falta una línea junto al campo de
-subida: "Solo sube material propio o con licencia de uso comercial." Es lo único
-que el software puede hacer al respecto.
+`src/components/configuracion/license-note.tsx`, montado en `BrandImageField` y
+`BrandVideoField` — cubre los 6 puntos de subida de `/configuracion/marca` desde
+un solo componente. Es lo único que el software puede hacer: verificar la
+procedencia de un archivo subido no lo puede comprobar el código.
 
-### 14. Explícitamente fuera de alcance (no son pendientes)
+### 15. Explícitamente fuera de alcance (no son pendientes)
 
 - **Agente de match/precalificación con IA** — excluido de forma permanente por
   decisión del usuario. No volver a proponerlo.
@@ -218,7 +239,7 @@ que el software puede hacer al respecto.
 - **Assets de portada reales de la marca** — el demo usa imágenes genéricas a
   propósito hasta que el cliente entregue las suyas.
 
-### 15. V2 del plan maestro (no urgente, no empezado)
+### 16. V2 del plan maestro (no urgente, no empezado)
 
 - Scorecards de entrevista estructurada con rúbrica fija.
 - Dashboard de métricas (time-to-hire, conversión por etapa, fuente de contratación).

@@ -9,6 +9,7 @@ import {
   removeBrandVideo,
   type BrandVideoField,
 } from "@/lib/organizations/actions";
+import { LicenseNote } from "./license-note";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 
@@ -116,6 +117,7 @@ export function BrandVideoField({
             />
           )}
         </div>
+        <LicenseNote />
       </div>
     </div>
   );

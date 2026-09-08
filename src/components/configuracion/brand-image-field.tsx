@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ImageUp } from "lucide-react";
 import { uploadBrandImage, removeBrandImage, type BrandImageField } from "@/lib/organizations/actions";
 import { ActionButton } from "@/components/ui/action-button";
+import { LicenseNote } from "./license-note";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { notifyError, notifySuccess } from "@/lib/notifications/toast";
 
@@ -87,6 +88,7 @@ export function BrandImageField({
             />
           )}
         </div>
+        <LicenseNote dark={dark} />
       </div>
     </div>
   );
