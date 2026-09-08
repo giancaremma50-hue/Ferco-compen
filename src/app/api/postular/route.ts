@@ -15,12 +15,36 @@ import { zodFieldError } from "@/lib/forms/zod-error";
 import { sendEmail } from "@/lib/email/send-email";
 import { NuevaPostulacionEmail } from "@/emails/nueva-postulacion";
 import { PostulacionRecibidaEmail } from "@/emails/postulacion-recibida";
+import { PostulacionDuplicadaEmail } from "@/emails/postulacion-duplicada";
 import { parseCandidacyFields } from "@/lib/job-templates/candidacy-fields";
 
 const MAX_CV_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CV_TYPE = "application/pdf";
 const MAX_ADDITIONAL_FILES = 5;
 const ALLOWED_ADDITIONAL_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
+
+/**
+ * Avisa por correo que ya existía la postulación. Best-effort y con `after()`
+ * (igual que el resto de los correos de esta ruta): la respuesta HTTP no puede
+ * depender de que Resend conteste, y sobre todo no puede TARDAR distinto
+ * según si el correo existía o no — una diferencia de tiempo medible sería el
+ * mismo oráculo que se acaba de cerrar, por el lado del reloj.
+ */
+function notifyDuplicate(email: string, jobTitle: string, fullName?: string) {
+  notifyBestEffort(async () => {
+    const { platformName, siteUrl } = await getEmailContext();
+    await sendEmail({
+      to: email,
+      subject: `Sobre tu postulación — ${jobTitle}`,
+      react: PostulacionDuplicadaEmail({
+        platformName,
+        privacyUrl: `${siteUrl}/privacidad`,
+        candidateName: fullName ?? email.split("@")[0],
+        jobTitle,
+      }),
+    });
+  });
+}
 
 export async function POST(request: NextRequest) {
   // x-forwarded-for crece de izquierda a derecha con cada proxy que la
@@ -141,22 +165,16 @@ export async function POST(request: NextRequest) {
     .eq("email", email)
     .maybeSingle();
 
-  // Chequeo temprano: evita subir archivos que de todos modos se van a
-  // rechazar por postulación duplicada.
-  if (existingCandidate) {
-    const { data: existingApplication } = await admin
-      .from("applications")
-      .select("id")
-      .eq("job_id", job.id)
-      .eq("candidate_id", existingCandidate.id)
-      .maybeSingle();
-    if (existingApplication) {
-      return NextResponse.json(
-        { error: "Ya tienes una postulación registrada para esta vacante." },
-        { status: 409 },
-      );
-    }
-  }
+  // NO hay chequeo temprano de duplicado, y es a propósito. Había uno acá
+  // ("evita subir archivos que de todos modos se van a rechazar") y era la
+  // fuente de un canal lateral por TIEMPO: al saltarse las subidas, un correo
+  // ya postulado respondía en 0,5 s y uno nuevo en 2,7 s — medido. O sea, el
+  // oráculo de enumeración que se cerró en el cuerpo de la respuesta seguía
+  // abierto por el reloj. Ahora todo envío recorre el mismo camino (buscar
+  // candidato → subir archivos → intentar el insert) y el duplicado lo
+  // resuelve el UNIQUE(job_id, candidate_id) de la base, más abajo. Se paga
+  // una subida inútil por cada duplicado; es el precio de que los dos casos
+  // sean indistinguibles.
 
   // El candidato se resuelve/crea ANTES de subir cualquier archivo:
   // cvs_privado_select (política de Storage) exige que el segundo segmento
@@ -262,12 +280,25 @@ export async function POST(request: NextRequest) {
   );
 
   if ("error" in applicationResult) {
-    if (cvPath) await admin.storage.from("cvs-privado").remove([cvPath]);
-    if (additionalUploads.length > 0) await admin.storage.from("cvs-privado").remove(additionalUploads.map((u) => u.path));
-    return NextResponse.json(
-      { error: applicationResult.error },
-      { status: applicationResult.duplicate ? 409 : 500 },
-    );
+    const uploaded = [...(cvPath ? [cvPath] : []), ...additionalUploads.map((u) => u.path)];
+
+    // Duplicado: única puerta por la que se detecta ahora, vía
+    // UNIQUE(job_id, candidate_id). Responde EXACTAMENTE igual que una
+    // postulación nueva (mismo cuerpo, mismo 201) y el aviso va por correo,
+    // que solo lee quien tiene ese buzón. La limpieza de los archivos que se
+    // acabaron de subir se hace con after() y sin await: si se esperara, el
+    // duplicado tardaría dos borrados MÁS que el caso nuevo y el canal por
+    // tiempo volvería a abrirse por el otro lado.
+    if (applicationResult.duplicate) {
+      notifyBestEffort(async () => {
+        if (uploaded.length > 0) await admin.storage.from("cvs-privado").remove(uploaded);
+      });
+      notifyDuplicate(email, job.title, parsed.data.full_name);
+      return NextResponse.json({ success: true }, { status: 201 });
+    }
+
+    if (uploaded.length > 0) await admin.storage.from("cvs-privado").remove(uploaded);
+    return NextResponse.json({ error: applicationResult.error }, { status: 500 });
   }
 
   // Solo se fija el CV del PERFIL cuando el candidato se acaba de crear en

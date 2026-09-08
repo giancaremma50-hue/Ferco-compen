@@ -179,36 +179,36 @@ Storage con service role (PDFs de hasta 10 MB). En Vercel el contador se reinici
 por instancia y no se comparte entre regiones. Siguiente paso cuando haya
 volumen: tabla en Postgres o Upstash Redis.
 
-### 11. Decisión pendiente del usuario: el bucket `archivos`
+### 11. ~~Bucket `archivos`~~ — Resuelto 2026-09-08
 
-Se puso privado (era público, sin límite de tamaño ni allowlist de MIME) y se le
-fijó un tope de 10 MB. **No se borró nada.** Contiene 1 objeto,
-`Presentacipon_RH.html` — "Resumen Mensual Mayo 2026 - RH", resto del sistema
-anterior de este proyecto de Supabase reutilizado. Ningún código del ATS
-referencia ese bucket. Falta que el usuario diga si el archivo sirve; si no,
-borrar objeto y bucket.
+Borrado, objeto y bucket, por decisión del usuario. Antes de borrar se guardó una
+copia del único archivo que tenía (`Presentacipon_RH.html`, "Resumen Mensual Mayo
+2026 - RH") en `Downloads\Resumen-Mensual-Mayo-2026-RH.html` — el borrado en
+Storage no se deshace.
 
-### 12. DECISIÓN PENDIENTE — el 409 de duplicado es un oráculo de enumeración
+Quedan 3 buckets, los 3 usados por el ATS: `cvs-privado` (privado),
+`marca-publico` y `avatares`.
 
-Hallado por `/security-review`. `POST /api/postular` responde `409 "Ya tienes una
-postulación registrada para esta vacante."` **antes de escribir nada**, y la ruta
-ya es anónima. Eso permite confirmar, correo por correo, si una persona postuló a
-una vacante concreta — el dato "está buscando trabajo", que es justo el sensible
-en un ATS. Contradice la sección 8 de la propia política de privacidad.
+### 12. ~~El 409 de duplicado era un oráculo de enumeración~~ — Resuelto 2026-09-08
 
-Mitigante real: cada intento fallido SÍ crea candidato + postulación, así que un
-barrido deja rastro visible para el reclutador. Y hace falta el `job_id` (público)
-más adivinar correos.
+Opción B, elegida por el usuario. `POST /api/postular` responde ahora
+**exactamente igual** ante una postulación nueva y ante una duplicada (mismo
+cuerpo `{"success":true}`, mismo 201), y el aviso "ya habías postulado" va por
+correo (`emails/postulacion-duplicada.tsx`), que solo lee quien tiene ese buzón.
 
-No se corrigió porque el arreglo cuesta UX y es decisión de producto:
+**El primer arreglo no alcanzó, y conviene saber por qué.** Igualar la respuesta
+dejó el oráculo abierto **por tiempo**: el chequeo temprano de duplicado se
+saltaba las subidas de archivos, así que un correo ya postulado respondía en
+0,51 s y uno nuevo en 2,69 s. Medido, no teórico. Se cerró **borrando** ese
+chequeo temprano: ahora todo envío recorre el mismo camino (buscar candidato →
+subir archivos → intentar el insert) y el duplicado lo detecta el
+`UNIQUE(job_id, candidate_id)`. La limpieza de los archivos recién subidos va con
+`after()` y sin `await`, porque esperarla habría abierto el canal por el otro
+lado (el duplicado tardaría dos borrados más que el caso nuevo).
 
-- **Opción A** — responder siempre `201` con el mismo texto y dejar que el
-  `UNIQUE(job_id, candidate_id)` sea la defensa. Quita el oráculo, pero al
-  candidato legítimo se le dice "enviada" cuando no pasó nada.
-- **Opción B** — responder igual, y avisar "ya habías postulado" **por correo** a
-  esa dirección. Quita el oráculo y conserva el aviso, solo que lo recibe quien
-  de verdad tiene ese buzón. Cuesta una plantilla de correo nueva.
-- **Opción C** — dejarlo como está, asumiendo el mitigante.
+Verificado: 3 duplicados en 2,10 / 1,36 / 1,23 s contra 3 nuevos en 1,90 / 1,69 s
+— rangos solapados, sin señal separable. Se paga una subida inútil por cada
+duplicado; es el precio de que los dos casos sean indistinguibles.
 
 ### 13. Verificar el logo de Google contra sus guidelines
 
@@ -226,7 +226,23 @@ Google Sign-In Branding Guidelines vigentes. Riesgo bajo.
 un solo componente. Es lo único que el software puede hacer: verificar la
 procedencia de un archivo subido no lo puede comprobar el código.
 
-### 15. Explícitamente fuera de alcance (no son pendientes)
+### 15. ~~Servidor MCP apuntando a la producción de Ferco~~ — Resuelto 2026-09-08
+
+El servidor MCP llamado `supabase` —el de nombre corto, el que cualquier sesión
+agarra primero— estaba fijado con `--project-ref=cihcimdzwlmhedpprmhf`, que es la
+**plataforma de RH de Ferco en producción**: 170 tablas, 887 usuarios en auth, y
+una migración aplicada el mismo 2026-09-08. Tenía `apply_migration` y
+`execute_sql` habilitados.
+
+Renombrado a `ferco-produccion` en `~/.claude.json` (backup en
+`.claude.json.backup-20260908`). No se borró: si algún día hace falta ese
+proyecto sigue disponible, pero ya es imposible confundirlo con el del ATS. Toma
+efecto en sesiones NUEVAS — los servidores MCP se cargan al arrancar.
+
+El ATS se opera por el servidor que exige `project_id` en cada llamada, con
+`cgudnnlcwcotovcslgzu`.
+
+### 16. Explícitamente fuera de alcance (no son pendientes)
 
 - **Agente de match/precalificación con IA** — excluido de forma permanente por
   decisión del usuario. No volver a proponerlo.
@@ -239,7 +255,7 @@ procedencia de un archivo subido no lo puede comprobar el código.
 - **Assets de portada reales de la marca** — el demo usa imágenes genéricas a
   propósito hasta que el cliente entregue las suyas.
 
-### 16. V2 del plan maestro (no urgente, no empezado)
+### 17. V2 del plan maestro (no urgente, no empezado)
 
 - Scorecards de entrevista estructurada con rúbrica fija.
 - Dashboard de métricas (time-to-hire, conversión por etapa, fuente de contratación).
