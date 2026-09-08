@@ -1,13 +1,24 @@
 import "server-only";
 
 /**
- * Limitador en memoria del proceso — suficiente para Vercel en v1 porque el
- * endpoint público (/api/postular) es de bajo volumen (postulaciones, no
- * tráfico general) y una función serverless individual vive varios minutos
- * bajo carga sostenida antes de reciclarse. Si el volumen crece o se corre
- * en múltiples regiones simultáneas, esto necesita moverse a una tabla en
- * Postgres o a Upstash Redis — no es un bug a corregir ahora, no hay
- * tráfico real todavía que lo exija.
+ * Limitador en memoria del proceso. 5 peticiones por minuto y por clave.
+ *
+ * ATENCIÓN — la justificación original de esto quedó obsoleta y se corrige
+ * acá: decía "no hay tráfico real todavía que lo exija". Era cierto por el
+ * motivo equivocado, /api/postular estaba INALCANZABLE (el proxy lo redirigía
+ * a /login, ver PUBLIC_PATHS en lib/supabase/proxy.ts) — el tráfico real era
+ * cero por un bug, no por falta de demanda. Desde 2026-09-08 el endpoint
+ * recibe de verdad.
+ *
+ * Lo que eso implica: este Map vive en la memoria de UNA instancia. En Vercel
+ * el contador se reinicia con cada instancia nueva y no se comparte entre
+ * regiones, así que rotando peticiones por instancias frías se pasa de los
+ * 5/min sin esfuerzo. Y /api/postular es el único camino por el que una
+ * entrada anónima escribe en Storage con service role (PDFs de hasta 10 MB).
+ * El techo sigue siendo aceptable mientras el volumen sea el de un portal de
+ * empleos de una empresa, pero ya no por "no hay tráfico": mover esto a una
+ * tabla en Postgres o a Upstash es el siguiente paso, anotado en
+ * docs/PENDIENTE.md.
  */
 const hits = new Map<string, { count: number; resetAt: number }>();
 const SWEEP_THRESHOLD = 500;

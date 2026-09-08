@@ -79,8 +79,12 @@ export async function rollbackIfNewCandidate(candidateId: string, isNewCandidate
  * necesita revertir en un paso previo (ej. la subida del CV en el portal).
  *
  * `extra` es exclusivo del portal público (carta de motivación,
- * precalificación) — `referCandidate` (referido interno, Fase 4/6) no lo
- * manda, esos dos campos se quedan `null` en ese camino.
+ * precalificación, consentimiento) — `referCandidate` (referido interno,
+ * Fase 4/6) no lo manda, esos campos se quedan `null` en ese camino. Para el
+ * consentimiento eso es lo correcto, no una omisión: en un referido el titular
+ * de los datos nunca vio la política, así que no hay consentimiento suyo que
+ * registrar (ver el comentario de la migración
+ * `consentimiento_de_privacidad_en_postulaciones`).
  */
 export async function createApplicationForCandidate(
   supabase: SupabaseClient<Database>,
@@ -88,7 +92,12 @@ export async function createApplicationForCandidate(
   jobId: string,
   candidateId: string,
   isNewCandidate: boolean,
-  extra?: { cover_letter?: string | null; prequalified?: boolean | null },
+  extra?: {
+    cover_letter?: string | null;
+    prequalified?: boolean | null;
+    privacy_consent_version?: string | null;
+    privacy_consent_at?: string | null;
+  },
 ): Promise<CreateApplicationResult> {
   const { data: firstStage } = await supabase
     .from("job_stages")
@@ -112,6 +121,8 @@ export async function createApplicationForCandidate(
       stage_id: firstStage.id,
       cover_letter: extra?.cover_letter ?? null,
       prequalified: extra?.prequalified ?? null,
+      privacy_consent_version: extra?.privacy_consent_version ?? null,
+      privacy_consent_at: extra?.privacy_consent_at ?? null,
     })
     .select("id")
     .single();

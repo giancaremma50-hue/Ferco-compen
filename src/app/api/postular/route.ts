@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { POLITICA_VERSION } from "@/lib/legal/policy";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   findOrCreateCandidate,
@@ -231,7 +232,15 @@ export async function POST(request: NextRequest) {
     job.id,
     candidateId,
     isNewCandidate,
-    { cover_letter: parsed.data.cover_letter ?? null, prequalified },
+    {
+      cover_letter: parsed.data.cover_letter ?? null,
+      prequalified,
+      // Zod ya garantizó que la casilla venía marcada; acá solo se deja la
+      // prueba de a QUÉ versión aceptó y cuándo. La hora la pone el servidor,
+      // nunca el cliente.
+      privacy_consent_version: POLITICA_VERSION,
+      privacy_consent_at: new Date().toISOString(),
+    },
   );
 
   if ("error" in applicationResult) {
@@ -313,7 +322,12 @@ export async function POST(request: NextRequest) {
       sendEmail({
         to: email,
         subject: "Recibimos tu postulación",
-        react: PostulacionRecibidaEmail({ platformName, candidateName: applicantName, jobTitle: job.title }),
+        react: PostulacionRecibidaEmail({
+          platformName,
+          privacyUrl: `${siteUrl}/privacidad`,
+          candidateName: applicantName,
+          jobTitle: job.title,
+        }),
       }),
       jobOwnerId
         ? notify({

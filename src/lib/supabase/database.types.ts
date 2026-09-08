@@ -145,6 +145,8 @@ export type Database = {
           job_id: string
           organization_id: string
           prequalified: boolean | null
+          privacy_consent_at: string | null
+          privacy_consent_version: string | null
           rating: number | null
           rejection_reason_id: string | null
           stage_changed_at: string
@@ -162,6 +164,8 @@ export type Database = {
           job_id: string
           organization_id: string
           prequalified?: boolean | null
+          privacy_consent_at?: string | null
+          privacy_consent_version?: string | null
           rating?: number | null
           rejection_reason_id?: string | null
           stage_changed_at?: string
@@ -179,6 +183,8 @@ export type Database = {
           job_id?: string
           organization_id?: string
           prequalified?: boolean | null
+          privacy_consent_at?: string | null
+          privacy_consent_version?: string | null
           rating?: number | null
           rejection_reason_id?: string | null
           stage_changed_at?: string

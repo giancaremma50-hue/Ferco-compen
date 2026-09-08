@@ -25,11 +25,19 @@ async function notifyCandidateOfInterview(
   durationMinutes: number,
   location: string | null,
 ): Promise<void> {
-  const { platformName } = await getEmailContext();
+  const { platformName, siteUrl } = await getEmailContext();
   await sendEmail({
     to: candidateEmail,
     subject: `Entrevista agendada — ${jobTitle}`,
-    react: EntrevistaProgramadaEmail({ platformName, candidateName, jobTitle, scheduledAtIso, durationMinutes, location }),
+    react: EntrevistaProgramadaEmail({
+      platformName,
+      privacyUrl: `${siteUrl}/privacidad`,
+      candidateName,
+      jobTitle,
+      scheduledAtIso,
+      durationMinutes,
+      location,
+    }),
   });
 }
 

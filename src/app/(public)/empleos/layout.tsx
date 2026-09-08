@@ -18,6 +18,19 @@ export default async function EmpleosLayout({ children }: { children: React.Reac
         </div>
       </header>
       {children}
+
+      {/* El enlace legal tiene que estar alcanzable desde cualquier pantalla
+          del portal, no solo desde el formulario. */}
+      <footer className="mt-16 border-t border-border">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted-foreground">
+          <span>
+            © {new Date().getFullYear()} {organization?.platform_name ?? "Demo AJE"}
+          </span>
+          <Link href="/privacidad" className="font-medium underline">
+            Política de privacidad y tratamiento de datos
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

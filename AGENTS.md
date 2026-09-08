@@ -116,6 +116,55 @@ gradientes morados o multicolor · glassmorphism · sombras difusas de color · 
 
 ---
 
+## Privacidad y datos de candidatos — reglas duras
+
+El candidato externo es el único usuario de la plataforma que **no** tiene cuenta,
+no acepta términos al entrar y no puede consultar nada de lo que guardamos sobre
+él. Todo lo que sigue existe por eso.
+
+- **La política de privacidad vive en código**, no en la base: `src/lib/legal/policy.ts`
+  (versión + vigencia + responsable) y `src/app/(public)/privacidad/page.tsx`. Git es
+  lo que da fecha, autor y diff de cada palabra — una tabla editable no prueba nada.
+- **Al cambiar el texto de forma sustantiva se sube `POLITICA_VERSION`.** Las
+  postulaciones viejas siguen apuntando a la versión que aceptaron. Eso es el punto,
+  no un efecto secundario.
+- **`/privacidad` tiene que estar en `PUBLIC_PATHS`** (`src/lib/supabase/proxy.ts`).
+  Si sale de ahí, el enlace del formulario manda a `/login` y el consentimiento se
+  vuelve una casilla que nadie puede leer antes de marcar.
+- **Ningún dato de un candidato externo entra sin consentimiento registrado.**
+  `/api/postular` exige la casilla con Zod (no basta el `required` del HTML) y guarda
+  `applications.privacy_consent_version` + `privacy_consent_at`. La hora la pone el
+  servidor, nunca el cliente.
+- **Una casilla sin marcar NO viaja en el `FormData`.** Se valida contra el literal
+  `"on"`, jamás con `z.coerce.boolean()` — cualquier string no vacío coerciona a
+  `true`, así que `privacy_consent=no` pasaría.
+- **Referir un candidato es la excepción, y se trata como tal.** Ahí los datos los
+  carga un empleado sobre un tercero que nunca vio la política: no hay consentimiento
+  del titular que registrar, las columnas quedan `NULL`, y lo que se exige es la
+  declaración de quien refiere (`referral_authorized`). No inventar un consentimiento
+  que esa persona no dio.
+- **Los CV van al bucket privado `cvs-privado`**, servidos con URL firmada de 60 s.
+  Nunca a un bucket público, nunca con URL permanente.
+- **Solo los correos que llegan al candidato llevan el pie legal**
+  (`EmailLayout privacyUrl=...`): `postulacion-recibida`, `entrevista-programada`,
+  `mensaje-candidato`. `cambio-etapa` va al equipo interno, no lleva pie.
+
+### Cookies — la regla que se rompe sin darse cuenta
+
+Hoy **el portal público no pone ni una cookie** (verificado: `Set-Cookie` = 0 en
+`/empleos` y `/login`). No hay analítica, ni píxeles, ni rastreadores, ni recursos
+de terceros — las tipografías se auto-hospedan (`font-src 'self'`). Por eso la
+política solo informa y no hay banner de consentimiento: las cookies de sesión de
+Supabase son estrictamente necesarias y aparecen únicamente tras iniciar sesión.
+
+**Agregar Vercel Analytics, Google Analytics, Meta Pixel, Hotjar, Sentry o cualquier
+script de terceros cambia eso y exige banner de consentimiento previo real** (con
+opción de rechazar, y sin cargar el script antes de la respuesta), más actualizar la
+sección 9 de la política. Es un cambio de dos líneas en el código y de categoría
+legal completa. No se agrega sin eso.
+
+---
+
 ## Centro de errores
 
 El error no es un callejón sin salida: es el canal de soporte entre el usuario y el super admin.

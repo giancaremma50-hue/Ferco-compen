@@ -4,7 +4,17 @@ import type { CandidacyFields, CandidacyState } from "@/lib/job-templates/candid
 
 function fieldSchema(state: CandidacyState, max: number, requiredMessage: string) {
   if (state === "required") {
-    return z.string().trim().min(1, { error: requiredMessage }).max(max, { error: `Máximo ${max} caracteres.` });
+    // El `error` del propio z.string() cubre el caso en que la clave NO viene
+    // en el payload: ahí `.min(1)` nunca corre porque falla antes el chequeo
+    // de tipo, y sin esto Zod devolvía su texto en inglés ("Invalid input:
+    // expected string, received undefined") directo a la pantalla del
+    // candidato. El formulario del navegador siempre manda todas sus claves,
+    // pero /api/postular es público y cualquier otro cliente puede omitirlas.
+    return z
+      .string({ error: requiredMessage })
+      .trim()
+      .min(1, { error: requiredMessage })
+      .max(max, { error: `Máximo ${max} caracteres.` });
   }
   return optionalText(max);
 }
@@ -18,6 +28,7 @@ function fieldSchema(state: CandidacyState, max: number, requiredMessage: string
 export type ApplyFormValues = {
   job_id: string;
   email: string;
+  privacy_consent: true;
   current_title?: string;
   years_experience?: number;
   full_name?: string;
@@ -45,6 +56,13 @@ export function buildApplySchema(candidacyFields: CandidacyFields): z.ZodType<Ap
   const shape: Record<string, z.ZodTypeAny> = {
     job_id: z.uuid({ error: "Vacante inválida." }),
     email: z.email({ error: "Correo inválido." }),
+    // Una casilla sin marcar NO viaja en el FormData: `formData.get()`
+    // devuelve null, no "false". Por eso se valida contra el literal "on"
+    // (lo que manda un checkbox marcado sin `value` propio) en vez de
+    // coercionar a booleano — `Boolean(null)` sería false, pero
+    // `z.coerce.boolean()` sobre cualquier string no vacío daría true, y
+    // un cliente fabricado podría mandar `privacy_consent=no` y pasar.
+    privacy_consent: z.literal("on", { error: "Tienes que aceptar la política de privacidad para postular." }).transform(() => true as const),
     current_title: optionalText(120),
     years_experience: z.preprocess(
       (v) => (v === "" || v == null ? undefined : Number(v)),

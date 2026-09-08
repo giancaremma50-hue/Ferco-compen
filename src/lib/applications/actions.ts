@@ -436,7 +436,7 @@ export async function sendCandidateMessage(
   // mandar un correo con remitente de esta plataforma a cualquier dirección.
   // getEmailContext() no depende de esta fila ni del permiso — va en
   // paralelo en vez de esperar a que ambos terminen en serie.
-  const [{ data: application }, { platformName }] = await Promise.all([
+  const [{ data: application }, { platformName, siteUrl }] = await Promise.all([
     supabase
       .from("applications")
       .select("job_id, organization_id, candidates(full_name, email)")
@@ -453,6 +453,7 @@ export async function sendCandidateMessage(
     subject: parsed.data.subject,
     react: MensajeCandidatoEmail({
       platformName,
+      privacyUrl: `${siteUrl}/privacidad`,
       candidateName: application.candidates!.full_name,
       body: parsed.data.body,
     }),

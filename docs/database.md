@@ -2,6 +2,73 @@
 
 **Proyecto**: `V1-motoslam` (ref `cgudnnlcwcotovcslgzu`), reutilizado y limpiado por indicación del usuario — tenía un sistema de vacaciones "PCG" sin uso que se eliminó por completo (tablas, tipos, función y políticas de storage) antes de montar el esquema del ATS.
 
+## Consentimiento de privacidad y cierre de un bucket público (post-Fase 19, sin número de fase)
+
+Migración `consentimiento_de_privacidad_en_postulaciones`, más un cambio de
+configuración en Storage. Nace de una auditoría legal pedida por el usuario:
+política de privacidad, copyright de fuentes/imágenes y cookies.
+
+**EL HALLAZGO MÁS GRAVE no era de privacidad: el portal público nunca pudo
+recibir una postulación.** `/api/postular` no estaba en `PUBLIC_PATHS`
+(`src/lib/supabase/proxy.ts`) desde el primer commit de auth (`66159d4`). El
+proxy lo redirigía a `/login` con un 307, el `fetch` del formulario recibía el
+HTML del login, `res.json()` lanzaba, y el candidato veía *"Se perdió la
+conexión. Tus datos no se enviaron"* — un mensaje falso, en bucle, sin forma de
+postular. Con 3 vacantes públicas abiertas. Las 11 postulaciones que existen son
+semilla (`@demo-candidatos.com`, sembradas por SQL el 2026-09-02), lo que encaja
+con que el formulario nunca funcionó para nadie. Corregido listando la ruta
+exacta, **nunca `/api` completo**. Verificado extremo a extremo: POST completo
+con CV → `201 {"success":true}`.
+
+**`applications` gana `privacy_consent_version` + `privacy_consent_at`.** Va en
+`applications`, no en `candidates`: una persona postula varias veces a lo largo
+de los años y la política cambia de versión, y lo que hay que poder demostrar es
+a QUÉ versión aceptó en CADA postulación. Índice parcial
+`applications_privacy_consent_version_idx` sobre las filas con consentimiento —
+la consulta real es "dame las postulaciones que aceptaron una versión ya
+retirada", para reconsentimiento.
+
+**Nullable a propósito, hay dos puertas con bases legales distintas:**
+- Portal público (`/api/postular`) — el titular acepta él mismo. Estas filas
+  SIEMPRE llevan versión y fecha, puestas por el servidor.
+- Referido interno (`referCandidate`) — un empleado carga nombre, correo y
+  teléfono de un tercero que nunca vio la política. Ahí no hay consentimiento
+  del titular que registrar, y fingir uno sería peor que dejarlo nulo. Lo que se
+  exige en ese camino es la declaración de quien refiere
+  (`referral_authorized`), no un consentimiento inventado.
+
+**La validación del consentimiento usa `z.literal("on")`, no `z.coerce.boolean()`.**
+Una casilla sin marcar NO viaja en el `FormData` (`formData.get()` devuelve
+`null`), y cualquier string no vacío coerciona a `true` — con `coerce`, un
+`privacy_consent=no` fabricado a mano habría pasado. Verificado contra el
+endpoint: sin casilla, con `=no` y con `=false` los tres devuelven 400; solo
+`=on` pasa.
+
+**Bucket `archivos`: era público, sin límite de tamaño y sin allowlist de MIME.**
+Resto del sistema anterior de este proyecto reutilizado; ningún código del ATS lo
+referencia. Contenía 1 objeto: `Presentacipon_RH.html`, *"Resumen Mensual Mayo
+2026 - RH"*, alcanzable sin autenticación. Se puso `public = false` y se le fijó
+un límite de 10 MB — **no se borró nada**, la decisión sobre el archivo es del
+usuario. Detalle honesto de la mitigación: el origen ya responde
+`{"code":"NoSuchBucket"}`, pero Cloudflare sirvió la copia en caché
+(`CF-Cache-Status: HIT`, `max-age=3600`) hasta 1 hora después, para quien ya
+tuviera la URL con el UUID exacto.
+
+**Lo que la auditoría encontró LIMPIO** (no hacía falta cambiar nada):
+- Fuentes: Geist e Instrument Serif, ambas SIL Open Font License 1.1, servidas
+  por `next/font/google` que las auto-hospeda en el build — verificado en la CSP
+  real, `font-src 'self'`. El navegador del candidato no le pide nada a Google.
+- Iconos: `lucide-react`, ISC.
+- Imágenes: `public/` está vacía, 0 referencias a Unsplash/Getty/Freepik/
+  Shutterstock, y los buckets de marca están sin objetos. El riesgo de copyright
+  es futuro (lo que suba el cliente), no presente.
+- Cookies: **cero** para un visitante externo. Medido, no deducido:
+  `Set-Cookie` = 0 en `/empleos` y en `/login`. `setAll()` de `@supabase/ssr`
+  solo corre cuando hay sesión que refrescar. Sin analítica, sin píxeles, sin
+  `localStorage`. Por eso la política informa y no hay banner de consentimiento:
+  las cookies de sesión son estrictamente necesarias y solo existen tras el
+  login de personal interno.
+
 ## El rol `colaborador`, fuera de verdad (post-Fase 19, sin número de fase)
 
 Migración `quitar_colaborador_de_los_defaults`. Cierra el pendiente que las

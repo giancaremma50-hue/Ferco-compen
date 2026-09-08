@@ -714,6 +714,15 @@ const ReferCandidateSchema = z.object({
   full_name: z.string().trim().min(3, { error: "Escribe el nombre completo." }).max(120),
   email: z.email({ error: "Correo inválido." }),
   phone: z.string().trim().min(6, { error: "Escribe un teléfono válido." }).max(30),
+  // Referir es la única puerta por la que entran datos de alguien que nunca
+  // vio la política de privacidad: los carga un empleado, no el titular. No
+  // se puede registrar un consentimiento que esa persona no dio, así que lo
+  // que se exige acá es la declaración de quien refiere. Mismo literal "on"
+  // que el portal público, por el mismo motivo (una casilla sin marcar no
+  // viaja en el FormData).
+  referral_authorized: z.literal("on", {
+    error: "Confirma que la persona te autorizó a compartir sus datos.",
+  }),
 });
 
 export async function referCandidate(

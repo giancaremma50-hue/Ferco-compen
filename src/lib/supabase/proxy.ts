@@ -3,7 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 import { sanitizeRedirectPath } from "@/lib/auth/redirect";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/empleos"];
+// `/privacidad` es obligatoriamente pública: es el documento que el candidato
+// tiene que poder leer ANTES de aceptar y entregar su CV. Si no está acá, el
+// enlace del formulario manda a /login y el consentimiento sería una casilla
+// que nadie puede leer antes de marcar.
+// `/api/postular` es el endpoint que recibe la postulación del portal público.
+// Faltaba desde el primer commit de auth: el proxy lo redirigía a /login con
+// un 307, el fetch del formulario recibía el HTML del login, `res.json()`
+// lanzaba, y el candidato veía "Se perdió la conexión. Tus datos no se
+// enviaron" — un mensaje falso, en bucle, sin forma de postular. Se lista la
+// ruta exacta, NUNCA "/api" completo: el resto de los endpoints tienen que
+// seguir exigiendo sesión.
+const PUBLIC_PATHS = ["/login", "/auth", "/empleos", "/privacidad", "/api/postular"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

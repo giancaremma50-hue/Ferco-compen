@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { notifySuccess } from "@/lib/notifications/toast";
 import { ActionButton } from "@/components/ui/action-button";
@@ -162,6 +163,28 @@ export function ApplicationForm({
           ))}
         </div>
       )}
+
+      {/* Sin marcar por defecto y `required`: el navegador ya frena el envío,
+          y /api/postular lo vuelve a exigir con Zod — quitar el atributo desde
+          las herramientas del navegador no alcanza para saltarlo. */}
+      <label className="flex items-start gap-2.5 border-t border-border pt-4 text-sm">
+        <input
+          type="checkbox"
+          name="privacy_consent"
+          required
+          className="mt-0.5 size-4 flex-none"
+        />
+        {/* Sin aria-describedby: este span YA es la etiqueta de la casilla (va
+            dentro del <label>), y apuntarlo también como descripción hace que
+            un lector de pantalla lea la frase completa dos veces. */}
+        <span className="text-foreground/90">
+          He leído y acepto la{" "}
+          <Link href="/privacidad" target="_blank" className="font-medium text-accent underline">
+            política de privacidad y tratamiento de datos
+          </Link>
+          , y autorizo el uso de la información y los archivos que envío para evaluar mi candidatura.
+        </span>
+      </label>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

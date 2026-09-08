@@ -1,6 +1,6 @@
 # Pendiente — ATS Ferco
 
-_Última actualización: 2026-09-03, después de cerrar el flujo de solicitud de vacante, el rediseño de Inicio y los permisos de 2 niveles por vacante._
+_Última actualización: 2026-09-08, después de la auditoría legal (privacidad, copyright, cookies) y de arreglar el portal público de postulaciones._
 
 ## Estado general
 
@@ -85,7 +85,88 @@ Inicio usan `updated_at` como aproximación, documentado en el código como no
 garantizado. El arreglo es una columna `hired_at` o loguear el evento en
 `hireApplication`; no bloquea nada hoy.
 
-### 8. Explícitamente fuera de alcance (no son pendientes)
+### 8. Política de privacidad — falta el texto aprobado y 4 datos del cliente
+
+La MECÁNICA completa ya está construida y verificada: página pública
+`/privacidad`, casilla obligatoria validada con Zod en el servidor, prueba del
+consentimiento en `applications.privacy_consent_version` + `privacy_consent_at`,
+pie legal en los 3 correos que llegan al candidato, enlace en el pie del portal,
+y declaración de autorización en el referido interno.
+
+Lo que falta **no es código**. La página muestra un aviso de "borrador, no
+publicado" y `robots: noindex` mientras `src/lib/legal/policy.ts` tenga
+marcadores `[PENDIENTE: ...]`. El aviso desaparece solo al llenarlos.
+
+**Cuatro datos que tiene que entregar el cliente:**
+1. **Razón social exacta, NIT y domicilio fiscal** del responsable del
+   tratamiento. Y si es una entidad para los 4 países o una por país — eso
+   cambia el documento.
+2. **Correo de contacto para ejercer derechos.** Un candidato externo no tiene
+   cuenta; el centro de errores no le sirve. Tiene que ser un buzón atendido:
+   el pie de los correos ya no promete "responde a este correo" justamente
+   porque ese canal no existe.
+3. **Plazo de conservación** de una candidatura no contratada. Sugerencia: 12
+   meses desde la última actividad. Sin plazo no se puede escribir la sección 6.
+4. **Confirmación de los encargados declarados** (Supabase, Resend, Vercel,
+   Google — todos en EE. UU., ya listados en `ENCARGADOS`).
+
+**Y revisión de un abogado antes de publicar.** El texto cubre el denominador
+común más estricto de los 4 países, pero los marcos difieren: Nicaragua tiene
+Ley 787 de Protección de Datos Personales (2012), la más concreta; Guatemala y
+Honduras no tienen ley integral del sector privado; **de El Salvador no se pudo
+confirmar el estado vigente** y no se inventó. Eso lo confirma un abogado, no
+esta sesión.
+
+**Consentimientos ya registrados bajo el borrador:** cualquier postulación que
+entre antes de la aprobación queda con `privacy_consent_version = "0.1-borrador"`.
+Al publicar la 1.0 hay que decidir si esas candidaturas necesitan
+reconsentimiento — el índice parcial de la migración existe para poder
+encontrarlas.
+
+### 9. Retención automática de datos de candidatos
+
+No existe ningún mecanismo de borrado ni expiración. Depende del plazo del punto
+8. Una vez definido: un job que elimine candidaturas y sus archivos de Storage
+pasado el plazo desde la última actividad. Sin esto, la sección 6 de la política
+promete algo que el sistema no cumple.
+
+### 10. Rate limit del endpoint público, a almacenamiento compartido
+
+`src/lib/rate-limit.ts` es un `Map` en memoria del proceso (5/min). Se justificaba
+con "no hay tráfico real todavía" — premisa que era cierta solo porque
+`/api/postular` estaba inalcanzable por un bug, ya corregido. Ahora el endpoint
+recibe de verdad y es el único camino por el que entrada anónima escribe en
+Storage con service role (PDFs de hasta 10 MB). En Vercel el contador se reinicia
+por instancia y no se comparte entre regiones. Siguiente paso cuando haya
+volumen: tabla en Postgres o Upstash Redis.
+
+### 11. Decisión pendiente del usuario: el bucket `archivos`
+
+Se puso privado (era público, sin límite de tamaño ni allowlist de MIME) y se le
+fijó un tope de 10 MB. **No se borró nada.** Contiene 1 objeto,
+`Presentacipon_RH.html` — "Resumen Mensual Mayo 2026 - RH", resto del sistema
+anterior de este proyecto de Supabase reutilizado. Ningún código del ATS
+referencia ese bucket. Falta que el usuario diga si el archivo sirve; si no,
+borrar objeto y bucket.
+
+### 12. Verificar el logo de Google contra sus guidelines
+
+`src/app/login/page.tsx:9` dibuja el "G" oficial en SVG inline. Es **marca
+registrada, no copyright**, y usar el logo oficial es lo correcto para "Iniciar
+sesión con Google" — pero tiene reglas propias (tamaño mínimo, espacio libre, no
+alterar colores, texto aprobado del botón). El uso actual (18×18, colores
+oficiales, "Continuar con Google") se ve conforme. Falta contrastarlo contra las
+Google Sign-In Branding Guidelines vigentes. Riesgo bajo.
+
+### 13. Nota de licencia en el configurador de marca
+
+Los buckets de marca están vacíos hoy, así que el riesgo de copyright de
+imágenes es futuro. Cuando el cliente suba logo, portada o video de login, ese
+material entra sin control de procedencia. Falta una línea junto al campo de
+subida: "Solo sube material propio o con licencia de uso comercial." Es lo único
+que el software puede hacer al respecto.
+
+### 14. Explícitamente fuera de alcance (no son pendientes)
 
 - **Agente de match/precalificación con IA** — excluido de forma permanente por
   decisión del usuario. No volver a proponerlo.
@@ -98,7 +179,7 @@ garantizado. El arreglo es una columna `hired_at` o loguear el evento en
 - **Assets de portada reales de la marca** — el demo usa imágenes genéricas a
   propósito hasta que el cliente entregue las suyas.
 
-### 9. V2 del plan maestro (no urgente, no empezado)
+### 15. V2 del plan maestro (no urgente, no empezado)
 
 - Scorecards de entrevista estructurada con rúbrica fija.
 - Dashboard de métricas (time-to-hire, conversión por etapa, fuente de contratación).
@@ -112,4 +193,9 @@ garantizado. El arreglo es una columna `hired_at` o loguear el evento en
    (generado) y comentarios; ningún `z.enum` ni `Object.keys(ROLE_LABEL)`.
 3. `select count(*) from profiles where department_id is not null;` — si es > 0,
    el punto 6 se puede desbloquear.
-4. `.claude/napkin.md` tiene el detalle técnico de cada hallazgo real detrás de estos pendientes.
+4. `curl -s -o /dev/null -D - <sitio>/empleos | grep -ic set-cookie` — si deja
+   de ser 0, alguien agregó analítica o un tercero y hace falta banner de
+   consentimiento (ver la regla de cookies en `AGENTS.md`).
+5. Abrir `/privacidad`: si NO muestra el aviso rojo de "borrador, no publicado",
+   el punto 8 está resuelto.
+6. `.claude/napkin.md` tiene el detalle técnico de cada hallazgo real detrás de estos pendientes.

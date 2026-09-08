@@ -4,6 +4,7 @@ import { buildInterviewCalendarUrl } from "@/lib/interviews/calendar-link";
 
 export function EntrevistaProgramadaEmail({
   platformName,
+  privacyUrl,
   candidateName,
   jobTitle,
   scheduledAtIso,
@@ -11,6 +12,7 @@ export function EntrevistaProgramadaEmail({
   location,
 }: {
   platformName: string;
+  privacyUrl: string;
   candidateName: string;
   jobTitle: string;
   scheduledAtIso: string;
@@ -27,7 +29,7 @@ export function EntrevistaProgramadaEmail({
   const calendarUrl = buildInterviewCalendarUrl(jobTitle, { scheduledAt: scheduledAtIso, durationMinutes, location });
 
   return (
-    <EmailLayout platformName={platformName}>
+    <EmailLayout platformName={platformName} privacyUrl={privacyUrl}>
       <Text style={{ fontSize: 20, fontWeight: 600 }}>Tienes una entrevista agendada</Text>
       <Text>
         Hola {candidateName}, se agendó tu entrevista para <strong>{jobTitle}</strong> el {when} (hora UTC)

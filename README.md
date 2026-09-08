@@ -44,6 +44,25 @@ Mover etapas, contratar, descartar, agendar una reunión y escribirle al candida
 son decisiones del **reclutador asignado** de la vacante, `admin` o `super_admin`
 — nadie más, por más permisos de miembro que tenga.
 
+## Privacidad de candidatos
+
+El candidato externo es el único usuario sin cuenta en la plataforma. Por eso:
+
+- **`/privacidad`** es una página pública con la política versionada
+  (`src/lib/legal/policy.ts`). Mientras le falten datos del cliente muestra un
+  aviso de borrador y `robots: noindex`, que desaparece solo al completarlos.
+- **Nadie postula sin aceptar**: casilla obligatoria validada con Zod en el
+  servidor, y la prueba queda en `applications.privacy_consent_version` +
+  `privacy_consent_at`.
+- **El portal público no usa cookies.** Verificado: `Set-Cookie` = 0. Sin
+  analítica, sin píxeles, sin recursos de terceros. Agregar cualquiera exige
+  banner de consentimiento — ver `AGENTS.md`.
+- **Los CV van a un bucket privado**, servidos con URL firmada de 60 s.
+
+⚠️ El texto de la política es un borrador técnico. **Necesita revisión de un
+abogado y 4 datos del cliente antes de publicarse** — ver `docs/PENDIENTE.md`,
+punto 8.
+
 ## Seguridad
 
 - **RLS activo en todas las tablas**, deny-by-default. Una tabla sin política es un bug bloqueante.
@@ -82,6 +101,7 @@ son decisiones del **reclutador asignado** de la vacante, `admin` o `super_admin
 | Flujo de solicitud: plantilla general, estado `aceptada`, visibilidad de 3 niveles | ✅ |
 | Inicio: agenda protagonista, buzón de solicitudes, embudo, informe por reclutador | ✅ |
 | Permisos de 2 niveles por vacante + notificaciones en cada cambio de estado | ✅ |
+| Consentimiento de privacidad en el portal público + política versionada | ⚠️ mecánica lista, texto pendiente de revisión legal |
 
 Los dos pasos manuales que bloqueaban el login en el Dashboard de Supabase (activar el custom access token hook, configurar el proveedor de Google) **ya están hechos** — confirmado en el Dashboard el 2026-09-02.
 

@@ -88,6 +88,16 @@ export function ReferCandidateDialog({ jobId }: { jobId: string }) {
                 />
                 {state?.field === "phone" && <p className="text-xs text-destructive">{state.error}</p>}
               </div>
+              {/* Quien refiere carga datos de OTRA persona. No es el
+                  consentimiento del titular (ese no existe en este camino):
+                  es la declaración de quien los sube. */}
+              <label className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                <input type="checkbox" name="referral_authorized" required className="mt-0.5 size-4 flex-none" />
+                <span>
+                  Esta persona me autorizó a compartir sus datos para postularla a esta vacante, y le informé que
+                  quedarán registrados en la plataforma.
+                </span>
+              </label>
               <ActionButton>Referir</ActionButton>
             </form>
           )}
